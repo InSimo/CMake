@@ -2,13 +2,14 @@
 
 #include "cmCTest.h"
 #include "cmCTestCoverageHandler.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 #include "cmsys/Directory.hxx"
 #include "cmsys/FStream.hxx"
+#include <cstdio>
+#include <cstdlib>
 #include <map>
-#include <stdio.h>
-#include <stdlib.h>
 #include <utility>
 
 cmParseCacheCoverage::cmParseCacheCoverage(
@@ -30,9 +31,7 @@ bool cmParseCacheCoverage::LoadCoverageData(const char* d)
   for (i = 0; i < numf; i++) {
     std::string file = dir.GetFile(i);
     if (file != "." && file != ".." && !cmSystemTools::FileIsDirectory(file)) {
-      std::string path = d;
-      path += "/";
-      path += file;
+      std::string path = cmStrCat(d, '/', file);
       if (cmSystemTools::GetFilenameLastExtension(path) == ".cmcov") {
         if (!this->ReadCMCovFile(path.c_str())) {
           return false;
@@ -48,8 +47,7 @@ void cmParseCacheCoverage::RemoveUnCoveredFiles()
 {
   // loop over the coverage data computed and remove all files
   // that only have -1 or 0 for the lines.
-  cmCTestCoverageHandlerContainer::TotalCoverageMap::iterator ci =
-    this->Coverage.TotalCoverage.begin();
+  auto ci = this->Coverage.TotalCoverage.begin();
   while (ci != this->Coverage.TotalCoverage.end()) {
     cmCTestCoverageHandlerContainer::SingleFileCoverageVector& v = ci->second;
     bool nothing = true;

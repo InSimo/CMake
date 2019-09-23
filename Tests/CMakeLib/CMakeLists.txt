@@ -9,7 +9,9 @@ set(CMakeLib_TESTS
   testGeneratedFileStream.cxx
   testRST.cxx
   testRange.cxx
+  testOptional.cxx
   testString.cxx
+  testStringAlgorithms.cxx
   testSystemTools.cxx
   testUTF8.cxx
   testXMLParser.cxx

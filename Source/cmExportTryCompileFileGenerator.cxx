@@ -9,11 +9,11 @@
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include "cmStateTypes.h"
-#include "cmSystemTools.h"
+#include "cmStringAlgorithms.h"
 #include "cmTarget.h"
 
 #include <map>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <utility>
 
 cmExportTryCompileFileGenerator::cmExportTryCompileFileGenerator(
@@ -103,8 +103,7 @@ void cmExportTryCompileFileGenerator::PopulateProperties(
       std::string evalResult =
         this->FindTargets(p, target, std::string(), emitted);
 
-      std::vector<std::string> depends;
-      cmSystemTools::ExpandListArgument(evalResult, depends);
+      std::vector<std::string> depends = cmExpandedList(evalResult);
       for (std::string const& li : depends) {
         cmGeneratorTarget* tgt =
           target->GetLocalGenerator()->FindGeneratorTargetToUse(li);

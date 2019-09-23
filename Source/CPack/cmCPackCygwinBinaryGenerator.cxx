@@ -12,6 +12,7 @@
 #include "cmsys/SystemTools.hxx"
 
 cmCPackCygwinBinaryGenerator::cmCPackCygwinBinaryGenerator()
+  : cmCPackArchiveGenerator(cmArchiveWrite::CompressBZip2, "paxr", ".tar.bz2")
 {
 }
 
@@ -28,13 +29,11 @@ int cmCPackCygwinBinaryGenerator::InitializeInternal()
 
 int cmCPackCygwinBinaryGenerator::PackageFiles()
 {
-  std::string packageName = this->GetOption("CPACK_PACKAGE_NAME");
-  packageName += "-";
-  packageName += this->GetOption("CPACK_PACKAGE_VERSION");
+  std::string packageName =
+    cmStrCat(this->GetOption("CPACK_PACKAGE_NAME"), '-',
+             this->GetOption("CPACK_PACKAGE_VERSION"));
   packageName = cmsys::SystemTools::LowerCase(packageName);
-  std::string manifest = "/usr/share/doc/";
-  manifest += packageName;
-  manifest += "/MANIFEST";
+  std::string manifest = cmStrCat("/usr/share/doc/", packageName, "/MANIFEST");
   std::string manifestFile = this->GetOption("CPACK_TEMPORARY_DIRECTORY");
   // Create a MANIFEST file that contains all of the files in
   // the tar file

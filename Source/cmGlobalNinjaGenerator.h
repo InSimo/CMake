@@ -7,7 +7,7 @@
 
 #include <iosfwd>
 #include <map>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -228,7 +228,7 @@ public:
       return this->GG->ConvertToNinjaPath(path);
     }
   };
-  MapToNinjaPathImpl MapToNinjaPath() { return MapToNinjaPathImpl(this); }
+  MapToNinjaPathImpl MapToNinjaPath() { return { this }; }
 
   // -- Additional clean files
   void AddAdditionalCleanFile(std::string fileName);
@@ -322,6 +322,7 @@ public:
   {
     return "1.9";
   }
+  static std::string RequiredNinjaVersionForDyndeps() { return "1.10"; }
   bool SupportsConsolePool() const;
   bool SupportsImplicitOuts() const;
   bool SupportsManifestRestat() const;
@@ -402,7 +403,7 @@ private:
   /// The set of dependencies to add to the "all" target.
   cmNinjaDeps AllDependencies;
 
-  bool UsingGCCOnWindows;
+  bool UsingGCCOnWindows = false;
 
   /// The set of custom commands we have seen.
   std::set<cmCustomCommand const*> CustomCommands;
@@ -412,8 +413,8 @@ private:
 
   /// Whether we are collecting known build outputs and needed
   /// dependencies to determine unknown dependencies.
-  bool ComputingUnknownDependencies;
-  cmPolicies::PolicyStatus PolicyCMP0058;
+  bool ComputingUnknownDependencies = false;
+  cmPolicies::PolicyStatus PolicyCMP0058 = cmPolicies::WARN;
 
   /// The combined explicit dependencies of custom build commands
   std::set<std::string> CombinedCustomCommandExplicitDependencies;
@@ -425,7 +426,7 @@ private:
   /// The mapping from source file to assumed dependencies.
   std::map<std::string, std::set<std::string>> AssumedSourceDependencies;
 
-  typedef std::map<std::string, cmGeneratorTarget*> TargetAliasMap;
+  using TargetAliasMap = std::map<std::string, cmGeneratorTarget*>;
   TargetAliasMap TargetAliases;
 
   std::map<cmGeneratorTarget const*, cmNinjaOuts> TargetDependsClosures;
@@ -435,11 +436,11 @@ private:
 
   std::string NinjaCommand;
   std::string NinjaVersion;
-  bool NinjaSupportsConsolePool;
-  bool NinjaSupportsImplicitOuts;
-  bool NinjaSupportsManifestRestat;
-  bool NinjaSupportsMultilineDepfile;
-  unsigned long NinjaSupportsDyndeps;
+  bool NinjaSupportsConsolePool = false;
+  bool NinjaSupportsImplicitOuts = false;
+  bool NinjaSupportsManifestRestat = false;
+  bool NinjaSupportsMultilineDepfile = false;
+  bool NinjaSupportsDyndeps = false;
 
 private:
   void InitOutputPathPrefix();

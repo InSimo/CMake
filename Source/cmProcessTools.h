@@ -6,8 +6,8 @@
 #include "cmConfigure.h" // IWYU pragma: keep
 #include "cmProcessOutput.h"
 
+#include <cstring>
 #include <iosfwd>
-#include <string.h>
 #include <string>
 
 /** \class cmProcessTools
@@ -17,7 +17,7 @@
 class cmProcessTools
 {
 public:
-  typedef cmProcessOutput::Encoding Encoding;
+  using Encoding = cmProcessOutput::Encoding;
   /** Abstract interface for process output parsers.  */
   class OutputParser
   {

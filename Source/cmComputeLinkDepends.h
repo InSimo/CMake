@@ -10,6 +10,7 @@
 #include "cmTargetLinkLibraryType.h"
 
 #include <map>
+#include <memory>
 #include <queue>
 #include <set>
 #include <string>
@@ -43,7 +44,7 @@ public:
     bool IsFlag = false;
   };
 
-  typedef std::vector<LinkEntry> EntryVector;
+  using EntryVector = std::vector<LinkEntry>;
   EntryVector const& Compute();
 
   void SetOldLinkDirMode(bool b);
@@ -105,14 +106,15 @@ private:
   };
   struct DependSetList : public std::vector<DependSet>
   {
+    bool Initialized = false;
   };
-  std::vector<DependSetList*> InferredDependSets;
+  std::vector<DependSetList> InferredDependSets;
   void InferDependencies();
 
   // Ordering constraint graph adjacency list.
-  typedef cmGraphNodeList NodeList;
-  typedef cmGraphEdgeList EdgeList;
-  typedef cmGraphAdjacencyList Graph;
+  using NodeList = cmGraphNodeList;
+  using EdgeList = cmGraphEdgeList;
+  using Graph = cmGraphAdjacencyList;
   Graph EntryConstraintGraph;
   void CleanConstraintGraph();
   void DisplayConstraintGraph();
@@ -137,7 +139,7 @@ private:
     std::set<int> Entries;
   };
   std::map<int, PendingComponent> PendingComponents;
-  cmComputeComponentGraph* CCG;
+  std::unique_ptr<cmComputeComponentGraph> CCG;
   std::vector<int> FinalLinkOrder;
   void DisplayComponents();
   void VisitComponent(unsigned int c);

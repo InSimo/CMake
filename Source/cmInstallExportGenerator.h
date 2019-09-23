@@ -8,8 +8,8 @@
 #include "cmInstallGenerator.h"
 #include "cmScriptGenerator.h"
 
+#include <cstddef>
 #include <iosfwd>
-#include <stddef.h>
 #include <string>
 #include <vector>
 
@@ -41,6 +41,7 @@ public:
   const std::string& GetNamespace() const { return this->Namespace; }
 
   std::string const& GetDestination() const { return this->Destination; }
+  std::string GetDestinationFile() const;
 
 protected:
   void GenerateScript(std::ostream& os) override;

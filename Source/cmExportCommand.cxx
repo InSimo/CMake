@@ -5,15 +5,15 @@
 #include "cm_static_string_view.hxx"
 #include "cmsys/RegularExpression.hxx"
 
-#include <algorithm>
 #include <map>
 #include <sstream>
 #include <utility>
 
+#include "cmAlgorithms.h"
 #include "cmArgumentParser.h"
 #include "cmExportBuildAndroidMKGenerator.h"
 #include "cmExportBuildFileGenerator.h"
-#include "cmExportSetMap.h"
+#include "cmExportSet.h"
 #include "cmGeneratedFileStream.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
@@ -23,7 +23,6 @@
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 
-class cmExportSet;
 class cmExecutionStatus;
 
 #if defined(__HAIKU__)
@@ -121,7 +120,7 @@ bool cmExportCommand::InitialPass(std::vector<std::string> const& args,
 
   cmGlobalGenerator* gg = this->Makefile->GetGlobalGenerator();
 
-  cmExportSet* ExportSet = nullptr;
+  cmExportSet* exportSet = nullptr;
   if (args[0] == "EXPORT") {
     cmExportSetMap& setMap = gg->GetExportSets();
     auto const it = setMap.find(arguments.ExportSetName);
@@ -131,11 +130,9 @@ bool cmExportCommand::InitialPass(std::vector<std::string> const& args,
       this->SetError(e.str());
       return false;
     }
-    ExportSet = it->second;
+    exportSet = &it->second;
   } else if (!arguments.Targets.empty() ||
-             std::find(keywordsMissingValue.begin(),
-                       keywordsMissingValue.end(),
-                       "TARGETS") != keywordsMissingValue.end()) {
+             cmContains(keywordsMissingValue, "TARGETS")) {
     for (std::string const& currentTarget : arguments.Targets) {
       if (this->Makefile->IsAlias(currentTarget)) {
         std::ostringstream e;
@@ -182,8 +179,8 @@ bool cmExportCommand::InitialPass(std::vector<std::string> const& args,
   ebfg->SetExportFile(fname.c_str());
   ebfg->SetNamespace(arguments.Namespace);
   ebfg->SetAppendMode(arguments.Append);
-  if (ExportSet != nullptr) {
-    ebfg->SetExportSet(ExportSet);
+  if (exportSet != nullptr) {
+    ebfg->SetExportSet(exportSet);
   } else {
     ebfg->SetTargets(targets);
   }
@@ -199,7 +196,7 @@ bool cmExportCommand::InitialPass(std::vector<std::string> const& args,
   for (std::string const& ct : configurationTypes) {
     ebfg->AddConfiguration(ct);
   }
-  if (ExportSet != nullptr) {
+  if (exportSet != nullptr) {
     gg->AddBuildExportExportSet(ebfg);
   } else {
     gg->AddBuildExportSet(ebfg);
@@ -301,8 +298,7 @@ void cmExportCommand::StorePackageRegistryWin(std::string const& package,
                                               const char* content,
                                               const char* hash)
 {
-  std::string key = "Software\\Kitware\\CMake\\Packages\\";
-  key += package;
+  std::string key = cmStrCat("Software\\Kitware\\CMake\\Packages\\", package);
   HKEY hKey;
   LONG err =
     RegCreateKeyExW(HKEY_CURRENT_USER, cmsys::Encoding::ToWide(key).c_str(), 0,
@@ -336,9 +332,7 @@ void cmExportCommand::StorePackageRegistryDir(std::string const& package,
       B_OK) {
     return;
   }
-  std::string fname = dir;
-  fname += "/cmake/packages/";
-  fname += package;
+  std::string fname = cmStrCat(dir, "/cmake/packages/", package);
 #  else
   std::string fname;
   if (!cmSystemTools::GetEnv("HOME", fname)) {

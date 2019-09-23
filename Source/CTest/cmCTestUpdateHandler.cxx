@@ -2,7 +2,6 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCTestUpdateHandler.h"
 
-#include "cmAlgorithms.h"
 #include "cmCLocaleEnvironmentScope.h"
 #include "cmCTest.h"
 #include "cmCTestBZR.h"
@@ -13,13 +12,15 @@
 #include "cmCTestSVN.h"
 #include "cmCTestVC.h"
 #include "cmGeneratedFileStream.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmVersion.h"
 #include "cmXMLWriter.h"
 
 #include <chrono>
-#include <memory> // IWYU pragma: keep
 #include <sstream>
+
+#include <cm/memory>
 
 static const char* cmCTestUpdateHandlerUpdateStrings[] = {
   "Unknown", "CVS", "SVN", "BZR", "GIT", "HG", "P4"
@@ -266,33 +267,27 @@ int cmCTestUpdateHandler::DetectVCS(const char* dir)
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_SVN;
   }
-  sourceDirectory = dir;
-  sourceDirectory += "/CVS";
+  sourceDirectory = cmStrCat(dir, "/CVS");
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_CVS;
   }
-  sourceDirectory = dir;
-  sourceDirectory += "/.bzr";
+  sourceDirectory = cmStrCat(dir, "/.bzr");
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_BZR;
   }
-  sourceDirectory = dir;
-  sourceDirectory += "/.git";
+  sourceDirectory = cmStrCat(dir, "/.git");
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_GIT;
   }
-  sourceDirectory = dir;
-  sourceDirectory += "/.hg";
+  sourceDirectory = cmStrCat(dir, "/.hg");
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_HG;
   }
-  sourceDirectory = dir;
-  sourceDirectory += "/.p4";
+  sourceDirectory = cmStrCat(dir, "/.p4");
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_P4;
   }
-  sourceDirectory = dir;
-  sourceDirectory += "/.p4config";
+  sourceDirectory = cmStrCat(dir, "/.p4config");
   if (cmSystemTools::FileExists(sourceDirectory)) {
     return cmCTestUpdateHandler::e_P4;
   }

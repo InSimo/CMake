@@ -2,7 +2,6 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCTestMemCheckCommand.h"
 
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -45,9 +44,9 @@ void cmCTestMemCheckCommand::ProcessAdditionalValues(
   cmCTestGenericHandler* handler)
 {
   if (this->Values[ctm_DEFECT_COUNT] && *this->Values[ctm_DEFECT_COUNT]) {
-    std::ostringstream str;
-    str << static_cast<cmCTestMemCheckHandler*>(handler)->GetDefectCount();
-    this->Makefile->AddDefinition(this->Values[ctm_DEFECT_COUNT],
-                                  str.str().c_str());
+    this->Makefile->AddDefinition(
+      this->Values[ctm_DEFECT_COUNT],
+      std::to_string(
+        static_cast<cmCTestMemCheckHandler*>(handler)->GetDefectCount()));
   }
 }

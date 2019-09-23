@@ -4,11 +4,16 @@
 
 #include "cmCTest.h"
 #include "cmCTestSubmitHandler.h"
+#include "cmCommand.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 #include <sstream>
+#include <utility>
+
+#include <cm/memory>
 
 class cmExecutionStatus;
 
@@ -27,12 +32,12 @@ cmCTestSubmitCommand::cmCTestSubmitCommand()
 /**
  * This is a virtual constructor for the command.
  */
-cmCommand* cmCTestSubmitCommand::Clone()
+std::unique_ptr<cmCommand> cmCTestSubmitCommand::Clone()
 {
-  cmCTestSubmitCommand* ni = new cmCTestSubmitCommand;
+  auto ni = cm::make_unique<cmCTestSubmitCommand>();
   ni->CTest = this->CTest;
   ni->CTestScriptHandler = this->CTestScriptHandler;
-  return ni;
+  return std::unique_ptr<cmCommand>(std::move(ni));
 }
 
 cmCTestGenericHandler* cmCTestSubmitCommand::InitializeHandler()
@@ -63,16 +68,14 @@ cmCTestGenericHandler* cmCTestSubmitCommand::InitializeHandler()
   const char* notesFilesVariable =
     this->Makefile->GetDefinition("CTEST_NOTES_FILES");
   if (notesFilesVariable) {
-    std::vector<std::string> notesFiles;
-    cmSystemTools::ExpandListArgument(notesFilesVariable, notesFiles);
+    std::vector<std::string> notesFiles = cmExpandedList(notesFilesVariable);
     this->CTest->GenerateNotesFile(notesFiles);
   }
 
   const char* extraFilesVariable =
     this->Makefile->GetDefinition("CTEST_EXTRA_SUBMIT_FILES");
   if (extraFilesVariable) {
-    std::vector<std::string> extraFiles;
-    cmSystemTools::ExpandListArgument(extraFilesVariable, extraFiles);
+    std::vector<std::string> extraFiles = cmExpandedList(extraFilesVariable);
     if (!this->CTest->SubmitExtraFiles(extraFiles)) {
       this->SetError("problem submitting extra files.");
       return nullptr;
@@ -139,7 +142,7 @@ bool cmCTestSubmitCommand::InitialPass(std::vector<std::string> const& args,
 
   if (this->Values[cts_BUILD_ID] && *this->Values[cts_BUILD_ID]) {
     this->Makefile->AddDefinition(this->Values[cts_BUILD_ID],
-                                  this->CTest->GetBuildID().c_str());
+                                  this->CTest->GetBuildID());
   }
 
   return ret;

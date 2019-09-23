@@ -1,16 +1,18 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmQtAutoGenerator.h"
-#include "cmQtAutoGen.h"
+
+#include <cm/memory>
 
 #include "cmsys/FStream.hxx"
 
-#include "cmAlgorithms.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
+#include "cmQtAutoGen.h"
 #include "cmState.h"
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
@@ -21,11 +23,11 @@ cmQtAutoGenerator::Logger::Logger()
     std::string verbose;
     if (cmSystemTools::GetEnv("VERBOSE", verbose) && !verbose.empty()) {
       unsigned long iVerbose = 0;
-      if (cmSystemTools::StringToULong(verbose.c_str(), &iVerbose)) {
+      if (cmStrToULong(verbose, &iVerbose)) {
         SetVerbosity(static_cast<unsigned int>(iVerbose));
       } else {
         // Non numeric verbosity
-        SetVerbose(cmSystemTools::IsOn(verbose));
+        SetVerbose(cmIsOn(verbose));
       }
     }
   }
@@ -33,7 +35,7 @@ cmQtAutoGenerator::Logger::Logger()
     std::string colorEnv;
     cmSystemTools::GetEnv("COLOR", colorEnv);
     if (!colorEnv.empty()) {
-      SetColorOutput(cmSystemTools::IsOn(colorEnv));
+      SetColorOutput(cmIsOn(colorEnv));
     } else {
       SetColorOutput(true);
     }
@@ -45,7 +47,7 @@ cmQtAutoGenerator::Logger::~Logger() = default;
 void cmQtAutoGenerator::Logger::RaiseVerbosity(std::string const& value)
 {
   unsigned long verbosity = 0;
-  if (cmSystemTools::StringToULong(value.c_str(), &verbosity)) {
+  if (cmStrToULong(value, &verbosity)) {
     if (this->Verbosity_ < verbosity) {
       this->Verbosity_ = static_cast<unsigned int>(verbosity);
     }
@@ -57,24 +59,16 @@ void cmQtAutoGenerator::Logger::SetColorOutput(bool value)
   ColorOutput_ = value;
 }
 
-std::string cmQtAutoGenerator::Logger::HeadLine(std::string const& title)
+std::string cmQtAutoGenerator::Logger::HeadLine(cm::string_view title)
 {
-  std::string head = title;
-  head += '\n';
-  head.append(head.size() - 1, '-');
-  head += '\n';
-  return head;
+  return cmStrCat(title, '\n', std::string(title.size(), '-'), '\n');
 }
 
 void cmQtAutoGenerator::Logger::Info(GenT genType,
-                                     std::string const& message) const
+                                     cm::string_view message) const
 {
-  std::string msg = GeneratorName(genType);
-  msg += ": ";
-  msg += message;
-  if (msg.back() != '\n') {
-    msg.push_back('\n');
-  }
+  std::string msg = cmStrCat(GeneratorName(genType), ": ", message,
+                             cmHasSuffix(message, '\n') ? "" : "\n");
   {
     std::lock_guard<std::mutex> lock(Mutex_);
     cmSystemTools::Stdout(msg);
@@ -82,94 +76,46 @@ void cmQtAutoGenerator::Logger::Info(GenT genType,
 }
 
 void cmQtAutoGenerator::Logger::Warning(GenT genType,
-                                        std::string const& message) const
+                                        cm::string_view message) const
 {
   std::string msg;
   if (message.find('\n') == std::string::npos) {
     // Single line message
-    msg += GeneratorName(genType);
-    msg += " warning: ";
+    msg = cmStrCat(GeneratorName(genType), " warning: ", message,
+                   cmHasSuffix(message, '\n') ? "\n" : "\n\n");
   } else {
     // Multi line message
-    msg += HeadLine(GeneratorName(genType) + " warning");
+    msg = cmStrCat(HeadLine(cmStrCat(GeneratorName(genType), " warning")),
+                   message, cmHasSuffix(message, '\n') ? "\n" : "\n\n");
   }
-  // Message
-  msg += message;
-  if (msg.back() != '\n') {
-    msg.push_back('\n');
-  }
-  msg.push_back('\n');
   {
     std::lock_guard<std::mutex> lock(Mutex_);
     cmSystemTools::Stdout(msg);
   }
 }
 
-void cmQtAutoGenerator::Logger::WarningFile(GenT genType,
-                                            std::string const& filename,
-                                            std::string const& message) const
-{
-  std::string msg = "  ";
-  msg += Quoted(filename);
-  msg.push_back('\n');
-  // Message
-  msg += message;
-  Warning(genType, msg);
-}
-
 void cmQtAutoGenerator::Logger::Error(GenT genType,
-                                      std::string const& message) const
+                                      cm::string_view message) const
 {
-  std::string msg;
-  msg += HeadLine(GeneratorName(genType) + " error");
-  // Message
-  msg += message;
-  if (msg.back() != '\n') {
-    msg.push_back('\n');
-  }
-  msg.push_back('\n');
+  std::string msg =
+    cmStrCat('\n', HeadLine(cmStrCat(GeneratorName(genType), " error")),
+             message, cmHasSuffix(message, '\n') ? "\n" : "\n\n");
   {
     std::lock_guard<std::mutex> lock(Mutex_);
     cmSystemTools::Stderr(msg);
   }
 }
 
-void cmQtAutoGenerator::Logger::ErrorFile(GenT genType,
-                                          std::string const& filename,
-                                          std::string const& message) const
-{
-  std::string emsg = "  ";
-  emsg += Quoted(filename);
-  emsg += '\n';
-  // Message
-  emsg += message;
-  Error(genType, emsg);
-}
-
 void cmQtAutoGenerator::Logger::ErrorCommand(
-  GenT genType, std::string const& message,
+  GenT genType, cm::string_view message,
   std::vector<std::string> const& command, std::string const& output) const
 {
-  std::string msg;
-  msg.push_back('\n');
-  msg += HeadLine(GeneratorName(genType) + " subprocess error");
-  msg += message;
-  if (msg.back() != '\n') {
-    msg.push_back('\n');
-  }
-  msg.push_back('\n');
-  msg += HeadLine("Command");
-  msg += QuotedCommand(command);
-  if (msg.back() != '\n') {
-    msg.push_back('\n');
-  }
-  msg.push_back('\n');
-  msg += HeadLine("Output");
-  msg += output;
-  if (msg.back() != '\n') {
-    msg.push_back('\n');
-  }
-  msg.push_back('\n');
+  std::string msg = cmStrCat(
+    '\n', HeadLine(cmStrCat(GeneratorName(genType), " subprocess error")),
+    message, cmHasSuffix(message, '\n') ? "\n" : "\n\n");
+  msg += cmStrCat(HeadLine("Command"), QuotedCommand(command), "\n\n");
+  msg += cmStrCat(HeadLine("Output"), output,
+                  cmHasSuffix(output, '\n') ? "\n" : "\n\n");
   {
     std::lock_guard<std::mutex> lock(Mutex_);
     cmSystemTools::Stderr(msg);
@@ -210,7 +156,7 @@ bool cmQtAutoGenerator::FileRead(std::string& content,
       return false;
     }
     content.reserve(length);
-    typedef std::istreambuf_iterator<char> IsIt;
+    using IsIt = std::istreambuf_iterator<char>;
     content.assign(IsIt{ ifs }, IsIt{});
     if (!ifs) {
       content.clear();
@@ -279,10 +225,8 @@ bool cmQtAutoGenerator::Run(std::string const& infoFile,
   InfoFile_ = infoFile;
   cmSystemTools::ConvertToUnixSlashes(InfoFile_);
   if (!InfoFileTime_.Load(InfoFile_)) {
-    std::string msg = "AutoGen: The info file ";
-    msg += Quoted(InfoFile_);
-    msg += " is not readable\n";
-    cmSystemTools::Stderr(msg);
+    cmSystemTools::Stderr(cmStrCat("AutoGen: The info file ",
+                                   Quoted(InfoFile_), " is not readable\n"));
     return false;
   }
   InfoDir_ = cmSystemTools::GetFilenamePath(infoFile);
@@ -316,8 +260,7 @@ bool cmQtAutoGenerator::Run(std::string const& infoFile,
 std::string cmQtAutoGenerator::SettingsFind(std::string const& content,
                                             const char* key)
 {
-  std::string prefix(key);
-  prefix += ':';
+  std::string prefix = cmStrCat(key, ':');
   std::string::size_type pos = content.find(prefix);
   if (pos != std::string::npos) {
     pos += prefix.size();
@@ -329,4 +272,17 @@ std::string cmQtAutoGenerator::SettingsFind(std::string const& content,
     }
   }
   return std::string();
+}
+
+std::string cmQtAutoGenerator::MessagePath(cm::string_view path) const
+{
+  std::string res;
+  if (cmHasPrefix(path, ProjectDirs().Source)) {
+    res = cmStrCat("SRC:", path.substr(ProjectDirs().Source.size()));
+  } else if (cmHasPrefix(path, ProjectDirs().Binary)) {
+    res = cmStrCat("BIN:", path.substr(ProjectDirs().Binary.size()));
+  } else {
+    res = std::string(path);
+  }
+  return cmQtAutoGen::Quoted(res);
 }

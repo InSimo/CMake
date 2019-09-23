@@ -5,7 +5,9 @@
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
-#include <memory> // IWYU pragma: keep
+#include <cm/string_view>
+
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -48,7 +50,7 @@ public:
     std::string HelpOutput;
     std::vector<std::string> ListOptions;
   };
-  typedef std::shared_ptr<CompilerFeatures> CompilerFeaturesHandle;
+  using CompilerFeaturesHandle = std::shared_ptr<CompilerFeatures>;
 
   /// @brief AutoGen generator type
   enum class GenT
@@ -66,24 +68,27 @@ public:
 
 public:
   /// @brief Returns the generator name
-  static std::string const& GeneratorName(GenT genType);
+  static cm::string_view GeneratorName(GenT genType);
   /// @brief Returns the generator name in upper case
-  static std::string const& GeneratorNameUpper(GenT genType);
+  static cm::string_view GeneratorNameUpper(GenT genType);
 
   /// @brief Returns a string with the requested tool names
   static std::string Tools(bool moc, bool uic, bool rcc);
 
   /// @brief Returns the string escaped and enclosed in quotes
-  static std::string Quoted(std::string const& text);
+  static std::string Quoted(cm::string_view text);
 
   static std::string QuotedCommand(std::vector<std::string> const& command);
 
+  /// @brief Returns the parent directory of the file (thread safe)
+  static std::string ParentDir(cm::string_view filename);
+
   /// @brief Returns the parent directory of the file with a "/" suffix
-  static std::string SubDirPrefix(std::string const& filename);
+  static std::string SubDirPrefix(cm::string_view filename);
 
   /// @brief Appends the suffix to the filename before the last dot
-  static std::string AppendFilenameSuffix(std::string const& filename,
-                                          std::string const& suffix);
+  static std::string AppendFilenameSuffix(cm::string_view filename,
+                                          cm::string_view suffix);
 
   /// @brief Merges newOpts into baseOpts
   static void UicMergeOptions(std::vector<std::string>& baseOpts,

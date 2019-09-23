@@ -443,7 +443,8 @@ this mode include:
  Specify the name of the project to build.
 
 ``--build-makeprogram``
- Override the make program chosen by CTest with a given one.
+ Specify the explicit make program to be used by CMake when configuring and
+ building the project. Only applicable for Make and Ninja based generators.
 
 ``--build-noclean``
  Skip the make clean step.
@@ -481,13 +482,16 @@ a `CDash`_ server. The command-line signature used to submit to `CDash`_ is::
 
 Options for Dashboard Client include:
 
-``--track <track>``
- Specify the track to submit dashboard to
+``--group <group>``
+ Specify what group you'd like to submit results to
 
- Submit dashboard to specified track instead of default one.  By
+ Submit dashboard to specified group instead of default one.  By
  default, the dashboard is submitted to Nightly, Experimental, or
- Continuous track, but by specifying this option, the track can be
+ Continuous group, but by specifying this option, the group can be
  arbitrary.
+
+ This replaces the deprecated option ``--track``.
+ Despite the name change its behavior is unchanged.
 
 ``-A <file>, --add-notes <file>``
  Add a notes file with submission.

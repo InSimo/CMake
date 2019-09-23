@@ -8,6 +8,8 @@
 #include "cmFileTime.h"
 #include "cmQtAutoGen.h"
 
+#include <cm/string_view>
+
 #include <mutex>
 #include <string>
 #include <vector>
@@ -22,9 +24,7 @@ class cmQtAutoGenerator : public cmQtAutoGen
 public:
   // -- Types
 
-  /**
-   * Thread safe logger
-   */
+  /** Thread safe logger.  */
   class Logger
   {
   public:
@@ -41,26 +41,31 @@ public:
     bool ColorOutput() const { return this->ColorOutput_; }
     void SetColorOutput(bool value);
     // -- Log info
-    void Info(GenT genType, std::string const& message) const;
+    void Info(GenT genType, cm::string_view message) const;
     // -- Log warning
-    void Warning(GenT genType, std::string const& message) const;
-    void WarningFile(GenT genType, std::string const& filename,
-                     std::string const& message) const;
+    void Warning(GenT genType, cm::string_view message) const;
     // -- Log error
-    void Error(GenT genType, std::string const& message) const;
-    void ErrorFile(GenT genType, std::string const& filename,
-                   std::string const& message) const;
-    void ErrorCommand(GenT genType, std::string const& message,
+    void Error(GenT genType, cm::string_view message) const;
+    void ErrorCommand(GenT genType, cm::string_view message,
                       std::vector<std::string> const& command,
                       std::string const& output) const;
 
   private:
-    static std::string HeadLine(std::string const& title);
+    static std::string HeadLine(cm::string_view title);
 
   private:
     mutable std::mutex Mutex_;
     unsigned int Verbosity_ = 0;
     bool ColorOutput_ = false;
+  };
+
+  /** Project directories.  */
+  struct ProjectDirsT
+  {
+    std::string Source;
+    std::string Binary;
+    std::string CurrentSource;
+    std::string CurrentBinary;
   };
 
   // -- File system methods
@@ -90,13 +95,18 @@ public:
   std::string const& InfoDir() const { return InfoDir_; }
   std::string const& InfoConfig() const { return InfoConfig_; }
 
+  // -- Directories
+  ProjectDirsT const& ProjectDirs() const { return ProjectDirs_; }
+
   // -- Utility
   static std::string SettingsFind(std::string const& content, const char* key);
+  std::string MessagePath(cm::string_view path) const;
 
 protected:
   // -- Abstract processing interface
   virtual bool Init(cmMakefile* makefile) = 0;
   virtual bool Process() = 0;
+  ProjectDirsT& ProjectDirsRef() { return ProjectDirs_; }
 
 private:
   // -- Info settings
@@ -104,6 +114,8 @@ private:
   cmFileTime InfoFileTime_;
   std::string InfoDir_;
   std::string InfoConfig_;
+  // -- Directories
+  ProjectDirsT ProjectDirs_;
 };
 
 #endif

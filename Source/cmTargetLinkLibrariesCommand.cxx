@@ -2,8 +2,8 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmTargetLinkLibrariesCommand.h"
 
+#include <cstring>
 #include <sstream>
-#include <string.h>
 
 #include "cmGeneratorExpression.h"
 #include "cmGlobalGenerator.h"
@@ -12,6 +12,7 @@
 #include "cmPolicies.h"
 #include "cmState.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 #include "cmake.h"
@@ -237,8 +238,7 @@ bool cmTargetLinkLibrariesCommand::InitialPass(
       // only there for backwards compatibility when mixing projects built
       // with old versions of CMake and new)
       llt = GENERAL_LibraryType;
-      std::string linkType = args[0];
-      linkType += "_LINK_TYPE";
+      std::string linkType = cmStrCat(args[0], "_LINK_TYPE");
       const char* linkTypeString = this->Makefile->GetDefinition(linkType);
       if (linkTypeString) {
         if (strcmp(linkTypeString, "debug") == 0) {
@@ -256,10 +256,11 @@ bool cmTargetLinkLibrariesCommand::InitialPass(
 
   // Make sure the last argument was not a library type specifier.
   if (haveLLT) {
-    std::ostringstream e;
-    e << "The \"" << cmTargetLinkLibrariesCommand::LinkLibraryTypeNames[llt]
-      << "\" argument must be followed by a library.";
-    this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
+    this->Makefile->IssueMessage(
+      MessageType::FATAL_ERROR,
+      cmStrCat("The \"",
+               cmTargetLinkLibrariesCommand::LinkLibraryTypeNames[llt],
+               "\" argument must be followed by a library."));
     cmSystemTools::SetFatalErrorOccured();
   }
 
@@ -284,14 +285,14 @@ bool cmTargetLinkLibrariesCommand::InitialPass(
 void cmTargetLinkLibrariesCommand::LinkLibraryTypeSpecifierWarning(int left,
                                                                    int right)
 {
-  std::ostringstream w;
-  w << "Link library type specifier \""
-    << cmTargetLinkLibrariesCommand::LinkLibraryTypeNames[left]
-    << "\" is followed by specifier \""
-    << cmTargetLinkLibrariesCommand::LinkLibraryTypeNames[right]
-    << "\" instead of a library name.  "
-    << "The first specifier will be ignored.";
-  this->Makefile->IssueMessage(MessageType::AUTHOR_WARNING, w.str());
+  this->Makefile->IssueMessage(
+    MessageType::AUTHOR_WARNING,
+    cmStrCat(
+      "Link library type specifier \"",
+      cmTargetLinkLibrariesCommand::LinkLibraryTypeNames[left],
+      "\" is followed by specifier \"",
+      cmTargetLinkLibrariesCommand::LinkLibraryTypeNames[right],
+      "\" instead of a library name.  The first specifier will be ignored."));
 }
 
 bool cmTargetLinkLibrariesCommand::HandleLibrary(const std::string& lib,
@@ -404,12 +405,13 @@ bool cmTargetLinkLibrariesCommand::HandleLibrary(const std::string& lib,
       this->CurrentProcessingState != ProcessingPlainLinkInterface) {
 
     if (rejectRemoteLinking) {
-      std::ostringstream e;
-      e << "Attempt to add link library \"" << lib << "\" to target \""
-        << this->Target->GetName()
-        << "\" which is not built in this directory.\n"
-        << "This is allowed only when policy CMP0079 is set to NEW.";
-      this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
+      this->Makefile->IssueMessage(
+        MessageType::FATAL_ERROR,
+        cmStrCat("Attempt to add link library \"", lib, "\" to target \"",
+                 this->Target->GetName(),
+                 "\" which is not built in this "
+                 "directory.\nThis is allowed only when policy CMP0079 "
+                 "is set to NEW."));
       return false;
     }
 
@@ -421,29 +423,31 @@ bool cmTargetLinkLibrariesCommand::HandleLibrary(const std::string& lib,
         (tgt->GetType() != cmStateEnums::OBJECT_LIBRARY) &&
         (tgt->GetType() != cmStateEnums::INTERFACE_LIBRARY) &&
         !tgt->IsExecutableWithExports()) {
-      std::ostringstream e;
-      e << "Target \"" << lib << "\" of type "
-        << cmState::GetTargetTypeName(tgt->GetType())
-        << " may not be linked into another target.  One may link only to "
-           "INTERFACE, OBJECT, STATIC or SHARED libraries, or to executables "
-           "with the ENABLE_EXPORTS property set.";
-      this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
+      this->Makefile->IssueMessage(
+        MessageType::FATAL_ERROR,
+        cmStrCat(
+          "Target \"", lib, "\" of type ",
+          cmState::GetTargetTypeName(tgt->GetType()),
+          " may not be linked into another target. One may link only to "
+          "INTERFACE, OBJECT, STATIC or SHARED libraries, or to ",
+          "executables with the ENABLE_EXPORTS property set."));
     }
 
     this->Target->AddLinkLibrary(*this->Makefile, lib, libRef, llt);
   }
 
   if (warnRemoteInterface) {
-    std::ostringstream w;
-    /* clang-format off */
-    w << cmPolicies::GetPolicyWarning(cmPolicies::CMP0079) << "\n"
-      "Target\n  " << this->Target->GetName() << "\nis not created in this "
-      "directory.  For compatibility with older versions of CMake, link "
-      "library\n  " << lib << "\nwill be looked up in the directory in "
-      "which the target was created rather than in this calling "
-      "directory.";
-    /* clang-format on */
-    this->Makefile->IssueMessage(MessageType::AUTHOR_WARNING, w.str());
+    this->Makefile->IssueMessage(
+      MessageType::AUTHOR_WARNING,
+      cmStrCat(
+        cmPolicies::GetPolicyWarning(cmPolicies::CMP0079), "\nTarget\n  ",
+        this->Target->GetName(),
+        "\nis not created in this "
+        "directory.  For compatibility with older versions of CMake, link "
+        "library\n  ",
+        lib,
+        "\nwill be looked up in the directory in which "
+        "the target was created rather than in this calling directory."));
   }
 
   // Handle (additional) case where the command was called with PRIVATE /
@@ -502,8 +506,7 @@ bool cmTargetLinkLibrariesCommand::HandleLibrary(const std::string& lib,
     if (llt == DEBUG_LibraryType || llt == GENERAL_LibraryType) {
       // Put in the DEBUG configuration interfaces.
       for (std::string const& dc : debugConfigs) {
-        prop = "LINK_INTERFACE_LIBRARIES_";
-        prop += dc;
+        prop = cmStrCat("LINK_INTERFACE_LIBRARIES_", dc);
         this->Target->AppendProperty(prop, libRef.c_str());
       }
     }
@@ -514,8 +517,7 @@ bool cmTargetLinkLibrariesCommand::HandleLibrary(const std::string& lib,
       // Make sure the DEBUG configuration interfaces exist so that the
       // general one will not be used as a fall-back.
       for (std::string const& dc : debugConfigs) {
-        prop = "LINK_INTERFACE_LIBRARIES_";
-        prop += dc;
+        prop = cmStrCat("LINK_INTERFACE_LIBRARIES_", dc);
         if (!this->Target->GetProperty(prop)) {
           this->Target->SetProperty(prop, "");
         }

@@ -11,10 +11,10 @@
 
 #include "cm_expat.h"
 #include "cmsys/RegularExpression.hxx"
+#include <cstdlib>
 #include <list>
 #include <map>
 #include <ostream>
-#include <stdlib.h>
 #include <vector>
 
 extern "C" int cmBZRXMLParserUnknownEncodingHandler(void* /*unused*/,
@@ -200,8 +200,8 @@ public:
 private:
   cmCTestBZR* BZR;
 
-  typedef cmCTestBZR::Revision Revision;
-  typedef cmCTestBZR::Change Change;
+  using Revision = cmCTestBZR::Revision;
+  using Change = cmCTestBZR::Change;
   Revision Rev;
   std::vector<Change> Changes;
   Change CurChange;

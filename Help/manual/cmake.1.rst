@@ -238,6 +238,9 @@ Options
 
  Multiple options are allowed.
 
+``--trace-redirect=<file>``
+ Put cmake in trace mode and redirect trace output to a file instead of stderr.
+
 ``--warn-uninitialized``
  Warn about uninitialized values.
 
@@ -459,7 +462,7 @@ Available commands are:
   but the files or directories it point to.
 
 ``copy_directory <dir>... <destination>``
-  Copy directories to ``<destination>`` directory.
+  Copy content of ``<dir>...`` directories to ``<destination>`` directory.
   If ``<destination>`` directory does not exist it will be created.
   ``copy_directory`` does follow symlinks.
 
@@ -469,6 +472,12 @@ Available commands are:
   If multiple files are specified, the ``<destination>`` must be
   directory and it must exist.
   ``copy_if_different`` does follow symlinks.
+
+``create_symlink <old> <new>``
+  Create a symbolic link ``<new>`` naming ``<old>``.
+
+  .. note::
+    Path to where ``<new>`` symbolic link will be created has to exist beforehand.
 
 ``echo [<string>...]``
   Displays arguments as text.
@@ -481,6 +490,9 @@ Available commands are:
 
 ``environment``
   Display the current environment variables.
+
+``false``
+  Do nothing, with an exit code of 1.
 
 ``make_directory <dir>...``
   Create ``<dir>`` directories.  If necessary, create parent
@@ -533,7 +545,8 @@ Available commands are:
 
 ``remove_directory <dir>...``
   Remove ``<dir>`` directories and their contents.  If a directory does
-  not exist it will be silently ignored.
+  not exist it will be silently ignored.  If ``<dir>`` is a symlink to
+  a directory, just the symlink will be removed.
 
 ``rename <oldname> <newname>``
   Rename a file or directory (on one volume). If file with the ``<newname>`` name
@@ -598,11 +611,8 @@ Available commands are:
   Touch a file if it exists but do not create it.  If a file does
   not exist it will be silently ignored.
 
-``create_symlink <old> <new>``
-  Create a symbolic link ``<new>`` naming ``<old>``.
-
-.. note::
-  Path to where ``<new>`` symbolic link will be created has to exist beforehand.
+``true``
+  Do nothing, with an exit code of 0.
 
 Windows-specific Command-Line Tools
 -----------------------------------

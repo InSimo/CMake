@@ -7,14 +7,14 @@
 #include "cmSystemTools.h"
 
 #include "cmsys/FStream.hxx"
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 
 class cmParseBlanketJSCoverage::JSONParser
 {
 public:
-  typedef cmCTestCoverageHandlerContainer::SingleFileCoverageVector
-    FileLinesType;
+  using FileLinesType =
+    cmCTestCoverageHandlerContainer::SingleFileCoverageVector;
   JSONParser(cmCTestCoverageHandlerContainer& cont)
     : Coverage(cont)
   {
@@ -110,7 +110,8 @@ cmParseBlanketJSCoverage::cmParseBlanketJSCoverage(
 {
 }
 
-bool cmParseBlanketJSCoverage::LoadCoverageData(std::vector<std::string> files)
+bool cmParseBlanketJSCoverage::LoadCoverageData(
+  std::vector<std::string> const& files)
 {
   cmCTestOptionalLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
                      "Found " << files.size() << " Files" << std::endl,

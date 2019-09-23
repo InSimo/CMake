@@ -3,13 +3,14 @@
 #include "cmCTestVC.h"
 
 #include "cmCTest.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmXMLWriter.h"
 
 #include "cmsys/Process.h"
+#include <cstdio>
+#include <ctime>
 #include <sstream>
-#include <stdio.h>
-#include <time.h>
 #include <vector>
 
 cmCTestVC::cmCTestVC(cmCTest* ct, std::ostream& log)
@@ -152,8 +153,7 @@ bool cmCTestVC::Update()
 
   // if update version only is on then do not actually update,
   // just note the current version and finish
-  if (!cmSystemTools::IsOn(
-        this->CTest->GetCTestConfiguration("UpdateVersionOnly"))) {
+  if (!cmIsOn(this->CTest->GetCTestConfiguration("UpdateVersionOnly"))) {
     result = this->NoteOldRevision() && result;
     this->Log << "--- Begin Update ---\n";
     result = this->UpdateImpl() && result;

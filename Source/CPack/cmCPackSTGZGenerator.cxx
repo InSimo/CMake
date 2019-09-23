@@ -3,17 +3,22 @@
 #include "cmCPackSTGZGenerator.h"
 
 #include "cmsys/FStream.hxx"
+#include <cstdio>
 #include <sstream>
-#include <stdio.h>
 #include <string>
 #include <vector>
 
+#include "cm_sys_stat.h"
+
+#include "cmArchiveWrite.h"
 #include "cmCPackGenerator.h"
 #include "cmCPackLog.h"
 #include "cmSystemTools.h"
-#include "cm_sys_stat.h"
 
-cmCPackSTGZGenerator::cmCPackSTGZGenerator() = default;
+cmCPackSTGZGenerator::cmCPackSTGZGenerator()
+  : cmCPackArchiveGenerator(cmArchiveWrite::CompressGZip, "paxr", ".sh")
+{
+}
 
 cmCPackSTGZGenerator::~cmCPackSTGZGenerator() = default;
 
@@ -21,7 +26,8 @@ int cmCPackSTGZGenerator::InitializeInternal()
 {
   this->SetOptionIfNotSet("CPACK_INCLUDE_TOPLEVEL_DIRECTORY", "0");
 
-  std::string inFile = this->FindTemplate("CPack.STGZ_Header.sh.in");
+  std::string inFile =
+    this->FindTemplate("Internal/CPack/CPack.STGZ_Header.sh.in");
   if (inFile.empty()) {
     cmCPackLogger(cmCPackLog::LOG_ERROR,
                   "Cannot find template file: " << inFile << std::endl);

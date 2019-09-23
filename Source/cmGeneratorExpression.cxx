@@ -3,17 +3,18 @@
 #include "cmGeneratorExpression.h"
 
 #include "cmsys/RegularExpression.hxx"
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <utility>
 
-#include "assert.h"
 #include "cmAlgorithms.h"
 #include "cmGeneratorExpressionContext.h"
 #include "cmGeneratorExpressionDAGChecker.h"
 #include "cmGeneratorExpressionEvaluator.h"
 #include "cmGeneratorExpressionLexer.h"
 #include "cmGeneratorExpressionParser.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include <cassert>
 
 cmGeneratorExpression::cmGeneratorExpression(cmListFileBacktrace backtrace)
   : Backtrace(std::move(backtrace))
@@ -294,7 +295,7 @@ void cmGeneratorExpression::Split(const std::string& input,
         preGenex = input.substr(startPos + 1, pos - startPos - 1);
       }
       if (!part.empty()) {
-        cmSystemTools::ExpandListArgument(part, output);
+        cmExpandList(part, output);
       }
     }
     pos += 2;
@@ -327,7 +328,7 @@ void cmGeneratorExpression::Split(const std::string& input,
     lastPos = pos;
   }
   if (lastPos < input.size()) {
-    cmSystemTools::ExpandListArgument(input.substr(lastPos), output);
+    cmExpandList(input.substr(lastPos), output);
   }
 }
 
@@ -369,10 +370,7 @@ bool cmGeneratorExpression::IsValidTargetName(const std::string& input)
 void cmCompiledGeneratorExpression::GetMaxLanguageStandard(
   const cmGeneratorTarget* tgt, std::map<std::string, std::string>& mapping)
 {
-  typedef std::map<cmGeneratorTarget const*,
-                   std::map<std::string, std::string>>
-    MapType;
-  MapType::const_iterator it = this->MaxLanguageStandard.find(tgt);
+  auto it = this->MaxLanguageStandard.find(tgt);
   if (it != this->MaxLanguageStandard.end()) {
     mapping = it->second;
   }

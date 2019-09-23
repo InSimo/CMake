@@ -9,6 +9,7 @@
 #include "cmDuration.h"
 
 #include <chrono>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -57,7 +58,7 @@ class cmake;
 class cmCTestScriptHandler : public cmCTestGenericHandler
 {
 public:
-  typedef cmCTestGenericHandler Superclass;
+  using Superclass = cmCTestGenericHandler;
 
   /**
    * Add a script to run, and if is should run in the current process
@@ -131,7 +132,8 @@ private:
   int RunConfigurationDashboard();
 
   // Add ctest command
-  void AddCTestCommand(std::string const& name, cmCTestCommand* command);
+  void AddCTestCommand(std::string const& name,
+                       std::unique_ptr<cmCTestCommand> command);
 
   // Try to remove the binary directory once
   static bool TryToRemoveBinaryDirectoryOnce(const std::string& directoryPath);

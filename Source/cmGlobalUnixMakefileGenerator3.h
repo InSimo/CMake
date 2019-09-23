@@ -5,10 +5,10 @@
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
+#include <cstddef>
 #include <iosfwd>
 #include <map>
 #include <set>
-#include <stddef.h>
 #include <string>
 #include <vector>
 
@@ -220,9 +220,8 @@ protected:
     std::vector<unsigned long> Marks;
     void WriteProgressVariables(unsigned long total, unsigned long& current);
   };
-  typedef std::map<cmGeneratorTarget const*, TargetProgress,
-                   cmGeneratorTarget::StrictTargetComparison>
-    ProgressMapType;
+  using ProgressMapType = std::map<cmGeneratorTarget const*, TargetProgress,
+                                   cmGeneratorTarget::StrictTargetComparison>;
   ProgressMapType ProgressMap;
 
   size_t CountProgressMarksInTarget(

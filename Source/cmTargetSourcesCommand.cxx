@@ -4,11 +4,11 @@
 
 #include <sstream>
 
-#include "cmAlgorithms.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
 #include "cmPolicies.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 
@@ -30,11 +30,10 @@ void cmTargetSourcesCommand::HandleInterfaceContent(
 
 void cmTargetSourcesCommand::HandleMissingTarget(const std::string& name)
 {
-  std::ostringstream e;
-  e << "Cannot specify sources for target \"" << name
-    << "\" "
-       "which is not built by this project.";
-  this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
+  this->Makefile->IssueMessage(
+    MessageType::FATAL_ERROR,
+    cmStrCat("Cannot specify sources for target \"", name,
+             "\" which is not built by this project."));
 }
 
 std::string cmTargetSourcesCommand::Join(
@@ -75,9 +74,8 @@ std::vector<std::string> cmTargetSourcesCommand::ConvertToAbsoluteContent(
       absoluteSrc = src;
     } else {
       changedPath = true;
-      absoluteSrc = this->Makefile->GetCurrentSourceDirectory();
-      absoluteSrc += "/";
-      absoluteSrc += src;
+      absoluteSrc =
+        cmStrCat(this->Makefile->GetCurrentSourceDirectory(), '/', src);
     }
     absoluteContent.push_back(absoluteSrc);
   }

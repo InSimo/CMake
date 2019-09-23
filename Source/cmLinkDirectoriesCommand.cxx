@@ -4,11 +4,11 @@
 
 #include <sstream>
 
-#include "cmAlgorithms.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
 #include "cmPolicies.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 class cmExecutionStatus;
@@ -75,9 +75,8 @@ void cmLinkDirectoriesCommand::AddLinkDir(
         break;
     }
     if (convertToAbsolute) {
-      std::string tmp = this->Makefile->GetCurrentSourceDirectory();
-      tmp += "/";
-      tmp += unixPath;
+      std::string tmp =
+        cmStrCat(this->Makefile->GetCurrentSourceDirectory(), '/', unixPath);
       unixPath = tmp;
     }
   }

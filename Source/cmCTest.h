@@ -9,11 +9,11 @@
 #include "cmProcessOutput.h"
 
 #include <chrono>
+#include <ctime>
 #include <map>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <sstream>
 #include <string>
-#include <time.h>
 #include <vector>
 
 class cmCTestBuildHandler;
@@ -41,7 +41,7 @@ class cmXMLWriter;
 class cmCTest
 {
 public:
-  typedef cmProcessOutput::Encoding Encoding;
+  using Encoding = cmProcessOutput::Encoding;
   /** Enumerate parts of the testing and submission process.  */
   enum Part
   {
@@ -404,9 +404,9 @@ public:
 
   std::vector<std::string>& GetInitialCommandLineArguments();
 
-  /** Set the track to submit to */
-  void SetSpecificTrack(const char* track);
-  const char* GetSpecificTrack();
+  /** Set the group to submit to */
+  void SetSpecificGroup(const char* group);
+  const char* GetSpecificGroup();
 
   void SetFailover(bool failover);
   bool GetFailover() const;

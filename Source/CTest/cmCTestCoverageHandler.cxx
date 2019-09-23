@@ -13,6 +13,7 @@
 #include "cmParseGTMCoverage.h"
 #include "cmParseJacocoCoverage.h"
 #include "cmParsePHPCoverage.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmWorkingDirectory.h"
 #include "cmXMLWriter.h"
@@ -23,12 +24,12 @@
 #include "cmsys/RegularExpression.hxx"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <iterator>
 #include <sstream>
-#include <stdio.h>
-#include <stdlib.h>
 #include <utility>
 
 class cmMakefile;
@@ -129,10 +130,9 @@ void cmCTestCoverageHandler::Initialize()
 
 void cmCTestCoverageHandler::CleanCoverageLogFiles(std::ostream& log)
 {
-  std::string logGlob = this->CTest->GetCTestConfiguration("BuildDirectory");
-  logGlob += "/Testing/";
-  logGlob += this->CTest->GetCurrentTag();
-  logGlob += "/CoverageLog*";
+  std::string logGlob =
+    cmStrCat(this->CTest->GetCTestConfiguration("BuildDirectory"), "/Testing/",
+             this->CTest->GetCurrentTag(), "/CoverageLog*");
   cmsys::Glob gl;
   gl.FindFiles(logGlob);
   std::vector<std::string> const& files = gl.GetFiles();
@@ -1181,7 +1181,7 @@ int cmCTestCoverageHandler::HandleGCovCoverage(
         // gcov 4.7 can have output lines saying "No executable lines" and
         // "Removing 'filename.gcov'"... Don't log those as "errors."
         if (line != "No executable lines" &&
-            !cmSystemTools::StringStartsWith(line.c_str(), "Removing ")) {
+            !cmHasLiteralPrefix(line, "Removing ")) {
           cmCTestLog(this->CTest, ERROR_MESSAGE,
                      "Unknown gcov output line: [" << line << "]"
                                                    << std::endl);
@@ -1455,8 +1455,7 @@ int cmCTestCoverageHandler::HandleLCovCoverage(
       std::vector<std::string> lcovFiles;
       dir = this->CTest->GetBinaryDir();
       std::string daGlob;
-      daGlob = dir;
-      daGlob += "/*.LCOV";
+      daGlob = cmStrCat(dir, "/*.LCOV");
       cmCTestOptionalLog(
         this->CTest, HANDLER_VERBOSE_OUTPUT,
         "   looking for LCOV files in: " << daGlob << std::endl, this->Quiet);
@@ -1597,12 +1596,10 @@ void cmCTestCoverageHandler::FindGCovFiles(std::vector<std::string>& files)
     cmCTestOptionalLog(
       this->CTest, HANDLER_VERBOSE_OUTPUT,
       "   globbing for coverage in: " << lm.first << std::endl, this->Quiet);
-    std::string daGlob = lm.first;
-    daGlob += "/*.da";
+    std::string daGlob = cmStrCat(lm.first, "/*.da");
     gl.FindFiles(daGlob);
     cmAppend(files, gl.GetFiles());
-    daGlob = lm.first;
-    daGlob += "/*.gcda";
+    daGlob = cmStrCat(lm.first, "/*.gcda");
     gl.FindFiles(daGlob);
     cmAppend(files, gl.GetFiles());
   }
@@ -1631,8 +1628,7 @@ bool cmCTestCoverageHandler::FindLCovFiles(std::vector<std::string>& files)
 
   // DPI file should appear in build directory
   std::string daGlob;
-  daGlob = buildDir;
-  daGlob += "/*.dpi";
+  daGlob = cmStrCat(buildDir, "/*.dpi");
   cmCTestOptionalLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
                      "   looking for dpi files in: " << daGlob << std::endl,
                      this->Quiet);
@@ -1834,9 +1830,8 @@ int cmCTestCoverageHandler::RunBullseyeCoverageBranch(
     return 0;
   }
   std::map<std::string, std::string> fileMap;
-  std::vector<std::string>::iterator fp = filesFullPath.begin();
-  for (std::vector<std::string>::iterator f = files.begin(); f != files.end();
-       ++f, ++fp) {
+  auto fp = filesFullPath.begin();
+  for (auto f = files.begin(); f != files.end(); ++f, ++fp) {
     fileMap[*f] = *fp;
   }
 
@@ -1874,7 +1869,7 @@ int cmCTestCoverageHandler::RunBullseyeCoverageBranch(
         this->StartCoverageLogXML(covLogXML);
         count++; // move on one
       }
-      std::map<std::string, std::string>::iterator i = fileMap.find(file);
+      auto i = fileMap.find(file);
       // if the file should be covered write out the header for that file
       if (i != fileMap.end()) {
         // we have a new file so count it in the output
@@ -1945,10 +1940,9 @@ int cmCTestCoverageHandler::RunBullseyeCommand(
   cmCTestRunProcess runCoverageSrc;
   runCoverageSrc.SetCommand(program.c_str());
   runCoverageSrc.AddArgument(arg);
-  std::string stdoutFile = cont->BinaryDir + "/Testing/Temporary/";
-  stdoutFile += this->GetCTestInstance()->GetCurrentTag();
-  stdoutFile += "-";
-  stdoutFile += cmd;
+  std::string stdoutFile =
+    cmStrCat(cont->BinaryDir, "/Testing/Temporary/",
+             this->GetCTestInstance()->GetCurrentTag(), '-', cmd);
   std::string stderrFile = stdoutFile;
   stdoutFile += ".stdout";
   stderrFile += ".stderr";
@@ -2037,9 +2031,7 @@ int cmCTestCoverageHandler::RunBullseyeSourceSummary(
       coveredFileNames.insert(file);
       if (!cmSystemTools::FileIsFullPath(sourceFile)) {
         // file will be relative to the binary dir
-        file = cont->BinaryDir;
-        file += "/";
-        file += sourceFile;
+        file = cmStrCat(cont->BinaryDir, '/', sourceFile);
       }
       file = cmSystemTools::CollapseFullPath(file);
       bool shouldIDoCoverage =
@@ -2209,7 +2201,7 @@ bool cmCTestCoverageHandler::ParseBullsEyeCovsrcLine(
 
 int cmCTestCoverageHandler::GetLabelId(std::string const& label)
 {
-  LabelIdMapType::iterator i = this->LabelIdMap.find(label);
+  auto i = this->LabelIdMap.find(label);
   if (i == this->LabelIdMap.end()) {
     int n = int(this->Labels.size());
     this->Labels.push_back(label);
@@ -2221,9 +2213,8 @@ int cmCTestCoverageHandler::GetLabelId(std::string const& label)
 
 void cmCTestCoverageHandler::LoadLabels()
 {
-  std::string fileList = this->CTest->GetBinaryDir();
-  fileList += "/CMakeFiles";
-  fileList += "/TargetDirectories.txt";
+  std::string fileList =
+    cmStrCat(this->CTest->GetBinaryDir(), "/CMakeFiles/TargetDirectories.txt");
   cmCTestOptionalLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
                      " target directory list [" << fileList << "]\n",
                      this->Quiet);
@@ -2237,8 +2228,7 @@ void cmCTestCoverageHandler::LoadLabels()
 void cmCTestCoverageHandler::LoadLabels(const char* dir)
 {
   LabelSet& dirLabels = this->TargetDirs[dir];
-  std::string fname = dir;
-  fname += "/Labels.txt";
+  std::string fname = cmStrCat(dir, "/Labels.txt");
   cmsys::ifstream fin(fname.c_str());
   if (!fin) {
     return;
@@ -2282,7 +2272,7 @@ void cmCTestCoverageHandler::LoadLabels(const char* dir)
 void cmCTestCoverageHandler::WriteXMLLabels(cmXMLWriter& xml,
                                             std::string const& source)
 {
-  LabelMapType::const_iterator li = this->SourceLabels.find(source);
+  auto li = this->SourceLabels.find(source);
   if (li != this->SourceLabels.end() && !li->second.empty()) {
     xml.StartElement("Labels");
     for (auto const& ls : li->second) {
@@ -2325,7 +2315,7 @@ bool cmCTestCoverageHandler::IsFilteredOut(std::string const& source)
   // The source is filtered out if it does not have any labels in
   // common with the filter set.
   std::string shortSrc = this->CTest->GetShortPathToFile(source.c_str());
-  LabelMapType::const_iterator li = this->SourceLabels.find(shortSrc);
+  auto li = this->SourceLabels.find(shortSrc);
   if (li != this->SourceLabels.end()) {
     return !this->IntersectsFilter(li->second);
   }

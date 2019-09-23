@@ -7,8 +7,10 @@
 #include "cmGeneratedFileStream.h"
 #include "cmQtAutoGen.h"
 
+#include <cm/string_view>
+
 #include <map>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <ostream>
 #include <set>
 #include <string>
@@ -17,9 +19,12 @@
 #include <vector>
 
 class cmGeneratorTarget;
-class cmTarget;
+class cmGlobalGenerator;
+class cmLocalGenerator;
+class cmMakefile;
 class cmQtAutoGenGlobalInitializer;
 class cmSourceFile;
+class cmTarget;
 
 /// @brief Initializes the QtAutoGen generators
 class cmQtAutoGenInitializer : public cmQtAutoGen
@@ -46,7 +51,7 @@ public:
   /// @brief Moc/Uic file
   struct MUFile
   {
-    std::string RealPath;
+    std::string FullPath;
     cmSourceFile* SF = nullptr;
     bool Generated = false;
     bool SkipMoc = false;
@@ -54,7 +59,7 @@ public:
     bool MocIt = false;
     bool UicIt = false;
   };
-  typedef std::unique_ptr<MUFile> MUFileHandle;
+  using MUFileHandle = std::unique_ptr<MUFile>;
 
   /// @brief Abstract moc/uic/rcc generator variables base class
   struct GenVarsT
@@ -62,7 +67,7 @@ public:
     bool Enabled = false;
     // Generator type/name
     GenT Gen;
-    std::string const& GenNameUpper;
+    cm::string_view GenNameUpper;
     // Executable
     std::string ExecutableTargetName;
     cmGeneratorTarget* ExecutableTarget = nullptr;
@@ -85,24 +90,24 @@ public:
     /// @return True if the file is open
     explicit operator bool() const { return static_cast<bool>(Ofs_); }
 
-    void Write(const char* text) { Ofs_ << text; }
-    void Write(const char* key, std::string const& value);
-    void WriteUInt(const char* key, unsigned int value);
+    void Write(cm::string_view text) { Ofs_ << text; }
+    void Write(cm::string_view, std::string const& value);
+    void WriteUInt(cm::string_view, unsigned int value);
 
     template <class C>
-    void WriteStrings(const char* key, C const& container);
-    void WriteConfig(const char* key,
+    void WriteStrings(cm::string_view, C const& container);
+    void WriteConfig(cm::string_view,
                      std::map<std::string, std::string> const& map);
     template <class C>
-    void WriteConfigStrings(const char* key,
+    void WriteConfigStrings(cm::string_view,
                             std::map<std::string, C> const& map);
-    void WriteNestedLists(const char* key,
+    void WriteNestedLists(cm::string_view,
                           std::vector<std::vector<std::string>> const& lists);
 
   private:
     template <class IT>
     static std::string ListJoin(IT it_begin, IT it_end);
-    static std::string ConfigKey(const char* key, std::string const& config);
+    static std::string ConfigKey(cm::string_view, std::string const& config);
 
   private:
     cmGeneratedFileStream Ofs_;
@@ -111,10 +116,10 @@ public:
 public:
   /// @return The detected Qt version and the required Qt major version
   static std::pair<IntegerVersion, unsigned int> GetQtVersion(
-    cmGeneratorTarget const* target);
+    cmGeneratorTarget const* genTarget);
 
   cmQtAutoGenInitializer(cmQtAutoGenGlobalInitializer* globalInitializer,
-                         cmGeneratorTarget* target,
+                         cmGeneratorTarget* genTarget,
                          IntegerVersion const& qtVersion, bool mocEnabled,
                          bool uicEnabled, bool rccEnabled,
                          bool globalAutogenTarget, bool globalAutoRccTarget);
@@ -144,15 +149,18 @@ private:
   bool AddGeneratedSource(std::string const& filename, GenVarsT const& genVars,
                           bool prepend = false);
   bool AddToSourceGroup(std::string const& fileName,
-                        std::string const& genNameUpper);
+                        cm::string_view genNameUpper);
   void AddCleanFile(std::string const& fileName);
 
   bool GetQtExecutable(GenVarsT& genVars, const std::string& executable,
                        bool ignoreMissingTarget) const;
 
 private:
-  cmQtAutoGenGlobalInitializer* GlobalInitializer;
-  cmGeneratorTarget* Target;
+  cmQtAutoGenGlobalInitializer* GlobalInitializer = nullptr;
+  cmGeneratorTarget* GenTarget = nullptr;
+  cmGlobalGenerator* GlobalGen = nullptr;
+  cmLocalGenerator* LocalGen = nullptr;
+  cmMakefile* Makefile = nullptr;
 
   // Configuration
   IntegerVersion QtVersion;

@@ -6,11 +6,12 @@
 #include "cmCTestConfigureHandler.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
+#include <cstring>
 #include <sstream>
-#include <string.h>
 #include <vector>
 
 cmCTestConfigureCommand::cmCTestConfigureCommand()
@@ -25,7 +26,7 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
   std::vector<std::string> options;
 
   if (this->Values[ctc_OPTIONS]) {
-    cmSystemTools::ExpandListArgument(this->Values[ctc_OPTIONS], options);
+    cmExpandList(this->Values[ctc_OPTIONS], options);
   }
 
   if (this->CTest->GetCTestConfiguration("BuildDirectory").empty()) {
@@ -75,9 +76,8 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
         delete gg;
       }
 
-      std::string cmakeConfigureCommand = "\"";
-      cmakeConfigureCommand += cmSystemTools::GetCMakeCommand();
-      cmakeConfigureCommand += "\"";
+      std::string cmakeConfigureCommand =
+        cmStrCat('"', cmSystemTools::GetCMakeCommand(), '"');
 
       for (std::string const& option : options) {
         cmakeConfigureCommand += " \"";

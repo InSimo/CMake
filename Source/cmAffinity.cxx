@@ -13,16 +13,16 @@
 #    include <pthread.h>
 #    include <sched.h>
 // On some platforms CPU_ZERO needs memset but sched.h forgets string.h
-#    include <string.h> // IWYU pragma: keep
+#    include <cstring> // IWYU pragma: keep
 #    if defined(__FreeBSD__)
 #      include <pthread_np.h>
 #      include <sys/cpuset.h>
 #      include <sys/param.h>
 #    endif
 #    if defined(__linux__)
-typedef cpu_set_t cm_cpuset_t;
+using cm_cpuset_t = cpu_set_t;
 #    else
-typedef cpuset_t cm_cpuset_t;
+using cm_cpuset_t = cpuset_t;
 #    endif
 #  endif
 #endif

@@ -6,7 +6,7 @@
 #include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -16,6 +16,7 @@
 #include "cmListFileCache.h"
 #include "cmPolicies.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 #include "cmTargetLinkLibraryType.h"
 
 class cmCustomCommand;
@@ -102,12 +103,12 @@ public:
   //! Add sources to the target.
   void AddSources(std::vector<std::string> const& srcs);
   void AddTracedSources(std::vector<std::string> const& srcs);
-  cmSourceFile* AddSourceCMP0049(const std::string& src);
+  std::string GetSourceCMP0049(const std::string& src);
   cmSourceFile* AddSource(const std::string& src, bool before = false);
 
   //! how we identify a library, by name and type
-  typedef std::pair<std::string, cmTargetLinkLibraryType> LibraryID;
-  typedef std::vector<LibraryID> LinkLibraryVectorType;
+  using LibraryID = std::pair<std::string, cmTargetLinkLibraryType>;
+  using LinkLibraryVectorType = std::vector<LibraryID>;
   LinkLibraryVectorType const& GetOriginalLinkLibraries() const;
 
   //! Clear the dependency information recorded for this target, if any.
@@ -181,6 +182,12 @@ public:
   //! Get all properties
   cmPropertyMap const& GetProperties() const;
 
+  //! Return whether or not the target is for a DLL platform.
+  bool IsDLLPlatform() const;
+
+  //! Return whether or not we are targeting AIX.
+  bool IsAIX() const;
+
   bool IsImported() const;
   bool IsImportedGloballyVisible() const;
 
@@ -209,6 +216,8 @@ public:
                         cmListFileBacktrace const& bt, bool before = false);
   void InsertLinkDirectory(std::string const& entry,
                            cmListFileBacktrace const& bt, bool before = false);
+  void InsertPrecompileHeader(std::string const& entry,
+                              cmListFileBacktrace const& bt);
 
   void AppendBuildInterfaceIncludes();
 
@@ -229,6 +238,9 @@ public:
 
   cmStringRange GetCompileDefinitionsEntries() const;
   cmBacktraceRange GetCompileDefinitionsBacktraces() const;
+
+  cmStringRange GetPrecompileHeadersEntries() const;
+  cmBacktraceRange GetPrecompileHeadersBacktraces() const;
 
   cmStringRange GetSourceEntries() const;
   cmBacktraceRange GetSourceBacktraces() const;

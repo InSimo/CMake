@@ -34,7 +34,7 @@ class cmCTestTestHandler : public cmCTestGenericHandler
   friend class cmCTestMultiProcessHandler;
 
 public:
-  typedef cmCTestGenericHandler Superclass;
+  using Superclass = cmCTestGenericHandler;
 
   /**
    * The main entry point for this class
@@ -118,6 +118,8 @@ public:
     std::vector<std::pair<cmsys::RegularExpression, std::string>>
       RequiredRegularExpressions;
     std::vector<std::pair<cmsys::RegularExpression, std::string>>
+      SkipRegularExpressions;
+    std::vector<std::pair<cmsys::RegularExpression, std::string>>
       TimeoutRegularExpressions;
     std::map<std::string, std::string> Measurements;
     bool IsInBasedOnREOptions;
@@ -186,14 +188,26 @@ public:
                                     std::vector<std::string>& extraPaths,
                                     std::vector<std::string>& failed);
 
-  typedef std::vector<cmCTestTestProperties> ListOfTests;
+  using ListOfTests = std::vector<cmCTestTestProperties>;
 
 protected:
+  using SetOfTests =
+    std::set<cmCTestTestHandler::cmCTestTestResult, cmCTestTestResultLess>;
+
   // compute a final test list
   virtual int PreProcessHandler();
   virtual int PostProcessHandler();
   virtual void GenerateTestCommand(std::vector<std::string>& args, int test);
   int ExecuteCommands(std::vector<std::string>& vec);
+
+  bool ProcessOptions();
+  void LogTestSummary(const std::vector<std::string>& passed,
+                      const std::vector<std::string>& failed,
+                      const cmDuration& durationInSecs);
+  void LogDisabledTests(const std::vector<cmCTestTestResult>& disabledTests);
+  void LogFailedTests(const std::vector<std::string>& failed,
+                      const SetOfTests& resultsSet);
+  bool GenerateXML();
 
   void WriteTestResultHeader(cmXMLWriter& xml,
                              cmCTestTestResult const& result);
@@ -207,7 +221,7 @@ protected:
 
   cmDuration ElapsedTestingTime;
 
-  typedef std::vector<cmCTestTestResult> TestResultsVector;
+  using TestResultsVector = std::vector<cmCTestTestResult>;
   TestResultsVector TestResults;
 
   std::vector<std::string> CustomTestsIgnore;

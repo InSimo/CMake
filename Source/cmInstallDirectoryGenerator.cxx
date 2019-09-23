@@ -6,9 +6,10 @@
 #include "cmInstallType.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
-#include <memory> // IWYU pragma: keep
+#include <memory>
 
 cmInstallDirectoryGenerator::cmInstallDirectoryGenerator(
   std::vector<std::string> const& dirs, const char* dest,
@@ -66,15 +67,14 @@ void cmInstallDirectoryGenerator::GenerateScriptForConfig(
   cmGeneratorExpression ge;
   for (std::string const& d : this->Directories) {
     std::unique_ptr<cmCompiledGeneratorExpression> cge = ge.Parse(d);
-    cmSystemTools::ExpandListArgument(
-      cge->Evaluate(this->LocalGenerator, config), dirs);
+    cmExpandList(cge->Evaluate(this->LocalGenerator, config), dirs);
   }
 
   // Make sure all dirs have absolute paths.
   cmMakefile const& mf = *this->LocalGenerator->GetMakefile();
   for (std::string& d : dirs) {
     if (!cmSystemTools::FileIsFullPath(d)) {
-      d = mf.GetCurrentSourceDirectory() + "/" + d;
+      d = cmStrCat(mf.GetCurrentSourceDirectory(), "/", d);
     }
   }
 

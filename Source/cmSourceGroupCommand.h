@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <cm/memory>
+
 #include "cmCommand.h"
 
 class cmExecutionStatus;
@@ -25,7 +27,10 @@ public:
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() override { return new cmSourceGroupCommand; }
+  std::unique_ptr<cmCommand> Clone() override
+  {
+    return cm::make_unique<cmSourceGroupCommand>();
+  }
 
   /**
    * This is called when the command is first encountered in
@@ -35,8 +40,8 @@ public:
                    cmExecutionStatus& status) override;
 
 private:
-  typedef std::map<std::string, std::vector<std::string>> ParsedArguments;
-  typedef std::vector<std::string> ExpectedOptions;
+  using ParsedArguments = std::map<std::string, std::vector<std::string>>;
+  using ExpectedOptions = std::vector<std::string>;
 
   ExpectedOptions getExpectedOptions() const;
 

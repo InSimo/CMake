@@ -8,12 +8,13 @@
 #include "cmCPackIFWRepository.h"
 #include "cmCPackLog.h" // IWYU pragma: keep
 #include "cmGeneratedFileStream.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmXMLParser.h"
 #include "cmXMLWriter.h"
 
+#include <cstddef>
 #include <sstream>
-#include <stddef.h>
 #include <utility>
 
 cmCPackIFWInstaller::cmCPackIFWInstaller() = default;
@@ -192,8 +193,8 @@ void cmCPackIFWInstaller::ConfigureFromOptions()
     this->TargetDir = optIFW_TARGET_DIRECTORY;
   } else if (const char* optPACKAGE_INSTALL_DIRECTORY =
                this->GetOption("CPACK_PACKAGE_INSTALL_DIRECTORY")) {
-    this->TargetDir = "@ApplicationsDir@/";
-    this->TargetDir += optPACKAGE_INSTALL_DIRECTORY;
+    this->TargetDir =
+      cmStrCat("@ApplicationsDir@/", optPACKAGE_INSTALL_DIRECTORY);
   } else {
     this->TargetDir = "@RootDir@/usr/local";
   }
@@ -244,8 +245,7 @@ void cmCPackIFWInstaller::ConfigureFromOptions()
   if (const char* optIFW_PACKAGE_RESOURCES =
         this->GetOption("CPACK_IFW_PACKAGE_RESOURCES")) {
     this->Resources.clear();
-    cmSystemTools::ExpandListArgument(optIFW_PACKAGE_RESOURCES,
-                                      this->Resources);
+    cmExpandList(optIFW_PACKAGE_RESOURCES, this->Resources);
   }
 }
 
@@ -292,7 +292,7 @@ protected:
   {
     if (this->file) {
       std::string content(data, data + length);
-      content = cmSystemTools::TrimWhitespace(content);
+      content = cmTrimWhitespace(content);
       std::string source = this->basePath + "/" + content;
       std::string destination = this->path + "/" + content;
       if (!cmSystemTools::CopyFileIfDifferent(source, destination)) {

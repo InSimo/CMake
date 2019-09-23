@@ -24,6 +24,7 @@ class cmCustomCommandGenerator
   cmGeneratorExpression* GE;
   cmCustomCommandLines CommandLines;
   std::vector<std::vector<std::string>> EmulatorsWithArguments;
+  std::vector<std::string> Byproducts;
   std::vector<std::string> Depends;
   std::string WorkingDirectory;
 

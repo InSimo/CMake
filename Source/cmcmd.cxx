@@ -13,23 +13,24 @@
 #include "cmState.h"
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmUtils.hxx"
 #include "cmVersion.h"
 #include "cmake.h"
 
-#if defined(CMAKE_BUILD_WITH_CMAKE)
+#if !defined(CMAKE_BOOTSTRAP)
 #  include "cmDependsFortran.h" // For -E cmake_copy_f90_mod callback.
 #  include "cmServer.h"
 #  include "cmServerConnection.h"
 #endif
 
-#if defined(CMAKE_BUILD_WITH_CMAKE) && defined(_WIN32)
+#if !defined(CMAKE_BOOTSTRAP) && defined(_WIN32)
 #  include "bindexplib.h"
 #  include "cmsys/ConsoleBuf.hxx"
 #endif
 
-#if defined(CMAKE_BUILD_WITH_CMAKE) && defined(_WIN32) && !defined(__CYGWIN__)
+#if !defined(CMAKE_BOOTSTRAP) && defined(_WIN32) && !defined(__CYGWIN__)
 #  include "cmVisualStudioWCEPlatformParser.h"
 #endif
 
@@ -37,16 +38,14 @@
 #include "cmsys/FStream.hxx"
 #include "cmsys/Process.h"
 #include "cmsys/Terminal.h"
-#include <algorithm>
 #include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <iostream>
-#include <iterator>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <sstream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 #include <utility>
 
 class cmConnection;
@@ -60,7 +59,7 @@ void CMakeCommandUsage(const char* program)
 {
   std::ostringstream errorStream;
 
-#ifdef CMAKE_BUILD_WITH_CMAKE
+#ifndef CMAKE_BOOTSTRAP
   /* clang-format off */
   errorStream
     << "cmake version " << cmVersion::GetCMakeVersion() << "\n";
@@ -114,6 +113,8 @@ void CMakeCommandUsage(const char* program)
     << "  touch <file>...           - touch a <file>.\n"
     << "  touch_nocreate <file>...  - touch a <file> but do not create it.\n"
     << "  create_symlink old new    - create a symbolic link new -> old\n"
+    << "  true                      - do nothing with an exit code of 0\n"
+    << "  false                     - do nothing with an exit code of 1\n"
 #if defined(_WIN32) && !defined(__CYGWIN__)
     << "Available on Windows only:\n"
     << "  delete_regv key           - delete registry value\n"
@@ -171,8 +172,7 @@ static int HandleIWYU(const std::string& runCmd,
 {
   // Construct the iwyu command line by taking what was given
   // and adding all the arguments we give to the compiler.
-  std::vector<std::string> iwyu_cmd;
-  cmSystemTools::ExpandListArgument(runCmd, iwyu_cmd, true);
+  std::vector<std::string> iwyu_cmd = cmExpandedList(runCmd, true);
   cmAppend(iwyu_cmd, orig_cmd.begin() + 1, orig_cmd.end());
   // Run the iwyu command line.  Capture its stderr and hide its stdout.
   // Ignore its return code because the tool always returns non-zero.
@@ -201,8 +201,7 @@ static int HandleTidy(const std::string& runCmd, const std::string& sourceFile,
   // automatically skip over the compiler itself and extract the
   // options.
   int ret;
-  std::vector<std::string> tidy_cmd =
-    cmSystemTools::ExpandedListArgument(runCmd, true);
+  std::vector<std::string> tidy_cmd = cmExpandedList(runCmd, true);
   tidy_cmd.push_back(sourceFile);
   tidy_cmd.emplace_back("--");
   cmAppend(tidy_cmd, orig_cmd);
@@ -262,8 +261,7 @@ static int HandleCppLint(const std::string& runCmd,
                          const std::vector<std::string>&)
 {
   // Construct the cpplint command line.
-  std::vector<std::string> cpplint_cmd;
-  cmSystemTools::ExpandListArgument(runCmd, cpplint_cmd, true);
+  std::vector<std::string> cpplint_cmd = cmExpandedList(runCmd, true);
   cpplint_cmd.push_back(sourceFile);
 
   // Run the cpplint command line.  Capture its output.
@@ -291,8 +289,7 @@ static int HandleCppCheck(const std::string& runCmd,
                           const std::vector<std::string>& orig_cmd)
 {
   // Construct the cpplint command line.
-  std::vector<std::string> cppcheck_cmd;
-  cmSystemTools::ExpandListArgument(runCmd, cppcheck_cmd, true);
+  std::vector<std::string> cppcheck_cmd = cmExpandedList(runCmd, true);
   // extract all the -D, -U, and -I options from the compile line
   for (auto const& opt : orig_cmd) {
     if (opt.size() > 2) {
@@ -342,8 +339,8 @@ static int HandleCppCheck(const std::string& runCmd,
   return ret;
 }
 
-typedef int (*CoCompileHandler)(const std::string&, const std::string&,
-                                const std::vector<std::string>&);
+using CoCompileHandler = int (*)(const std::string&, const std::string&,
+                                 const std::vector<std::string>&);
 
 struct CoCompiler
 {
@@ -405,7 +402,7 @@ int cmcmd::HandleCoCompileCommands(std::vector<std::string> const& args)
         if (cmHasLiteralPrefix(arg, "--source=")) {
           sourceFile = arg.substr(9);
         } else if (cmHasLiteralPrefix(arg, "--launcher=")) {
-          cmSystemTools::ExpandListArgument(arg.substr(11), launchers, true);
+          cmExpandList(arg.substr(11), launchers, true);
         } else {
           // if it was not a co-compiler or --source/--launcher then error
           std::cerr << "__run_co_compile given unknown argument: " << arg
@@ -558,17 +555,11 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       return 0;
     }
 
-#if defined(_WIN32) && defined(CMAKE_BUILD_WITH_CMAKE)
+#if defined(_WIN32) && !defined(CMAKE_BOOTSTRAP)
     else if (args[1] == "__create_def") {
       if (args.size() < 4) {
-        std::cerr
-          << "__create_def Usage: -E __create_def outfile.def objlistfile\n";
-        return 1;
-      }
-      FILE* fout = cmsys::SystemTools::Fopen(args[2].c_str(), "w+");
-      if (!fout) {
-        std::cerr << "could not open output .def file: " << args[2].c_str()
-                  << "\n";
+        std::cerr << "__create_def Usage: -E __create_def outfile.def "
+                     "objlistfile [-nm=nm-path]\n";
         return 1;
       }
       cmsys::ifstream fin(args[3].c_str(), std::ios::in | std::ios::binary);
@@ -577,9 +568,41 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
                   << "\n";
         return 1;
       }
-      std::string file;
+      std::vector<std::string> files;
+      {
+        std::string file;
+        cmFileTime outTime;
+        bool outValid = outTime.Load(args[2]);
+        while (cmSystemTools::GetLineFromStream(fin, file)) {
+          files.push_back(file);
+          if (outValid) {
+            cmFileTime inTime;
+            outValid = inTime.Load(file) && inTime.Older(outTime);
+          }
+        }
+        if (outValid) {
+          // The def file already exists and all input files are older than the
+          // existing def file.
+          return 0;
+        }
+      }
+      FILE* fout = cmsys::SystemTools::Fopen(args[2].c_str(), "w+");
+      if (!fout) {
+        std::cerr << "could not open output .def file: " << args[2].c_str()
+                  << "\n";
+        return 1;
+      }
       bindexplib deffile;
-      while (cmSystemTools::GetLineFromStream(fin, file)) {
+      if (args.size() >= 5) {
+        auto a = args[4];
+        if (cmHasLiteralPrefix(a, "--nm=")) {
+          deffile.SetNmPath(a.substr(5));
+          std::cerr << a.substr(5) << "\n";
+        } else {
+          std::cerr << "unknown argument: " << a << "\n";
+        }
+      }
+      for (auto const& file : files) {
         std::string const& ext = cmSystemTools::GetFilenameLastExtension(file);
         if (cmSystemTools::LowerCase(ext) == ".def") {
           if (!deffile.AddDefinitionFile(file.c_str())) {
@@ -651,7 +674,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       return 1;
     }
 
-#if defined(CMAKE_BUILD_WITH_CMAKE)
+#if !defined(CMAKE_BOOTSTRAP)
     if (args[1] == "environment") {
       for (auto const& env : cmSystemTools::GetEnvironmentVariables()) {
         std::cout << env << std::endl;
@@ -676,10 +699,17 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       // If an error occurs, we want to continue removing directories.
       bool return_value = false;
       for (auto const& arg : cmMakeRange(args).advance(2)) {
-        if (cmSystemTools::FileIsDirectory(arg) &&
-            !cmSystemTools::RemoveADirectory(arg)) {
-          std::cerr << "Error removing directory \"" << arg << "\".\n";
-          return_value = true;
+        if (cmSystemTools::FileIsDirectory(arg)) {
+          if (cmSystemTools::FileIsSymlink(arg)) {
+            if (!cmSystemTools::RemoveFile(arg)) {
+              std::cerr << "Error removing directory symlink \"" << arg
+                        << "\".\n";
+              return_value = true;
+            }
+          } else if (!cmSystemTools::RemoveADirectory(arg)) {
+            std::cerr << "Error removing directory \"" << arg << "\".\n";
+            return_value = true;
+          }
         }
       }
       return return_value;
@@ -763,8 +793,10 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
     if (args[1] == "time" && args.size() > 2) {
       std::vector<std::string> command(args.begin() + 2, args.end());
 
-      clock_t clock_start, clock_finish;
-      time_t time_start, time_finish;
+      clock_t clock_start;
+      clock_t clock_finish;
+      time_t time_start;
+      time_t time_finish;
 
       time(&time_start);
       clock_start = clock();
@@ -835,8 +867,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
     // Command to start progress for a build
     if (args[1] == "cmake_progress_start" && args.size() == 4) {
       // basically remove the directory
-      std::string dirName = args[2];
-      dirName += "/Progress";
+      std::string dirName = cmStrCat(args[2], "/Progress");
       cmSystemTools::RemoveADirectory(dirName);
 
       // is the last argument a filename that exists?
@@ -853,8 +884,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       if (count) {
         cmSystemTools::MakeDirectory(dirName);
         // write the count into the directory
-        std::string fName = dirName;
-        fName += "/count.txt";
+        std::string fName = cmStrCat(dirName, "/count.txt");
         FILE* progFile = cmsys::SystemTools::Fopen(fName, "w");
         if (progFile) {
           fprintf(progFile, "%i\n", count);
@@ -889,6 +919,16 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
         return 1;
       }
       return 0;
+    }
+
+    // Command to do nothing with an exit code of 0.
+    if (args[1] == "true") {
+      return 0;
+    }
+
+    // Command to do nothing with an exit code of 1.
+    if (args[1] == "false") {
+      return 1;
     }
 
     // Internal CMake shared library support.
@@ -933,8 +973,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
         if (args.size() >= 9 && args[8].length() >= 8 &&
             args[8].substr(0, 8) == "--color=") {
           // Enable or disable color based on the switch value.
-          color =
-            (args[8].size() == 8 || cmSystemTools::IsOn(args[8].substr(8)));
+          color = (args[8].size() == 8 || cmIsOn(args[8].substr(8)));
         }
       } else {
         // Support older signature for existing makefiles:
@@ -981,7 +1020,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       return cmcmd::ExecuteLinkScript(args);
     }
 
-#ifdef CMAKE_BUILD_WITH_CMAKE
+#ifndef CMAKE_BOOTSTRAP
     // Internal CMake ninja dependency scanning support.
     if (args[1] == "cmake_ninja_depends") {
       return cmcmd_cmake_ninja_depends(args.begin() + 2, args.end());
@@ -1016,7 +1055,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       return cmcmd::ExecuteEchoColor(args);
     }
 
-#ifdef CMAKE_BUILD_WITH_CMAKE
+#ifndef CMAKE_BOOTSTRAP
     if ((args[1] == "cmake_autogen") && (args.size() >= 4)) {
       cmQtAutoMocUic autoGen;
       std::string const& infoDir = args[2];
@@ -1063,11 +1102,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
             }
           } else if (cmHasLiteralPrefix(arg, "--format=")) {
             format = arg.substr(9);
-            bool isKnown =
-              std::find(cm::cbegin(knownFormats), cm::cend(knownFormats),
-                        format) != cm::cend(knownFormats);
-
-            if (!isKnown) {
+            if (!cmContains(knownFormats, format)) {
               cmSystemTools::Error("Unknown -E tar --format= argument: " +
                                    format);
               return 1;
@@ -1197,7 +1232,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
           return 1;
         }
       }
-#if defined(CMAKE_BUILD_WITH_CMAKE)
+#if !defined(CMAKE_BOOTSTRAP)
       cmConnection* conn;
       if (isDebug) {
         conn = new cmServerStdIoConnection;
@@ -1218,7 +1253,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string> const& args)
       return 1;
     }
 
-#if defined(CMAKE_BUILD_WITH_CMAKE)
+#if !defined(CMAKE_BOOTSTRAP)
     // Internal CMake Fortran module support.
     if (args[1] == "cmake_copy_f90_mod" && args.size() >= 4) {
       return cmDependsFortran::CopyModule(args) ? 0 : 1;
@@ -1339,14 +1374,12 @@ bool cmcmd::SymlinkInternal(std::string const& file, std::string const& link)
 
 static void cmcmdProgressReport(std::string const& dir, std::string const& num)
 {
-  std::string dirName = dir;
-  dirName += "/Progress";
+  std::string dirName = cmStrCat(dir, "/Progress");
   std::string fName;
   FILE* progFile;
 
   // read the count
-  fName = dirName;
-  fName += "/count.txt";
+  fName = cmStrCat(dirName, "/count.txt");
   progFile = cmsys::SystemTools::Fopen(fName, "r");
   int count = 0;
   if (!progFile) {
@@ -1361,8 +1394,7 @@ static void cmcmdProgressReport(std::string const& dir, std::string const& num)
   for (const char* c = last;; ++c) {
     if (*c == ',' || *c == '\0') {
       if (c != last) {
-        fName = dirName;
-        fName += "/";
+        fName = cmStrCat(dirName, '/');
         fName.append(last, c - last);
         progFile = cmsys::SystemTools::Fopen(fName, "w");
         if (progFile) {
@@ -1399,7 +1431,7 @@ int cmcmd::ExecuteEchoColor(std::vector<std::string> const& args)
       // Enable or disable color based on the switch value.
       std::string value = arg.substr(9);
       if (!value.empty()) {
-        enabled = cmSystemTools::IsOn(value);
+        enabled = cmIsOn(value);
       }
     } else if (cmHasLiteralPrefix(arg, "--progress-dir=")) {
       progressDir = arg.substr(15);
@@ -1451,7 +1483,7 @@ int cmcmd::ExecuteLinkScript(std::vector<std::string> const& args)
   bool verbose = false;
   if (args.size() >= 4) {
     if (args[3].find("--verbose=") == 0) {
-      if (!cmSystemTools::IsOff(args[3].substr(10))) {
+      if (!cmIsOff(args[3].substr(10))) {
         verbose = true;
       }
     }
@@ -1534,7 +1566,7 @@ int cmcmd::ExecuteLinkScript(std::vector<std::string> const& args)
 
 int cmcmd::WindowsCEEnvironment(const char* version, const std::string& name)
 {
-#if defined(CMAKE_BUILD_WITH_CMAKE) && defined(_WIN32) && !defined(__CYGWIN__)
+#if !defined(CMAKE_BOOTSTRAP) && defined(_WIN32) && !defined(__CYGWIN__)
   cmVisualStudioWCEPlatformParser parser(name.c_str());
   parser.ParseVersion(version);
   if (parser.Found()) {
@@ -1592,7 +1624,7 @@ private:
 // still works.
 int cmcmd::VisualStudioLink(std::vector<std::string> const& args, int type)
 {
-#if defined(_WIN32) && defined(CMAKE_BUILD_WITH_CMAKE)
+#if defined(_WIN32) && !defined(CMAKE_BOOTSTRAP)
   // Replace streambuf so we output in the system codepage. CMake is set up
   // to output in Unicode (see SetUTF8Pipes) but the Visual Studio linker
   // outputs using the system codepage so we need to change behavior when
@@ -1691,8 +1723,8 @@ bool cmVSLink::Parse(std::vector<std::string>::const_iterator argBeg,
   //   parsing the content of a response file and this iterator is active
   // - otherwise, we are parsing regular command line arguments and in_arg
   //   iterator is active
-  std::vector<std::string>::const_iterator ex_arg = expandedArgs.end();
-  std::vector<std::string>::const_iterator in_arg = argBeg;
+  auto ex_arg = expandedArgs.end();
+  auto in_arg = argBeg;
   // Simple state machine to follow where we are in the parsing: 
   bool parsingOptions = true;        // initial options
   bool parsingManifests = false;     // list of manifests
@@ -1716,7 +1748,7 @@ bool cmVSLink::Parse(std::vector<std::string>::const_iterator argBeg,
       break;
     }
     // active iterator
-    std::vector<std::string>::const_iterator& arg =
+    auto& arg =
       (ex_arg != expandedArgs.end()) ? ex_arg : in_arg;
     if ((parsingOptions || parsingManifests) && cmHasLiteralPrefix(*arg, "-")) {
       if (*arg == "--") { // next is the link command

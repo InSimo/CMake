@@ -2,12 +2,13 @@
 
 #include "cmCTest.h"
 #include "cmCTestCoverageHandler.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 #include "cmsys/Directory.hxx"
 #include "cmsys/FStream.hxx"
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
 /*
   To setup coverage for php.
@@ -210,9 +211,7 @@ bool cmParsePHPCoverage::ReadPHPCoverageDirectory(const char* d)
   for (i = 0; i < numf; i++) {
     std::string file = dir.GetFile(i);
     if (file != "." && file != ".." && !cmSystemTools::FileIsDirectory(file)) {
-      std::string path = d;
-      path += "/";
-      path += file;
+      std::string path = cmStrCat(d, '/', file);
       if (!this->ReadPHPData(path.c_str())) {
         return false;
       }

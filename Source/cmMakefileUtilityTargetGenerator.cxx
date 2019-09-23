@@ -7,7 +7,8 @@
 #include <utility>
 #include <vector>
 
-#include "cmAlgorithms.h"
+#include <cm/memory>
+
 #include "cmGeneratedFileStream.h"
 #include "cmGeneratorTarget.h"
 #include "cmGlobalUnixMakefileGenerator3.h"
@@ -24,6 +25,9 @@ cmMakefileUtilityTargetGenerator::cmMakefileUtilityTargetGenerator(
   this->OSXBundleGenerator =
     cm::make_unique<cmOSXBundleGenerator>(target, this->ConfigName);
   this->OSXBundleGenerator->SetMacContentFolders(&this->MacContentFolders);
+
+  this->LocalGenerator->AddUnityBuild(target, this->ConfigName);
+  this->LocalGenerator->AddPchDependencies(target, this->ConfigName);
 }
 
 cmMakefileUtilityTargetGenerator::~cmMakefileUtilityTargetGenerator() =

@@ -8,11 +8,11 @@
 #include "cmSystemTools.h"
 
 #include "cmsys/Encoding.hxx"
-#if defined(_WIN32) && defined(CMAKE_BUILD_WITH_CMAKE)
+#if defined(_WIN32) && !defined(CMAKE_BOOTSTRAP)
 #  include "cmsys/ConsoleBuf.hxx"
 #endif
+#include <cstring>
 #include <iostream>
-#include <string.h>
 #include <string>
 #include <vector>
 
@@ -83,7 +83,9 @@ static const char* cmDocumentationOptions[][2] = {
   { "-T <action>, --test-action <action>",
     "Sets the dashboard action to "
     "perform" },
-  { "--track <track>", "Specify the track to submit dashboard to" },
+  { "--group <group>",
+    "Specify what build group on the dashboard you'd like to "
+    "submit results to." },
   { "-S <script>, --script <script>",
     "Execute a dashboard for a "
     "configuration" },
@@ -144,7 +146,7 @@ static const char* cmDocumentationOptions[][2] = {
 int main(int argc, char const* const* argv)
 {
   cmSystemTools::EnsureStdPipes();
-#if defined(_WIN32) && defined(CMAKE_BUILD_WITH_CMAKE)
+#if defined(_WIN32) && !defined(CMAKE_BOOTSTRAP)
   // Replace streambuf so we can output Unicode to console
   cmsys::ConsoleBuf::Manager consoleOut(std::cout);
   consoleOut.SetUTF8Pipes();

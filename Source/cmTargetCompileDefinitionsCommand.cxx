@@ -2,11 +2,9 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmTargetCompileDefinitionsCommand.h"
 
-#include <sstream>
-
-#include "cmAlgorithms.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmStringAlgorithms.h"
 #include "cmTarget.h"
 
 class cmExecutionStatus;
@@ -20,11 +18,10 @@ bool cmTargetCompileDefinitionsCommand::InitialPass(
 void cmTargetCompileDefinitionsCommand::HandleMissingTarget(
   const std::string& name)
 {
-  std::ostringstream e;
-  e << "Cannot specify compile definitions for target \"" << name
-    << "\" "
-       "which is not built by this project.";
-  this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
+  this->Makefile->IssueMessage(
+    MessageType::FATAL_ERROR,
+    cmStrCat("Cannot specify compile definitions for target \"", name,
+             "\" which is not built by this project."));
 }
 
 std::string cmTargetCompileDefinitionsCommand::Join(

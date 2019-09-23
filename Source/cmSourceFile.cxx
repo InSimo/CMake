@@ -5,12 +5,12 @@
 #include <array>
 #include <utility>
 
-#include "cmCustomCommand.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
 #include "cmProperty.h"
 #include "cmState.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
@@ -18,11 +18,6 @@ cmSourceFile::cmSourceFile(cmMakefile* mf, const std::string& name,
                            cmSourceFileLocationKind kind)
   : Location(mf, name, kind)
 {
-}
-
-cmSourceFile::~cmSourceFile()
-{
-  this->SetCustomCommand(nullptr);
 }
 
 std::string const& cmSourceFile::GetExtension() const
@@ -44,11 +39,13 @@ std::string cmSourceFile::GetObjectLibrary() const
   return this->ObjectLibrary;
 }
 
-std::string cmSourceFile::GetLanguage()
+std::string const& cmSourceFile::GetOrDetermineLanguage()
 {
   // If the language was set explicitly by the user then use it.
   if (const char* lang = this->GetProperty(propLANGUAGE)) {
-    return lang;
+    // Assign to member in order to return a reference.
+    this->Language = lang;
+    return this->Language;
   }
 
   // Perform computation needed to get the language if necessary.
@@ -62,7 +59,7 @@ std::string cmSourceFile::GetLanguage()
         this->Location.DirectoryIsAmbiguous()) {
       // Finalize the file location to get the extension and set the
       // language.
-      this->GetFullPath();
+      this->ResolveFullPath();
     } else {
       // Use the known extension to get the language if possible.
       std::string ext =
@@ -71,8 +68,8 @@ std::string cmSourceFile::GetLanguage()
     }
   }
 
-  // Now try to determine the language.
-  return static_cast<cmSourceFile const*>(this)->GetLanguage();
+  // Use the language determined from the file extension.
+  return this->Language;
 }
 
 std::string cmSourceFile::GetLanguage() const
@@ -82,13 +79,8 @@ std::string cmSourceFile::GetLanguage() const
     return lang;
   }
 
-  // If the language was determined from the source file extension use it.
-  if (!this->Language.empty()) {
-    return this->Language;
-  }
-
-  // The language is not known.
-  return "";
+  // Use the language determined from the file extension.
+  return this->Language;
 }
 
 cmSourceFileLocation const& cmSourceFile::GetLocation() const
@@ -96,7 +88,7 @@ cmSourceFileLocation const& cmSourceFile::GetLocation() const
   return this->Location;
 }
 
-std::string const& cmSourceFile::GetFullPath(std::string* error)
+std::string const& cmSourceFile::ResolveFullPath(std::string* error)
 {
   if (this->FullPath.empty()) {
     if (this->FindFullPath(error)) {
@@ -150,9 +142,7 @@ bool cmSourceFile::FindFullPath(std::string* error)
     for (auto exts : extsLists) {
       for (std::string const& ext : *exts) {
         if (!ext.empty()) {
-          std::string extPath = fullPath;
-          extPath += '.';
-          extPath += ext;
+          std::string extPath = cmStrCat(fullPath, '.', ext);
           if (cmSystemTools::FileExists(extPath)) {
             this->FullPath = extPath;
             return true;
@@ -177,10 +167,8 @@ bool cmSourceFile::FindFullPath(std::string* error)
   }
 
   // Compose error
-  std::string err;
-  err += "Cannot find source file:\n  ";
-  err += lPath;
-  err += "\nTried extensions";
+  std::string err =
+    cmStrCat("Cannot find source file:\n  ", lPath, "\nTried extensions");
   for (auto exts : extsLists) {
     for (std::string const& ext : *exts) {
       err += " .";
@@ -242,7 +230,7 @@ void cmSourceFile::SetProperty(const std::string& prop, const char* value)
 
   // Update IsGenerated flag
   if (prop == propGENERATED) {
-    this->IsGenerated = cmSystemTools::IsOn(value);
+    this->IsGenerated = cmIsOn(value);
   }
 }
 
@@ -275,7 +263,14 @@ const char* cmSourceFile::GetPropertyForUser(const std::string& prop)
   // LOCATION property we must commit now.
   if (prop == propLOCATION) {
     // Commit to a location.
-    this->GetFullPath();
+    this->ResolveFullPath();
+  }
+
+  // Similarly, LANGUAGE can be determined by the file extension
+  // if it is requested by the user.
+  if (prop == propLANGUAGE) {
+    // The c_str pointer is valid until `this->Language` is modified.
+    return this->GetOrDetermineLanguage().c_str();
   }
 
   // Perform the normal property lookup.
@@ -316,22 +311,15 @@ const char* cmSourceFile::GetSafeProperty(const std::string& prop) const
 
 bool cmSourceFile::GetPropertyAsBool(const std::string& prop) const
 {
-  return cmSystemTools::IsOn(this->GetProperty(prop));
+  return cmIsOn(this->GetProperty(prop));
 }
 
-cmCustomCommand* cmSourceFile::GetCustomCommand()
+cmCustomCommand* cmSourceFile::GetCustomCommand() const
 {
-  return this->CustomCommand;
+  return this->CustomCommand.get();
 }
 
-cmCustomCommand const* cmSourceFile::GetCustomCommand() const
+void cmSourceFile::SetCustomCommand(std::unique_ptr<cmCustomCommand> cc)
 {
-  return this->CustomCommand;
-}
-
-void cmSourceFile::SetCustomCommand(cmCustomCommand* cc)
-{
-  cmCustomCommand* old = this->CustomCommand;
-  this->CustomCommand = cc;
-  delete old;
+  this->CustomCommand = std::move(cc);
 }

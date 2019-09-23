@@ -14,7 +14,7 @@
 #include "cmState.h"
 #include "cmVersion.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #ifdef __QNX__
 #  include <malloc.h> /* for malloc/free on QNX */
@@ -65,8 +65,10 @@ unsigned int CCONV cmGetMinorVersion(void*)
 
 void CCONV cmAddDefinition(void* arg, const char* name, const char* value)
 {
-  cmMakefile* mf = static_cast<cmMakefile*>(arg);
-  mf->AddDefinition(name, value);
+  if (value) {
+    cmMakefile* mf = static_cast<cmMakefile*>(arg);
+    mf->AddDefinition(name, value);
+  }
 }
 
 /* Add a definition to this makefile and the global cmake cache. */
@@ -421,7 +423,7 @@ int CCONV cmExecuteCommand(void* arg, const char* name, int numArgs,
     // Assume all arguments are quoted.
     lff.Arguments.emplace_back(args[i], cmListFileArgument::Quoted, 0);
   }
-  cmExecutionStatus status;
+  cmExecutionStatus status(*mf);
   return mf->ExecuteCommand(lff, status);
 }
 
@@ -488,9 +490,9 @@ class cmCPluginAPISourceFileMap
   : public std::map<cmSourceFile*, cmCPluginAPISourceFile*>
 {
 public:
-  typedef std::map<cmSourceFile*, cmCPluginAPISourceFile*> derived;
-  typedef derived::iterator iterator;
-  typedef derived::value_type value_type;
+  using derived = std::map<cmSourceFile*, cmCPluginAPISourceFile*>;
+  using iterator = derived::iterator;
+  using value_type = derived::value_type;
   cmCPluginAPISourceFileMap() = default;
   ~cmCPluginAPISourceFileMap()
   {
@@ -529,12 +531,12 @@ void CCONV* cmGetSource(void* arg, const char* name)
   cmMakefile* mf = static_cast<cmMakefile*>(arg);
   if (cmSourceFile* rsf = mf->GetSource(name)) {
     // Lookup the proxy source file object for this source.
-    cmCPluginAPISourceFileMap::iterator i = cmCPluginAPISourceFiles.find(rsf);
+    auto i = cmCPluginAPISourceFiles.find(rsf);
     if (i == cmCPluginAPISourceFiles.end()) {
       // Create a proxy source file object for this source.
       cmCPluginAPISourceFile* sf = new cmCPluginAPISourceFile;
       sf->RealSourceFile = rsf;
-      sf->FullPath = rsf->GetFullPath();
+      sf->FullPath = rsf->ResolveFullPath();
       sf->SourceName =
         cmSystemTools::GetFilenameWithoutLastExtension(sf->FullPath);
       sf->SourceExtension =
@@ -606,7 +608,7 @@ int CCONV cmSourceFileGetPropertyAsBool(void* arg, const char* prop)
   if (cmSourceFile* rsf = sf->RealSourceFile) {
     return rsf->GetPropertyAsBool(prop) ? 1 : 0;
   }
-  return cmSystemTools::IsOn(cmSourceFileGetProperty(arg, prop)) ? 1 : 0;
+  return cmIsOn(cmSourceFileGetProperty(arg, prop)) ? 1 : 0;
 }
 
 void CCONV cmSourceFileSetProperty(void* arg, const char* prop,
@@ -688,9 +690,7 @@ void CCONV cmSourceFileSetName(void* arg, const char* name, const char* dir,
 
   // Next, try the various source extensions
   for (std::string const& ext : sourceExts) {
-    hname = pathname;
-    hname += ".";
-    hname += ext;
+    hname = cmStrCat(pathname, '.', ext);
     if (cmSystemTools::FileExists(hname)) {
       sf->SourceExtension = ext;
       sf->FullPath = hname;
@@ -700,9 +700,7 @@ void CCONV cmSourceFileSetName(void* arg, const char* name, const char* dir,
 
   // Finally, try the various header extensions
   for (std::string const& ext : headerExts) {
-    hname = pathname;
-    hname += ".";
-    hname += ext;
+    hname = cmStrCat(pathname, '.', ext);
     if (cmSystemTools::FileExists(hname)) {
       sf->SourceExtension = ext;
       sf->FullPath = hname;

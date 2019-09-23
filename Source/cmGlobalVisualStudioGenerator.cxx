@@ -10,9 +10,11 @@
 #include <shellapi.h>
 #include <windows.h>
 
-#include "cmAlgorithms.h"
+#include <cm/iterator>
+
 #include "cmCallVisualStudioMacro.h"
 #include "cmCustomCommand.h"
+#include "cmCustomCommandLines.h"
 #include "cmGeneratedFileStream.h"
 #include "cmGeneratorTarget.h"
 #include "cmLocalVisualStudioGenerator.h"
@@ -57,7 +59,7 @@ void cmGlobalVisualStudioGenerator::EnableLanguage(
   std::vector<std::string> const& lang, cmMakefile* mf, bool optional)
 {
   mf->AddDefinition("CMAKE_VS_PLATFORM_NAME_DEFAULT",
-                    this->DefaultPlatformName.c_str());
+                    this->DefaultPlatformName);
   this->cmGlobalGenerator::EnableLanguage(lang, mf, optional);
 }
 
@@ -69,7 +71,7 @@ bool cmGlobalVisualStudioGenerator::SetGeneratorPlatform(std::string const& p,
   } else if (this->GetPlatformName() == "Itanium") {
     mf->AddDefinition("CMAKE_FORCE_IA64", "TRUE");
   }
-  mf->AddDefinition("CMAKE_VS_PLATFORM_NAME", this->GetPlatformName().c_str());
+  mf->AddDefinition("CMAKE_VS_PLATFORM_NAME", this->GetPlatformName());
   return this->cmGlobalGenerator::SetGeneratorPlatform(p, mf);
 }
 
@@ -104,6 +106,9 @@ const char* cmGlobalVisualStudioGenerator::GetIDEVersion() const
 
 void cmGlobalVisualStudioGenerator::WriteSLNHeader(std::ostream& fout)
 {
+  char utf8bom[] = { char(0xEF), char(0xBB), char(0xBF) };
+  fout.write(utf8bom, 3);
+
   switch (this->Version) {
     case cmGlobalVisualStudioGenerator::VS9:
       fout << "Microsoft Visual Studio Solution File, Format Version 10.00\n";
@@ -224,8 +229,8 @@ void cmGlobalVisualStudioGenerator::AddExtraIDETargets()
 void cmGlobalVisualStudioGenerator::ComputeTargetObjectDirectory(
   cmGeneratorTarget* gt) const
 {
-  std::string dir = gt->LocalGenerator->GetCurrentBinaryDirectory();
-  dir += "/";
+  std::string dir =
+    cmStrCat(gt->LocalGenerator->GetCurrentBinaryDirectory(), '/');
   std::string tgtDir = gt->LocalGenerator->GetTargetDirectory(gt);
   if (!tgtDir.empty()) {
     dir += tgtDir;
@@ -258,8 +263,8 @@ void cmGlobalVisualStudioGenerator::ConfigureCMakeVisualStudioMacros()
   std::string dir = this->GetUserMacrosDirectory();
 
   if (!dir.empty()) {
-    std::string src = cmSystemTools::GetCMakeRoot();
-    src += "/Templates/" CMAKE_VSMACROS_FILENAME;
+    std::string src = cmStrCat(cmSystemTools::GetCMakeRoot(),
+                               "/Templates/" CMAKE_VSMACROS_FILENAME);
 
     std::string dst = dir + "/CMakeMacros/" CMAKE_VSMACROS_FILENAME;
 
@@ -306,10 +311,9 @@ void cmGlobalVisualStudioGenerator::CallVisualStudioMacro(
       if (vsSolutionFile) {
         topLevelSlnName = vsSolutionFile;
       } else {
-        topLevelSlnName = mf->GetCurrentBinaryDirectory();
-        topLevelSlnName += "/";
-        topLevelSlnName += this->LocalGenerators[0]->GetProjectName();
-        topLevelSlnName += ".sln";
+        topLevelSlnName =
+          cmStrCat(mf->GetCurrentBinaryDirectory(), '/',
+                   this->LocalGenerators[0]->GetProjectName(), ".sln");
       }
 
       if (m == MacroReload) {
@@ -487,8 +491,8 @@ bool cmGlobalVisualStudioGenerator::FindMakeProgram(cmMakefile* mf)
   // Visual Studio generators know how to lookup their build tool
   // directly instead of needing a helper module to do it, so we
   // do not actually need to put CMAKE_MAKE_PROGRAM into the cache.
-  if (cmSystemTools::IsOff(mf->GetDefinition("CMAKE_MAKE_PROGRAM"))) {
-    mf->AddDefinition("CMAKE_MAKE_PROGRAM", this->GetVSMakeProgram().c_str());
+  if (cmIsOff(mf->GetDefinition("CMAKE_MAKE_PROGRAM"))) {
+    mf->AddDefinition("CMAKE_MAKE_PROGRAM", this->GetVSMakeProgram());
   }
   return true;
 }
@@ -553,9 +557,9 @@ bool IsVisualStudioMacrosFileRegistered(const std::string& macrosFile,
   if (ERROR_SUCCESS == result) {
     // Iterate the subkeys and look for the values of interest in each subkey:
     wchar_t subkeyname[256];
-    DWORD cch_subkeyname = sizeof(subkeyname) * sizeof(subkeyname[0]);
+    DWORD cch_subkeyname = cm::size(subkeyname);
     wchar_t keyclass[256];
-    DWORD cch_keyclass = sizeof(keyclass) * sizeof(keyclass[0]);
+    DWORD cch_keyclass = cm::size(keyclass);
     FILETIME lastWriteTime;
     lastWriteTime.dwHighDateTime = 0;
     lastWriteTime.dwLowDateTime = 0;
@@ -569,8 +573,8 @@ bool IsVisualStudioMacrosFileRegistered(const std::string& macrosFile,
       if (ERROR_SUCCESS == result) {
         DWORD valueType = REG_SZ;
         wchar_t data1[256];
-        DWORD cch_data1 = sizeof(data1) * sizeof(data1[0]);
-        RegQueryValueExW(hsubkey, L"Path", 0, &valueType, (LPBYTE)&data1[0],
+        DWORD cch_data1 = sizeof(data1);
+        RegQueryValueExW(hsubkey, L"Path", 0, &valueType, (LPBYTE)data1,
                          &cch_data1);
 
         DWORD data2 = 0;
@@ -618,8 +622,8 @@ bool IsVisualStudioMacrosFileRegistered(const std::string& macrosFile,
       }
 
       ++index;
-      cch_subkeyname = sizeof(subkeyname) * sizeof(subkeyname[0]);
-      cch_keyclass = sizeof(keyclass) * sizeof(keyclass[0]);
+      cch_subkeyname = cm::size(subkeyname);
+      cch_keyclass = cm::size(keyclass);
       lastWriteTime.dwHighDateTime = 0;
       lastWriteTime.dwLowDateTime = 0;
     }
@@ -634,9 +638,7 @@ bool IsVisualStudioMacrosFileRegistered(const std::string& macrosFile,
   // follow the expected naming scheme. Expected naming scheme is that
   // the subkeys of OtherProjects7 is 0 to n-1, so it's ok to use "n"
   // as the name of the next subkey.
-  std::ostringstream ossNext;
-  ossNext << index;
-  nextAvailableSubKeyName = ossNext.str();
+  nextAvailableSubKeyName = std::to_string(index);
 
   keyname = regKeyBase + "\\RecordingProject7";
   hkey = NULL;
@@ -646,9 +648,8 @@ bool IsVisualStudioMacrosFileRegistered(const std::string& macrosFile,
   if (ERROR_SUCCESS == result) {
     DWORD valueType = REG_SZ;
     wchar_t data1[256];
-    DWORD cch_data1 = sizeof(data1) * sizeof(data1[0]);
-    RegQueryValueExW(hkey, L"Path", 0, &valueType, (LPBYTE)&data1[0],
-                     &cch_data1);
+    DWORD cch_data1 = sizeof(data1);
+    RegQueryValueExW(hkey, L"Path", 0, &valueType, (LPBYTE)data1, &cch_data1);
 
     DWORD data2 = 0;
     DWORD cch_data2 = sizeof(data2);
@@ -901,17 +902,11 @@ void cmGlobalVisualStudioGenerator::AddSymbolExportCommand(
   std::string obj_dir = gt->ObjectDirectory;
   std::string cmakeCommand = cmSystemTools::GetCMakeCommand();
   cmSystemTools::ConvertToWindowsExtendedPath(cmakeCommand);
-  cmCustomCommandLine cmdl;
-  cmdl.push_back(cmakeCommand);
-  cmdl.push_back("-E");
-  cmdl.push_back("__create_def");
-  cmdl.push_back(mdi->DefFile);
   std::string obj_dir_expanded = obj_dir;
   cmSystemTools::ReplaceString(obj_dir_expanded, this->GetCMakeCFGIntDir(),
                                configName.c_str());
   cmSystemTools::MakeDirectory(obj_dir_expanded);
   std::string const objs_file = obj_dir_expanded + "/objects.txt";
-  cmdl.push_back(objs_file);
   cmGeneratedFileStream fout(objs_file.c_str());
   if (!fout) {
     cmSystemTools::Error("could not open " + objs_file);
@@ -949,8 +944,8 @@ void cmGlobalVisualStudioGenerator::AddSymbolExportCommand(
     fout << i->GetFullPath() << "\n";
   }
 
-  cmCustomCommandLines commandLines;
-  commandLines.push_back(cmdl);
+  cmCustomCommandLines commandLines = cmMakeSingleCommandLine(
+    { cmakeCommand, "-E", "__create_def", mdi->DefFile, objs_file });
   cmCustomCommand command(gt->Target->GetMakefile(), outputs, empty, empty,
                           commandLines, "Auto build dll exports", ".");
   commands.push_back(command);

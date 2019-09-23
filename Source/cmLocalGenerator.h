@@ -121,9 +121,13 @@ public:
   //! Append flags to a string.
   virtual void AppendFlags(std::string& flags,
                            const std::string& newFlags) const;
-  virtual void AppendFlags(std::string& flags, const char* newFlags) const;
+  virtual void AppendFlags(std::string& flags,
+                           const std::vector<BT<std::string>>& newFlags) const;
   virtual void AppendFlagEscape(std::string& flags,
                                 const std::string& rawFlag) const;
+  void AddPchDependencies(cmGeneratorTarget* target,
+                          const std::string& config);
+  void AddUnityBuild(cmGeneratorTarget* target, const std::string& config);
   void AppendIPOLinkerFlags(std::string& flags, cmGeneratorTarget* target,
                             const std::string& config,
                             const std::string& lang);
@@ -194,6 +198,9 @@ public:
   }
   void AppendCompileOptions(std::string& options,
                             const std::vector<std::string>& options_vec,
+                            const char* regex = nullptr) const;
+  void AppendCompileOptions(std::vector<BT<std::string>>& options,
+                            const std::vector<BT<std::string>>& options_vec,
                             const char* regex = nullptr) const;
 
   /**
@@ -281,6 +288,9 @@ public:
 
   void AddCompileOptions(std::string& flags, cmGeneratorTarget* target,
                          const std::string& lang, const std::string& config);
+  void AddCompileOptions(std::vector<BT<std::string>>& flags,
+                         cmGeneratorTarget* target, const std::string& lang,
+                         const std::string& config);
 
   std::string GetProjectName() const;
 
@@ -361,6 +371,9 @@ public:
   void GetStaticLibraryFlags(std::string& flags, std::string const& config,
                              std::string const& linkLanguage,
                              cmGeneratorTarget* target);
+  std::vector<BT<std::string>> GetStaticLibraryFlags(
+    std::string const& config, std::string const& linkLanguage,
+    cmGeneratorTarget* target);
 
   /** Fill out these strings for the given target.  Libraries to link,
    *  flags, and linkflags. */
@@ -369,6 +382,11 @@ public:
                       std::string& flags, std::string& linkFlags,
                       std::string& frameworkPath, std::string& linkPath,
                       cmGeneratorTarget* target);
+  void GetTargetFlags(
+    cmLinkLineComputer* linkLineComputer, const std::string& config,
+    std::vector<BT<std::string>>& linkLibs, std::string& flags,
+    std::vector<BT<std::string>>& linkFlags, std::string& frameworkPath,
+    std::vector<BT<std::string>>& linkPath, cmGeneratorTarget* target);
   void GetTargetDefines(cmGeneratorTarget const* target,
                         std::string const& config, std::string const& lang,
                         std::set<std::string>& defines) const;
@@ -378,6 +396,9 @@ public:
   void GetTargetCompileFlags(cmGeneratorTarget* target,
                              std::string const& config,
                              std::string const& lang, std::string& flags);
+  std::vector<BT<std::string>> GetTargetCompileFlags(cmGeneratorTarget* target,
+                                                     std::string const& config,
+                                                     std::string const& lang);
 
   std::string GetFrameworkFlags(std::string const& l,
                                 std::string const& config,
@@ -408,6 +429,11 @@ protected:
                            cmLinkLineComputer* linkLineComputer,
                            std::string& linkLibraries,
                            std::string& frameworkPath, std::string& linkPath);
+  void OutputLinkLibraries(cmComputeLinkInformation* pcli,
+                           cmLinkLineComputer* linkLineComputer,
+                           std::vector<BT<std::string>>& linkLibraries,
+                           std::string& frameworkPath,
+                           std::vector<BT<std::string>>& linkPath);
 
   // Handle old-style install rules stored in the targets.
   void GenerateTargetInstallRules(
@@ -431,8 +457,8 @@ protected:
 
   std::set<std::string> EnvCPATH;
 
-  typedef std::unordered_map<std::string, cmGeneratorTarget*>
-    GeneratorTargetMap;
+  using GeneratorTargetMap =
+    std::unordered_map<std::string, cmGeneratorTarget*>;
   GeneratorTargetMap GeneratorTargetSearchIndex;
   std::vector<cmGeneratorTarget*> GeneratorTargets;
 
@@ -461,7 +487,7 @@ private:
   void ComputeObjectMaxPath();
 };
 
-#if defined(CMAKE_BUILD_WITH_CMAKE)
+#if !defined(CMAKE_BOOTSTRAP)
 bool cmLocalGeneratorCheckObjectName(std::string& objName,
                                      std::string::size_type dir_len,
                                      std::string::size_type max_total_len);

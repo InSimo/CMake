@@ -2,13 +2,14 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmSourceGroupCommand.h"
 
-#include <algorithm>
+#include <cstddef>
 #include <set>
-#include <stddef.h>
 #include <utility>
 
+#include "cmAlgorithms.h"
 #include "cmMakefile.h"
 #include "cmSourceGroup.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 namespace {
@@ -20,7 +21,7 @@ const std::string kSourceGroupOptionName = "<sg_name>";
 
 std::vector<std::string> tokenizePath(const std::string& path)
 {
-  return cmSystemTools::tokenize(path, "\\/");
+  return cmTokenize(path, "\\/");
 }
 
 std::string getFullFilePath(const std::string& currentPath,
@@ -29,9 +30,7 @@ std::string getFullFilePath(const std::string& currentPath,
   std::string fullPath = path;
 
   if (!cmSystemTools::FileIsFullPath(path)) {
-    fullPath = currentPath;
-    fullPath += "/";
-    fullPath += path;
+    fullPath = cmStrCat(currentPath, '/', path);
   }
 
   return cmSystemTools::CollapseFullPath(fullPath);
@@ -54,8 +53,8 @@ bool rootIsPrefix(const std::string& root,
                   const std::vector<std::string>& files, std::string& error)
 {
   for (std::string const& file : files) {
-    if (!cmSystemTools::StringStartsWith(file, root.c_str())) {
-      error = "ROOT: " + root + " is not a prefix of file: " + file;
+    if (!cmHasPrefix(file, root)) {
+      error = cmStrCat("ROOT: ", root, " is not a prefix of file: ", file);
       return false;
     }
   }
@@ -93,7 +92,7 @@ bool addFilesToItsSourceGroups(const std::string& root,
 
     std::vector<std::string> tokenizedPath;
     if (!prefix.empty()) {
-      tokenizedPath = tokenizePath(prefix + '/' + sgFilesPath);
+      tokenizedPath = tokenizePath(cmStrCat(prefix, '/', sgFilesPath));
     } else {
       tokenizedPath = tokenizePath(sgFilesPath);
     }
@@ -139,8 +138,7 @@ cmSourceGroupCommand::getExpectedOptions() const
 bool cmSourceGroupCommand::isExpectedOption(
   const std::string& argument, const ExpectedOptions& expectedOptions)
 {
-  return std::find(expectedOptions.begin(), expectedOptions.end(), argument) !=
-    expectedOptions.end();
+  return cmContains(expectedOptions, argument);
 }
 
 void cmSourceGroupCommand::parseArguments(
@@ -236,9 +234,8 @@ bool cmSourceGroupCommand::InitialPass(std::vector<std::string> const& args,
     for (auto const& filesArg : filesArguments) {
       std::string src = filesArg;
       if (!cmSystemTools::FileIsFullPath(src)) {
-        src = this->Makefile->GetCurrentSourceDirectory();
-        src += "/";
-        src += filesArg;
+        src =
+          cmStrCat(this->Makefile->GetCurrentSourceDirectory(), '/', filesArg);
       }
       src = cmSystemTools::CollapseFullPath(src);
       sg->AddGroupFile(src);
@@ -287,8 +284,7 @@ bool cmSourceGroupCommand::checkSingleParameterArgumentPreconditions(
   const std::string& argument, const ParsedArguments& parsedArguments,
   std::string& errorMsg) const
 {
-  ParsedArguments::const_iterator foundArgument =
-    parsedArguments.find(argument);
+  auto foundArgument = parsedArguments.find(argument);
   if (foundArgument != parsedArguments.end()) {
     const std::vector<std::string>& optionArguments = foundArgument->second;
 

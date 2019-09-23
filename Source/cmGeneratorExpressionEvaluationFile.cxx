@@ -3,7 +3,7 @@
 #include "cmGeneratorExpressionEvaluationFile.h"
 
 #include "cmsys/FStream.hxx"
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <sstream>
 #include <utility>
 
@@ -64,8 +64,7 @@ void cmGeneratorExpressionEvaluationFile::Generate(
     outputFileName = this->FixRelativePath(outputFileName, PathForOutput, lg);
   }
 
-  std::map<std::string, std::string>::iterator it =
-    outputFiles.find(outputFileName);
+  auto it = outputFiles.find(outputFileName);
 
   if (it != outputFiles.end()) {
     if (it->second == outputContent) {

@@ -6,12 +6,15 @@
 #include "cmConfigure.h" // IWYU pragma: keep
 
 #include "cmCTestHandlerCommand.h"
+#include "cmCommand.h"
 
 #include <set>
 #include <string>
+#include <utility>
+
+#include <cm/memory>
 
 class cmCTestGenericHandler;
-class cmCommand;
 
 /** \class cmCTestUpload
  * \brief Run a ctest script
@@ -25,12 +28,12 @@ public:
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() override
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestUploadCommand* ni = new cmCTestUploadCommand;
+    auto ni = cm::make_unique<cmCTestUploadCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
@@ -38,7 +41,7 @@ public:
    */
   std::string GetName() const override { return "ctest_upload"; }
 
-  typedef cmCTestHandlerCommand Superclass;
+  using Superclass = cmCTestHandlerCommand;
 
 protected:
   cmCTestGenericHandler* InitializeHandler() override;

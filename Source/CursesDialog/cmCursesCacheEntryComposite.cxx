@@ -11,10 +11,11 @@
 #include "cmCursesWidget.h"
 #include "cmState.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
-#include <assert.h>
+#include <cassert>
 #include <vector>
 
 cmCursesCacheEntryComposite::cmCursesCacheEntryComposite(
@@ -49,7 +50,7 @@ cmCursesCacheEntryComposite::cmCursesCacheEntryComposite(
   switch (cm->GetState()->GetCacheEntryType(key)) {
     case cmStateEnums::BOOL:
       this->Entry = new cmCursesBoolWidget(this->EntryWidth, 1, 1, 1);
-      if (cmSystemTools::IsOn(value)) {
+      if (cmIsOn(value)) {
         static_cast<cmCursesBoolWidget*>(this->Entry)->SetValueAsBool(true);
       } else {
         static_cast<cmCursesBoolWidget*>(this->Entry)->SetValueAsBool(false);
@@ -70,8 +71,7 @@ cmCursesCacheEntryComposite::cmCursesCacheEntryComposite(
         cmCursesOptionsWidget* ow =
           new cmCursesOptionsWidget(this->EntryWidth, 1, 1, 1);
         this->Entry = ow;
-        std::vector<std::string> options;
-        cmSystemTools::ExpandListArgument(stringsProp, options);
+        std::vector<std::string> options = cmExpandedList(stringsProp);
         for (auto const& opt : options) {
           ow->AddOption(opt);
         }

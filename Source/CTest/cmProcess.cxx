@@ -7,10 +7,11 @@
 #include "cmCTestRunTest.h"
 #include "cmCTestTestHandler.h"
 #include "cmGetPipes.h"
+#include "cmStringAlgorithms.h"
 #include "cmsys/Process.h"
 
+#include <csignal>
 #include <iostream>
-#include <signal.h>
 #include <string>
 #if defined(_WIN32)
 #  include "cm_kwiml.h"
@@ -694,8 +695,7 @@ std::string cmProcess::GetExitExceptionString()
 #    endif
 #  endif
     default:
-      exception_str = "Signal ";
-      exception_str += std::to_string(this->Signal);
+      exception_str = cmStrCat("Signal ", this->Signal);
   }
 #endif
   return exception_str;

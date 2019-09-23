@@ -9,6 +9,7 @@
 #include "cmAlgorithms.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 class cmExecutionStatus;
@@ -21,7 +22,7 @@ bool cmIncludeDirectoryCommand::InitialPass(
     return true;
   }
 
-  std::vector<std::string>::const_iterator i = args.begin();
+  auto i = args.begin();
 
   bool before = this->Makefile->IsOn("CMAKE_INCLUDE_DIRECTORIES_BEFORE");
   bool system = false;
@@ -116,14 +117,13 @@ void cmIncludeDirectoryCommand::NormalizeInclude(std::string& inc)
     return;
   }
 
-  if (!cmSystemTools::IsOff(inc)) {
+  if (!cmIsOff(inc)) {
     cmSystemTools::ConvertToUnixSlashes(inc);
 
     if (!cmSystemTools::FileIsFullPath(inc)) {
       if (!cmGeneratorExpression::StartsWithGeneratorExpression(inc)) {
-        std::string tmp = this->Makefile->GetCurrentSourceDirectory();
-        tmp += "/";
-        tmp += inc;
+        std::string tmp =
+          cmStrCat(this->Makefile->GetCurrentSourceDirectory(), '/', inc);
         inc = tmp;
       }
     }

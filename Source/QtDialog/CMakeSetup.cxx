@@ -6,6 +6,7 @@
 #include "cmAlgorithms.h"
 #include "cmDocumentation.h"
 #include "cmDocumentationEntry.h"
+#include "cmStringAlgorithms.h"
 #include "cmVersion.h"
 #include "cmake.h"
 #include "cmsys/CommandLineArguments.hxx"
@@ -228,8 +229,8 @@ int main(int argc, char** argv)
 
 #if defined(Q_OS_MAC)
 #  include "cm_sys_stat.h"
-#  include <errno.h>
-#  include <string.h>
+#  include <cerrno>
+#  include <cstring>
 #  include <unistd.h>
 static bool cmOSXInstall(std::string const& dir, std::string const& tool)
 {

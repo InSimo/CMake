@@ -1,6 +1,5 @@
 #include "cmUVProcessChain.h"
 
-#include "cmAlgorithms.h"
 #include "cmGetPipes.h"
 #include "cmUVHandlePtr.h"
 #include "cmUVStreambuf.h"
@@ -15,6 +14,8 @@
 #include <vector>
 
 #include <csignal>
+
+#include <cm/memory>
 
 struct ExpectedStatus
 {

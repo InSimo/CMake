@@ -13,7 +13,7 @@
 #include "cmOSXBundleGenerator.h"
 
 #include <map>
-#include <memory> // IWYU pragma: keep
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -70,6 +70,7 @@ protected:
   std::string LanguageDyndepRule(std::string const& lang) const;
   bool NeedDyndep(std::string const& lang) const;
   bool UsePreprocessedSource(std::string const& lang) const;
+  bool CompilePreprocessedSourceWithDefines(std::string const& lang) const;
 
   std::string OrderDependsTargetForTarget();
 

@@ -148,12 +148,11 @@ class cmGlobalGhsMultiGenerator::OrderedTargetDependSet
   : public std::multiset<cmTargetDepend,
                          cmGlobalGhsMultiGenerator::TargetCompare>
 {
-  typedef std::multiset<cmTargetDepend,
-                        cmGlobalGhsMultiGenerator::TargetCompare>
-    derived;
+  using derived =
+    std::multiset<cmTargetDepend, cmGlobalGhsMultiGenerator::TargetCompare>;
 
 public:
-  typedef cmGlobalGenerator::TargetDependSet TargetDependSet;
+  using TargetDependSet = cmGlobalGenerator::TargetDependSet;
   OrderedTargetDependSet(TargetDependSet const&, std::string const& first);
 };
 

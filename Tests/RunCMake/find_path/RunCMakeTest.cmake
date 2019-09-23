@@ -1,9 +1,8 @@
 include(RunCMake)
 
 run_cmake(EmptyOldStyle)
-if(WIN32 OR CYGWIN)
-  run_cmake(PrefixInPATH)
-endif()
+run_cmake(FromPATHEnv)
+run_cmake(PrefixInPATH)
 
 if(APPLE)
   run_cmake(FrameworksWithSubdirs)

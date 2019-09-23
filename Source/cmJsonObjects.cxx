@@ -14,13 +14,13 @@
 #include "cmLinkLineComputer.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
-#include "cmProperty.h"
 #include "cmPropertyMap.h"
 #include "cmSourceFile.h"
 #include "cmState.h"
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 #include "cmTest.h"
@@ -32,6 +32,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -263,7 +264,7 @@ static Json::Value DumpSourceFilesList(
   std::unordered_map<LanguageData, std::vector<std::string>> fileGroups;
   for (cmSourceFile* file : files) {
     LanguageData fileData;
-    fileData.Language = file->GetLanguage();
+    fileData.Language = file->GetOrDetermineLanguage();
     if (!fileData.Language.empty()) {
       const LanguageData& ld = languageDataMap.at(fileData.Language);
       cmLocalGenerator* lg = target->GetLocalGenerator();
@@ -326,7 +327,7 @@ static Json::Value DumpSourceFilesList(
 
     fileData.IsGenerated = file->GetIsGenerated();
     std::vector<std::string>& groupFileList = fileGroups[fileData];
-    groupFileList.push_back(file->GetFullPath());
+    groupFileList.push_back(file->ResolveFullPath());
   }
 
   const std::string& baseDir = target->Makefile->GetCurrentSourceDirectory();
@@ -363,12 +364,12 @@ static Json::Value DumpCTestInfo(cmLocalGenerator* lg, cmTest* testInfo,
 
   // Build up the list of properties that may have been specified
   Json::Value properties = Json::arrayValue;
-  for (auto& prop : testInfo->GetProperties()) {
+  for (auto& prop : testInfo->GetProperties().GetList()) {
     Json::Value entry = Json::objectValue;
     entry[kKEY_KEY] = prop.first;
 
     // Remove config variables from the value too.
-    auto cge_value = ge.Parse(prop.second.GetValue());
+    auto cge_value = ge.Parse(prop.second);
     const std::string& processed_value = cge_value->Evaluate(lg, config);
     entry[kVALUE_KEY] = processed_value;
     properties.append(entry);
@@ -500,9 +501,9 @@ static Json::Value DumpTarget(cmGeneratorTarget* target,
         if (!dest.empty() && cmSystemTools::FileIsFullPath(dest)) {
           installPath = dest;
         } else {
-          std::string installPrefix =
-            target->Makefile->GetSafeDefinition("CMAKE_INSTALL_PREFIX");
-          installPath = installPrefix + '/' + dest;
+          installPath = cmStrCat(
+            target->Makefile->GetSafeDefinition("CMAKE_INSTALL_PREFIX"), '/',
+            dest);
         }
 
         installPaths.append(installPath);
@@ -516,9 +517,11 @@ static Json::Value DumpTarget(cmGeneratorTarget* target,
     Json::Value artifacts = Json::arrayValue;
     artifacts.append(
       target->GetFullPath(config, cmStateEnums::RuntimeBinaryArtifact));
-    if (target->IsDLLPlatform()) {
+    if (target->HasImportLibrary(config)) {
       artifacts.append(
         target->GetFullPath(config, cmStateEnums::ImportLibraryArtifact));
+    }
+    if (target->IsDLLPlatform()) {
       const cmGeneratorTarget::OutputInfo* output =
         target->GetOutputInfo(config);
       if (output && !output->PdbDir.empty()) {
@@ -539,19 +542,19 @@ static Json::Value DumpTarget(cmGeneratorTarget* target,
     lg->GetTargetFlags(&linkLineComputer, config, linkLibs, linkLanguageFlags,
                        linkFlags, frameworkPath, linkPath, target);
 
-    linkLibs = cmSystemTools::TrimWhitespace(linkLibs);
-    linkFlags = cmSystemTools::TrimWhitespace(linkFlags);
-    linkLanguageFlags = cmSystemTools::TrimWhitespace(linkLanguageFlags);
-    frameworkPath = cmSystemTools::TrimWhitespace(frameworkPath);
-    linkPath = cmSystemTools::TrimWhitespace(linkPath);
+    linkLibs = cmTrimWhitespace(linkLibs);
+    linkFlags = cmTrimWhitespace(linkFlags);
+    linkLanguageFlags = cmTrimWhitespace(linkLanguageFlags);
+    frameworkPath = cmTrimWhitespace(frameworkPath);
+    linkPath = cmTrimWhitespace(linkPath);
 
-    if (!cmSystemTools::TrimWhitespace(linkLibs).empty()) {
+    if (!cmTrimWhitespace(linkLibs).empty()) {
       result[kLINK_LIBRARIES_KEY] = linkLibs;
     }
-    if (!cmSystemTools::TrimWhitespace(linkFlags).empty()) {
+    if (!cmTrimWhitespace(linkFlags).empty()) {
       result[kLINK_FLAGS_KEY] = linkFlags;
     }
-    if (!cmSystemTools::TrimWhitespace(linkLanguageFlags).empty()) {
+    if (!cmTrimWhitespace(linkLanguageFlags).empty()) {
       result[kLINK_LANGUAGE_FLAGS_KEY] = linkLanguageFlags;
     }
     if (!frameworkPath.empty()) {

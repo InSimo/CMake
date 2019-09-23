@@ -7,11 +7,12 @@
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
+#include <cstring>
 #include <sstream>
-#include <string.h>
 
 class cmExecutionStatus;
 
@@ -90,9 +91,8 @@ cmCTestGenericHandler* cmCTestBuildCommand::InitializeHandler()
           this->Makefile->GetCMakeInstance()->CreateGlobalGenerator(
             cmakeGeneratorName);
         if (!this->GlobalGenerator) {
-          std::string e = "could not create generator named \"";
-          e += cmakeGeneratorName;
-          e += "\"";
+          std::string e = cmStrCat("could not create generator named \"",
+                                   cmakeGeneratorName, '"');
           this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e);
           cmSystemTools::SetFatalErrorOccured();
           return nullptr;
@@ -154,17 +154,15 @@ bool cmCTestBuildCommand::InitialPass(std::vector<std::string> const& args,
 {
   bool ret = cmCTestHandlerCommand::InitialPass(args, status);
   if (this->Values[ctb_NUMBER_ERRORS] && *this->Values[ctb_NUMBER_ERRORS]) {
-    std::ostringstream str;
-    str << this->Handler->GetTotalErrors();
-    this->Makefile->AddDefinition(this->Values[ctb_NUMBER_ERRORS],
-                                  str.str().c_str());
+    this->Makefile->AddDefinition(
+      this->Values[ctb_NUMBER_ERRORS],
+      std::to_string(this->Handler->GetTotalErrors()));
   }
   if (this->Values[ctb_NUMBER_WARNINGS] &&
       *this->Values[ctb_NUMBER_WARNINGS]) {
-    std::ostringstream str;
-    str << this->Handler->GetTotalWarnings();
-    this->Makefile->AddDefinition(this->Values[ctb_NUMBER_WARNINGS],
-                                  str.str().c_str());
+    this->Makefile->AddDefinition(
+      this->Values[ctb_NUMBER_WARNINGS],
+      std::to_string(this->Handler->GetTotalWarnings()));
   }
   return ret;
 }

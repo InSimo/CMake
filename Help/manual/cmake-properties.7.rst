@@ -134,6 +134,7 @@ Properties on Targets
    /prop_tgt/AUTOMOC_EXECUTABLE
    /prop_tgt/AUTOMOC_MACRO_NAMES
    /prop_tgt/AUTOMOC_MOC_OPTIONS
+   /prop_tgt/AUTOMOC_PATH_PREFIX
    /prop_tgt/AUTOMOC
    /prop_tgt/AUTOUIC
    /prop_tgt/AUTOUIC_EXECUTABLE
@@ -181,6 +182,7 @@ Properties on Targets
    /prop_tgt/DEFINE_SYMBOL
    /prop_tgt/DEPLOYMENT_REMOTE_DIRECTORY
    /prop_tgt/DEPLOYMENT_ADDITIONAL_FILES
+   /prop_tgt/DISABLE_PRECOMPILE_HEADERS
    /prop_tgt/DOTNET_TARGET_FRAMEWORK_VERSION
    /prop_tgt/EchoString
    /prop_tgt/ENABLE_EXPORTS
@@ -228,6 +230,7 @@ Properties on Targets
    /prop_tgt/IMPORT_SUFFIX
    /prop_tgt/INCLUDE_DIRECTORIES
    /prop_tgt/INSTALL_NAME_DIR
+   /prop_tgt/INSTALL_REMOVE_ENVIRONMENT_RPATH
    /prop_tgt/INSTALL_RPATH
    /prop_tgt/INSTALL_RPATH_USE_LINK_PATH
    /prop_tgt/INTERFACE_AUTOUIC_OPTIONS
@@ -239,6 +242,7 @@ Properties on Targets
    /prop_tgt/INTERFACE_LINK_DIRECTORIES
    /prop_tgt/INTERFACE_LINK_LIBRARIES
    /prop_tgt/INTERFACE_LINK_OPTIONS
+   /prop_tgt/INTERFACE_PRECOMPILE_HEADERS
    /prop_tgt/INTERFACE_POSITION_INDEPENDENT_CODE
    /prop_tgt/INTERFACE_SOURCES
    /prop_tgt/INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
@@ -294,6 +298,8 @@ Properties on Targets
    /prop_tgt/PDB_OUTPUT_DIRECTORY_CONFIG
    /prop_tgt/PDB_OUTPUT_DIRECTORY
    /prop_tgt/POSITION_INDEPENDENT_CODE
+   /prop_tgt/PRECOMPILE_HEADERS
+   /prop_tgt/PRECOMPILE_HEADERS_REUSE_FROM
    /prop_tgt/PREFIX
    /prop_tgt/PRIVATE_HEADER
    /prop_tgt/PROJECT_LABEL
@@ -315,9 +321,14 @@ Properties on Targets
    /prop_tgt/STATIC_LIBRARY_OPTIONS
    /prop_tgt/SUFFIX
    /prop_tgt/Swift_DEPENDENCIES_FILE
+   /prop_tgt/Swift_LANGUAGE_VERSION
    /prop_tgt/Swift_MODULE_DIRECTORY
    /prop_tgt/Swift_MODULE_NAME
    /prop_tgt/TYPE
+   /prop_tgt/UNITY_BUILD
+   /prop_tgt/UNITY_BUILD_BATCH_SIZE
+   /prop_tgt/UNITY_BUILD_CODE_AFTER_INCLUDE
+   /prop_tgt/UNITY_BUILD_CODE_BEFORE_INCLUDE
    /prop_tgt/VERSION
    /prop_tgt/VISIBILITY_INLINES_HIDDEN
    /prop_tgt/VS_CONFIGURATION_TYPE
@@ -331,6 +342,7 @@ Properties on Targets
    /prop_tgt/VS_DOTNET_REFERENCES
    /prop_tgt/VS_DOTNET_REFERENCES_COPY_LOCAL
    /prop_tgt/VS_DOTNET_TARGET_FRAMEWORK_VERSION
+   /prop_tgt/VS_DPI_AWARE
    /prop_tgt/VS_GLOBAL_KEYWORD
    /prop_tgt/VS_GLOBAL_PROJECT_TYPES
    /prop_tgt/VS_GLOBAL_ROOTNAMESPACE
@@ -406,6 +418,7 @@ Properties on Tests
    /prop_test/REQUIRED_FILES
    /prop_test/RESOURCE_LOCK
    /prop_test/RUN_SERIAL
+   /prop_test/SKIP_REGULAR_EXPRESSION
    /prop_test/SKIP_RETURN_CODE
    /prop_test/TIMEOUT
    /prop_test/TIMEOUT_AFTER_MATCH
@@ -442,6 +455,8 @@ Properties on Source Files
    /prop_sf/SKIP_AUTOMOC
    /prop_sf/SKIP_AUTORCC
    /prop_sf/SKIP_AUTOUIC
+   /prop_sf/SKIP_PRECOMPILE_HEADERS
+   /prop_sf/SKIP_UNITY_BUILD_INCLUSION
    /prop_sf/Swift_DEPENDENCIES_FILE
    /prop_sf/Swift_DIAGNOSTICS_FILE
    /prop_sf/SYMBOLIC

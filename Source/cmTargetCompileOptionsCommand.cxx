@@ -2,12 +2,10 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmTargetCompileOptionsCommand.h"
 
-#include <sstream>
-
-#include "cmAlgorithms.h"
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmStringAlgorithms.h"
 #include "cmTarget.h"
 
 class cmExecutionStatus;
@@ -21,10 +19,10 @@ bool cmTargetCompileOptionsCommand::InitialPass(
 void cmTargetCompileOptionsCommand::HandleMissingTarget(
   const std::string& name)
 {
-  std::ostringstream e;
-  e << "Cannot specify compile options for target \"" << name
-    << "\" which is not built by this project.";
-  this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
+  this->Makefile->IssueMessage(
+    MessageType::FATAL_ERROR,
+    cmStrCat("Cannot specify compile options for target \"", name,
+             "\" which is not built by this project."));
 }
 
 std::string cmTargetCompileOptionsCommand::Join(

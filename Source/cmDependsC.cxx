@@ -9,6 +9,7 @@
 #include "cmFileTime.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 #define INCLUDE_REGEX_LINE                                                    \
@@ -35,15 +36,12 @@ cmDependsC::cmDependsC(cmLocalGenerator* lg, const std::string& targetDir,
   std::string scanRegex = "^.*$";
   std::string complainRegex = "^$";
   {
-    std::string scanRegexVar = "CMAKE_";
-    scanRegexVar += lang;
-    scanRegexVar += "_INCLUDE_REGEX_SCAN";
+    std::string scanRegexVar = cmStrCat("CMAKE_", lang, "_INCLUDE_REGEX_SCAN");
     if (const char* sr = mf->GetDefinition(scanRegexVar)) {
       scanRegex = sr;
     }
-    std::string complainRegexVar = "CMAKE_";
-    complainRegexVar += lang;
-    complainRegexVar += "_INCLUDE_REGEX_COMPLAIN";
+    std::string complainRegexVar =
+      cmStrCat("CMAKE_", lang, "_INCLUDE_REGEX_COMPLAIN");
     if (const char* cr = mf->GetDefinition(complainRegexVar)) {
       complainRegex = cr;
     }
@@ -53,17 +51,15 @@ cmDependsC::cmDependsC(cmLocalGenerator* lg, const std::string& targetDir,
   this->IncludeRegexScan.compile(scanRegex);
   this->IncludeRegexComplain.compile(complainRegex);
   this->IncludeRegexLineString = INCLUDE_REGEX_LINE_MARKER INCLUDE_REGEX_LINE;
-  this->IncludeRegexScanString = INCLUDE_REGEX_SCAN_MARKER;
-  this->IncludeRegexScanString += scanRegex;
-  this->IncludeRegexComplainString = INCLUDE_REGEX_COMPLAIN_MARKER;
-  this->IncludeRegexComplainString += complainRegex;
+  this->IncludeRegexScanString =
+    cmStrCat(INCLUDE_REGEX_SCAN_MARKER, scanRegex);
+  this->IncludeRegexComplainString =
+    cmStrCat(INCLUDE_REGEX_COMPLAIN_MARKER, complainRegex);
 
   this->SetupTransforms();
 
-  this->CacheFileName = this->TargetDirectory;
-  this->CacheFileName += "/";
-  this->CacheFileName += lang;
-  this->CacheFileName += ".includecache";
+  this->CacheFileName =
+    cmStrCat(this->TargetDirectory, '/', lang, ".includecache");
 
   this->ReadCacheFile();
 }
@@ -391,7 +387,7 @@ void cmDependsC::SetupTransforms()
   std::vector<std::string> transformRules;
   cmMakefile* mf = this->LocalGenerator->GetMakefile();
   if (const char* xform = mf->GetDefinition("CMAKE_INCLUDE_TRANSFORMS")) {
-    cmSystemTools::ExpandListArgument(xform, transformRules, true);
+    cmExpandList(xform, transformRules, true);
   }
   for (std::string const& tr : transformRules) {
     this->ParseTransform(tr);
@@ -442,8 +438,7 @@ void cmDependsC::TransformLine(std::string& line)
   if (!this->IncludeRegexTransform.find(line)) {
     return;
   }
-  TransformRulesType::const_iterator tri =
-    this->TransformRules.find(this->IncludeRegexTransform.match(3));
+  auto tri = this->TransformRules.find(this->IncludeRegexTransform.match(3));
   if (tri == this->TransformRules.end()) {
     return;
   }

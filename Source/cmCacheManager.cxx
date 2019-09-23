@@ -5,15 +5,16 @@
 #include "cmsys/FStream.hxx"
 #include "cmsys/Glob.hxx"
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <sstream>
-#include <stdio.h>
-#include <string.h>
 #include <string>
 
 #include "cmGeneratedFileStream.h"
 #include "cmMessageType.h"
 #include "cmMessenger.h"
 #include "cmState.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmVersion.h"
 
@@ -25,9 +26,7 @@ cmCacheManager::cmCacheManager()
 
 void cmCacheManager::CleanCMakeFiles(const std::string& path)
 {
-  std::string glob = path;
-  glob += "/CMakeFiles";
-  glob += "/*.cmake";
+  std::string glob = cmStrCat(path, "/CMakeFiles/*.cmake");
   cmsys::Glob globIt;
   globIt.FindFiles(glob);
   std::vector<std::string> files = globIt.GetFiles();
@@ -38,8 +37,7 @@ bool cmCacheManager::LoadCache(const std::string& path, bool internal,
                                std::set<std::string>& excludes,
                                std::set<std::string>& includes)
 {
-  std::string cacheFile = path;
-  cacheFile += "/CMakeCache.txt";
+  std::string cacheFile = cmStrCat(path, "/CMakeCache.txt");
   // clear the old cache, if we are reading in internal values
   if (internal) {
     this->Cache.clear();
@@ -104,12 +102,10 @@ bool cmCacheManager::LoadCache(const std::string& path, bool internal,
           // not visible in the gui
           if (!internal) {
             e.Type = cmStateEnums::INTERNAL;
-            helpString = "DO NOT EDIT, ";
-            helpString += entryKey;
-            helpString += " loaded from external file.  "
-                          "To change this value edit this file: ";
-            helpString += path;
-            helpString += "/CMakeCache.txt";
+            helpString = cmStrCat("DO NOT EDIT, ", entryKey,
+                                  " loaded from external file.  "
+                                  "To change this value edit this file: ",
+                                  path, "/CMakeCache.txt");
             e.SetProperty("HELPSTRING", helpString.c_str());
           }
           if (!this->ReadPropertyEntry(entryKey, e)) {
@@ -214,14 +210,11 @@ void cmCacheManager::WritePropertyEntries(std::ostream& os, CacheIterator i,
 {
   for (const char** p = cmCacheManager::PersistentProperties; *p; ++p) {
     if (const char* value = i.GetProperty(*p)) {
-      std::string helpstring = *p;
-      helpstring += " property for variable: ";
-      helpstring += i.GetName();
+      std::string helpstring =
+        cmStrCat(*p, " property for variable: ", i.GetName());
       cmCacheManager::OutputHelpString(os, helpstring);
 
-      std::string key = i.GetName();
-      key += "-";
-      key += *p;
+      std::string key = cmStrCat(i.GetName(), '-', *p);
       cmCacheManager::OutputKey(os, key);
       os << ":INTERNAL=";
       cmCacheManager::OutputValue(os, value);
@@ -234,8 +227,7 @@ void cmCacheManager::WritePropertyEntries(std::ostream& os, CacheIterator i,
 
 bool cmCacheManager::SaveCache(const std::string& path, cmMessenger* messenger)
 {
-  std::string cacheFile = path;
-  cacheFile += "/CMakeCache.txt";
+  std::string cacheFile = cmStrCat(path, "/CMakeCache.txt");
   cmGeneratedFileStream fout(cacheFile);
   fout.SetCopyIfDifferent(true);
   if (!fout) {
@@ -356,8 +348,7 @@ bool cmCacheManager::SaveCache(const std::string& path, cmMessenger* messenger)
   }
   fout << "\n";
   fout.Close();
-  std::string checkCacheFile = path;
-  checkCacheFile += "/CMakeFiles";
+  std::string checkCacheFile = cmStrCat(path, "/CMakeFiles");
   cmSystemTools::MakeDirectory(checkCacheFile);
   checkCacheFile += "/cmake.check_cache";
   cmsys::ofstream checkCache(checkCacheFile.c_str());
@@ -473,15 +464,14 @@ void cmCacheManager::OutputNewlineTruncationWarning(std::ostream& fout,
 {
   if (value.find('\n') != std::string::npos) {
     if (messenger) {
-      std::string message = "Value of ";
-      message += key;
-      message += " contained a newline; truncating";
+      std::string message =
+        cmStrCat("Value of ", key, " contained a newline; truncating");
       messenger->IssueMessage(MessageType::WARNING, message);
     }
 
-    std::string comment = "WARNING: Value of ";
-    comment += key;
-    comment += " contained a newline and was truncated. Original value:";
+    std::string comment =
+      cmStrCat("WARNING: Value of ", key,
+               " contained a newline and was truncated. Original value:");
 
     OutputWarningComment(fout, comment, true);
     OutputWarningComment(fout, value, false);
@@ -490,7 +480,7 @@ void cmCacheManager::OutputNewlineTruncationWarning(std::ostream& fout,
 
 void cmCacheManager::RemoveCacheEntry(const std::string& key)
 {
-  CacheEntryMap::iterator i = this->Cache.find(key);
+  auto i = this->Cache.find(key);
   if (i != this->Cache.end()) {
     this->Cache.erase(i);
   }
@@ -499,7 +489,7 @@ void cmCacheManager::RemoveCacheEntry(const std::string& key)
 cmCacheManager::CacheEntry* cmCacheManager::GetCacheEntry(
   const std::string& key)
 {
-  CacheEntryMap::iterator i = this->Cache.find(key);
+  auto i = this->Cache.find(key);
   if (i != this->Cache.end()) {
     return &i->second;
   }
@@ -508,13 +498,13 @@ cmCacheManager::CacheEntry* cmCacheManager::GetCacheEntry(
 
 cmCacheManager::CacheIterator cmCacheManager::GetCacheIterator(const char* key)
 {
-  return CacheIterator(*this, key);
+  return { *this, key };
 }
 
 const std::string* cmCacheManager::GetInitializedCacheValue(
   const std::string& key) const
 {
-  CacheEntryMap::const_iterator i = this->Cache.find(key);
+  auto i = this->Cache.find(key);
   if (i != this->Cache.end() && i->second.Initialized) {
     return &i->second.Value;
   }
@@ -551,8 +541,7 @@ void cmCacheManager::AddCacheEntry(const std::string& key, const char* value,
   // make sure we only use unix style paths
   if (type == cmStateEnums::FILEPATH || type == cmStateEnums::PATH) {
     if (e.Value.find(';') != std::string::npos) {
-      std::vector<std::string> paths;
-      cmSystemTools::ExpandListArgument(e.Value, paths);
+      std::vector<std::string> paths = cmExpandedList(e.Value);
       const char* sep = "";
       e.Value = "";
       for (std::string& i : paths) {
@@ -615,12 +604,12 @@ void cmCacheManager::CacheIterator::SetValue(const char* value)
 
 bool cmCacheManager::CacheIterator::GetValueAsBool() const
 {
-  return cmSystemTools::IsOn(this->GetEntry().Value);
+  return cmIsOn(this->GetEntry().Value);
 }
 
 std::vector<std::string> cmCacheManager::CacheEntry::GetPropertyList() const
 {
-  return this->Properties.GetPropertyList();
+  return this->Properties.GetKeys();
 }
 
 const char* cmCacheManager::CacheEntry::GetProperty(
@@ -695,7 +684,7 @@ bool cmCacheManager::CacheIterator::GetPropertyAsBool(
   const std::string& prop) const
 {
   if (const char* value = this->GetProperty(prop)) {
-    return cmSystemTools::IsOn(value);
+    return cmIsOn(value);
   }
   return false;
 }

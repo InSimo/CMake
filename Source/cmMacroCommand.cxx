@@ -10,6 +10,7 @@
 #include "cmExecutionStatus.h"
 #include "cmMakefile.h"
 #include "cmPolicies.h"
+#include "cmRange.h"
 #include "cmState.h"
 #include "cmSystemTools.h"
 
@@ -17,11 +18,6 @@
 class cmMacroHelperCommand : public cmCommand
 {
 public:
-  cmMacroHelperCommand() {}
-
-  ///! clean up any memory allocated by the macro
-  ~cmMacroHelperCommand() override {}
-
   /**
    * This is a virtual constructor for the command.
    */
@@ -94,7 +90,7 @@ bool cmMacroHelperCommand::InvokeInitialPass(
   char argvName[60];
   for (unsigned int j = 0; j < expandedArgs.size(); ++j) {
     sprintf(argvName, "${ARGV%u}", j);
-    argVs.push_back(argvName);
+    argVs.emplace_back(argvName);
   }
   // Invoke all the functions that were collected in the block.
   cmListFileFunction newLFF;
@@ -216,7 +212,7 @@ bool cmMacroCommand::InitialPass(std::vector<std::string> const& args,
 
   // create a function blocker
   cmMacroFunctionBlocker* f = new cmMacroFunctionBlocker();
-  f->Args.insert(f->Args.end(), args.begin(), args.end());
+  cmAppend(f->Args, args);
   this->Makefile->AddFunctionBlocker(f);
   return true;
 }

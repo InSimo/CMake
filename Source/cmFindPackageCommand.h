@@ -4,9 +4,11 @@
 #define cmFindPackageCommand_h
 
 #include "cmConfigure.h" // IWYU pragma: keep
+#include "cmPolicies.h"
 
 #include "cm_kwiml.h"
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -15,14 +17,12 @@
 // IWYU insists we should forward-declare instead of including <functional>,
 // but we cannot forward-declare reliably because some C++ standard libraries
 // put the template in an inline namespace.
-#ifdef CMAKE_IWYU
+#ifdef CMAKE_IWYU_FORWARD_STD_HASH
 /* clang-format off */
 namespace std {
   template <class T> struct hash;
 }
 /* clang-format on */
-#else
-#  include <functional>
 #endif
 
 #include "cmFindCommon.h"
@@ -90,6 +90,9 @@ private:
     static PathLabel SystemRegistry;
   };
 
+  bool FindPackageUsingModuleMode();
+  bool FindPackageUsingConfigMode();
+
   // Add additional search path labels and groups not present in the
   // parent class
   void AppendSearchPathGroups();
@@ -100,7 +103,14 @@ private:
   bool FindModule(bool& found);
   void AddFindDefinition(const std::string& var, const char* val);
   void RestoreFindDefinitions();
-  bool HandlePackageMode();
+
+  enum /*class*/ HandlePackageModeType
+  {
+    Module,
+    Config
+  };
+  bool HandlePackageMode(HandlePackageModeType type);
+
   bool FindConfig();
   bool FindPrefixedConfig();
   bool FindFrameworkConfig();
@@ -110,7 +120,7 @@ private:
     NoPolicyScope,
     DoPolicyScope
   };
-  bool ReadListFile(const char* f, PolicyScopeRule psr);
+  bool ReadListFile(const std::string& f, PolicyScopeRule psr);
   void StoreVersionFound();
 
   void ComputePrefixes();
@@ -149,6 +159,8 @@ private:
   };
   std::map<std::string, OriginalDef> OriginalDefs;
 
+  std::map<std::string, cmPolicies::PolicyID> DeprecatedFindModules;
+
   std::string Name;
   std::string Variable;
   std::string Version;
@@ -176,6 +188,7 @@ private:
   bool UseLib32Paths;
   bool UseLib64Paths;
   bool UseLibx32Paths;
+  bool UseRealPath;
   bool PolicyScope;
   std::string LibraryArchitecture;
   std::vector<std::string> Names;

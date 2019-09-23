@@ -21,15 +21,12 @@
  */
 class cmGlobVerificationManager
 {
-public:
-  cmGlobVerificationManager() {}
-
 protected:
-  ///! Save verification script for given makefile.
-  ///! Saves to output <path>/<CMakeFilesDirectory>/VerifyGlobs.cmake
+  //! Save verification script for given makefile.
+  //! Saves to output <path>/<CMakeFilesDirectory>/VerifyGlobs.cmake
   bool SaveVerificationScript(const std::string& path);
 
-  ///! Add an entry into the glob cache
+  //! Add an entry into the glob cache
   void AddCacheEntry(bool recurse, bool listDirectories, bool followSymlinks,
                      const std::string& relative,
                      const std::string& expression,
@@ -37,10 +34,13 @@ protected:
                      const std::string& variable,
                      const cmListFileBacktrace& bt);
 
-  ///! Check targets should be written in generated build system.
+  //! Clear the glob cache for state reset.
+  void Reset();
+
+  //! Check targets should be written in generated build system.
   bool DoWriteVerifyTarget() const;
 
-  ///! Get the paths to the generated script and stamp files
+  //! Get the paths to the generated script and stamp files
   std::string const& GetVerifyScript() const { return this->VerifyScript; }
   std::string const& GetVerifyStamp() const { return this->VerifyStamp; }
 
@@ -52,13 +52,13 @@ private:
     const bool FollowSymlinks;
     const std::string Relative;
     const std::string Expression;
-    CacheEntryKey(const bool rec, const bool l, const bool s,
-                  const std::string& rel, const std::string& e)
+    CacheEntryKey(const bool rec, const bool l, const bool s, std::string rel,
+                  std::string e)
       : Recurse(rec)
       , ListDirectories(l)
       , FollowSymlinks(s)
-      , Relative(rel)
-      , Expression(e)
+      , Relative(std::move(rel))
+      , Expression(std::move(e))
     {
     }
     bool operator<(const CacheEntryKey& r) const;
@@ -67,13 +67,9 @@ private:
 
   struct CacheEntryValue
   {
-    bool Initialized;
+    bool Initialized = false;
     std::vector<std::string> Files;
     std::vector<std::pair<std::string, cmListFileBacktrace>> Backtraces;
-    CacheEntryValue()
-      : Initialized(false)
-    {
-    }
   };
 
   typedef std::map<CacheEntryKey, CacheEntryValue> CacheEntryMap;

@@ -4,7 +4,10 @@
 
 #include <algorithm>
 #include <set>
+#include <utility>
 
+#include "cmAlgorithms.h"
+#include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
 #include "cmSystemTools.h"
 
@@ -50,11 +53,9 @@ bool cmIncludeDirectoryCommand::InitialPass(
     this->GetIncludes(*i, includes);
 
     if (before) {
-      beforeIncludes.insert(beforeIncludes.end(), includes.begin(),
-                            includes.end());
+      cmAppend(beforeIncludes, includes);
     } else {
-      afterIncludes.insert(afterIncludes.end(), includes.begin(),
-                           includes.end());
+      cmAppend(afterIncludes, includes);
     }
     if (system) {
       systemIncludes.insert(includes.begin(), includes.end());
@@ -67,11 +68,6 @@ bool cmIncludeDirectoryCommand::InitialPass(
   this->Makefile->AddSystemIncludeDirectories(systemIncludes);
 
   return true;
-}
-
-static bool StartsWithGeneratorExpression(const std::string& input)
-{
-  return input[0] == '$' && input[1] == '<';
 }
 
 // do a lot of cleanup on the arguments because this is one place where folks
@@ -120,11 +116,11 @@ void cmIncludeDirectoryCommand::NormalizeInclude(std::string& inc)
     return;
   }
 
-  if (!cmSystemTools::IsOff(inc.c_str())) {
+  if (!cmSystemTools::IsOff(inc)) {
     cmSystemTools::ConvertToUnixSlashes(inc);
 
     if (!cmSystemTools::FileIsFullPath(inc)) {
-      if (!StartsWithGeneratorExpression(inc)) {
+      if (!cmGeneratorExpression::StartsWithGeneratorExpression(inc)) {
         std::string tmp = this->Makefile->GetCurrentSourceDirectory();
         tmp += "/";
         tmp += inc;

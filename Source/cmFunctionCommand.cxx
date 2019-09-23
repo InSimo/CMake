@@ -8,17 +8,13 @@
 #include "cmExecutionStatus.h"
 #include "cmMakefile.h"
 #include "cmPolicies.h"
+#include "cmRange.h"
 #include "cmState.h"
 
 // define the class for function commands
 class cmFunctionHelperCommand : public cmCommand
 {
 public:
-  cmFunctionHelperCommand() {}
-
-  ///! clean up any memory allocated by the function
-  ~cmFunctionHelperCommand() override {}
-
   /**
    * This is a virtual constructor for the command.
    */
@@ -181,7 +177,7 @@ bool cmFunctionCommand::InitialPass(std::vector<std::string> const& args,
 
   // create a function blocker
   cmFunctionFunctionBlocker* f = new cmFunctionFunctionBlocker();
-  f->Args.insert(f->Args.end(), args.begin(), args.end());
+  cmAppend(f->Args, args);
   this->Makefile->AddFunctionBlocker(f);
   return true;
 }

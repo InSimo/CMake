@@ -1,9 +1,11 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.12)
 
 project(FindPkgConfig_IMPORTED_TARGET C)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(NCURSES IMPORTED_TARGET QUIET ncurses)
+
+message(STATUS "source: ${CMAKE_CURRENT_SOURCE_DIR} bin ${CMAKE_CURRENT_BINARY_DIR}")
 
 if (NCURSES_FOUND)
   set(tgt PkgConfig::NCURSES)
@@ -66,6 +68,16 @@ if (NOT TARGET PkgConfig::FakePackage1)
   message(FATAL_ERROR "No import target for fake package 1 with prefix path")
 endif()
 
+# find targets in subdir and check their visibility
+add_subdirectory(target_subdir)
+if (TARGET PkgConfig::FakePackage1_dir)
+  message(FATAL_ERROR "imported target PkgConfig::FakePackage1_dir is visible outside it's directory")
+endif()
+
+if (NOT TARGET PkgConfig::FakePackage1_global)
+  message(FATAL_ERROR "imported target PkgConfig::FakePackage1_global is not visible outside it's directory")
+endif()
+
 # And now do the same for the NO_CMAKE_ENVIRONMENT_PATH - ENV{CMAKE_PREFIX_PATH}
 # combination
 unset(CMAKE_PREFIX_PATH)
@@ -96,4 +108,25 @@ unset(FakePackage2_LINK_LIBRARIES)
 pkg_check_modules(FakePackage2 REQUIRED QUIET IMPORTED_TARGET cmakeinternalfakepackage2)
 if (NOT FakePackage2_LINK_LIBRARIES STREQUAL "${fakePkgDir}/lib/libcmakeinternalfakepackage2.a")
   message(FATAL_ERROR "FakePackage2_LINK_LIBRARIES has bad content on second run: ${FakePackage2_LINK_LIBRARIES}")
+endif()
+
+set(pname fakelinkoptionspackage)
+file(WRITE ${fakePkgDir}/lib/pkgconfig/${pname}.pc
+"Name: FakeLinkOptionsPackage
+Description: Dummy package for FindPkgConfig IMPORTED_TARGET INTERFACE_LINK_OPTIONS test
+Version: 1.2.3
+Libs: -e dummy_main
+")
+
+set(expected_link_options -e dummy_main)
+pkg_check_modules(FakeLinkOptionsPackage REQUIRED QUIET IMPORTED_TARGET fakelinkoptionspackage)
+if (NOT TARGET PkgConfig::FakeLinkOptionsPackage)
+  message(FATAL_ERROR "No import target for fake link options package")
+endif()
+get_target_property(link_options PkgConfig::FakeLinkOptionsPackage INTERFACE_LINK_OPTIONS)
+if (NOT link_options STREQUAL expected_link_options)
+  message(FATAL_ERROR
+    "Additional link options not present in INTERFACE_LINK_OPTIONS property"
+    "expected: \"${expected_link_options}\", but got \"${link_options}\""
+  )
 endif()

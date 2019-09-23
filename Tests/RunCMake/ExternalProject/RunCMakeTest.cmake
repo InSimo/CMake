@@ -1,5 +1,7 @@
 include(RunCMake)
 
+run_cmake(IncludeScope-Add)
+run_cmake(IncludeScope-Add_Step)
 run_cmake(NoOptions)
 run_cmake(SourceEmpty)
 run_cmake(SourceMissing)
@@ -26,6 +28,13 @@ function(__ep_test_with_build testName)
 endfunction()
 
 __ep_test_with_build(MultiCommand)
+
+# Output is not predictable enough to be able to verify it reliably
+# when using the various different Visual Studio generators
+if(NOT RunCMake_GENERATOR MATCHES "Visual Studio")
+  __ep_test_with_build(LogOutputOnFailure)
+  __ep_test_with_build(LogOutputOnFailureMerged)
+endif()
 
 # We can't test the substitution when using the old MSYS due to
 # make/sh mangling the paths (substitution is performed correctly,

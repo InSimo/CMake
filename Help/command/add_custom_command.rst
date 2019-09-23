@@ -8,7 +8,9 @@ There are two main signatures for ``add_custom_command``.
 Generating Files
 ^^^^^^^^^^^^^^^^
 
-The first signature is for adding a custom command to produce an output::
+The first signature is for adding a custom command to produce an output:
+
+.. code-block:: cmake
 
   add_custom_command(OUTPUT output1 [output2 ...]
                      COMMAND command1 [ARGS] [args1...]
@@ -21,6 +23,7 @@ The first signature is for adding a custom command to produce an output::
                      [WORKING_DIRECTORY dir]
                      [COMMENT comment]
                      [DEPFILE depfile]
+                     [JOB_POOL job_pool]
                      [VERBATIM] [APPEND] [USES_TERMINAL]
                      [COMMAND_EXPAND_LISTS])
 
@@ -142,6 +145,13 @@ The options are:
   Note that the ``IMPLICIT_DEPENDS`` option is currently supported
   only for Makefile generators and will be ignored by other generators.
 
+``JOB_POOL``
+  Specify a :prop_gbl:`pool <JOB_POOLS>` for the :generator:`Ninja`
+  generator. Incompatible with ``USES_TERMINAL``, which implies
+  the ``console`` pool.
+  Using a pool that is not defined by :prop_gbl:`JOB_POOLS` causes
+  an error by ninja at build time.
+
 ``MAIN_DEPENDENCY``
   Specify the primary input source file to the command.  This is
   treated just like any value given to the ``DEPENDS`` option
@@ -182,6 +192,9 @@ The options are:
   If it is a relative path it will be interpreted relative to the
   build tree directory corresponding to the current source directory.
 
+  Arguments to ``WORKING_DIRECTORY`` may use
+  :manual:`generator expressions <cmake-generator-expressions(7)>`.
+
 ``DEPFILE``
   Specify a ``.d`` depfile for the :generator:`Ninja` generator.
   A ``.d`` file holds dependencies usually emitted by the custom
@@ -197,7 +210,7 @@ before or after building the target.  The command becomes part of the
 target and will only execute when the target itself is built.  If the
 target is already built, the command will not execute.
 
-::
+.. code-block:: cmake
 
   add_custom_command(TARGET <target>
                      PRE_BUILD | PRE_LINK | POST_BUILD

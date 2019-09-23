@@ -9,10 +9,10 @@
 
 #include "cmAlgorithms.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
 #include "cmPolicies.h"
 #include "cmStateTypes.h"
 #include "cmSystemTools.h"
-#include "cmake.h"
 
 class cmExecutionStatus;
 
@@ -22,6 +22,10 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
 {
   if (args.empty()) {
     this->SetError("PROJECT called with incorrect number of arguments");
+    return false;
+  }
+
+  if (!this->IncludeByVariable("CMAKE_PROJECT_INCLUDE_BEFORE")) {
     return false;
   }
 
@@ -35,19 +39,19 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
   srcdir += "_SOURCE_DIR";
 
   this->Makefile->AddCacheDefinition(
-    bindir, this->Makefile->GetCurrentBinaryDirectory(),
+    bindir, this->Makefile->GetCurrentBinaryDirectory().c_str(),
     "Value Computed by CMake", cmStateEnums::STATIC);
   this->Makefile->AddCacheDefinition(
-    srcdir, this->Makefile->GetCurrentSourceDirectory(),
+    srcdir, this->Makefile->GetCurrentSourceDirectory().c_str(),
     "Value Computed by CMake", cmStateEnums::STATIC);
 
   bindir = "PROJECT_BINARY_DIR";
   srcdir = "PROJECT_SOURCE_DIR";
 
-  this->Makefile->AddDefinition(bindir,
-                                this->Makefile->GetCurrentBinaryDirectory());
-  this->Makefile->AddDefinition(srcdir,
-                                this->Makefile->GetCurrentSourceDirectory());
+  this->Makefile->AddDefinition(
+    bindir, this->Makefile->GetCurrentBinaryDirectory().c_str());
+  this->Makefile->AddDefinition(
+    srcdir, this->Makefile->GetCurrentSourceDirectory().c_str());
 
   this->Makefile->AddDefinition("PROJECT_NAME", projectName.c_str());
 
@@ -69,6 +73,7 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
   bool haveLanguages = false;
   bool haveDescription = false;
   bool haveHomepage = false;
+  bool injectedProjectCommand = false;
   std::string version;
   std::string description;
   std::string homepage;
@@ -89,7 +94,8 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
     if (args[i] == "LANGUAGES") {
       if (haveLanguages) {
         this->Makefile->IssueMessage(
-          cmake::FATAL_ERROR, "LANGUAGES may be specified at most once.");
+          MessageType::FATAL_ERROR,
+          "LANGUAGES may be specified at most once.");
         cmSystemTools::SetFatalErrorOccured();
         return true;
       }
@@ -104,11 +110,11 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
           "keyword: ";
         msg += cmJoin(languages, ", ");
         msg += '.';
-        this->Makefile->IssueMessage(cmake::WARNING, msg);
+        this->Makefile->IssueMessage(MessageType::WARNING, msg);
       }
     } else if (args[i] == "VERSION") {
       if (haveVersion) {
-        this->Makefile->IssueMessage(cmake::FATAL_ERROR,
+        this->Makefile->IssueMessage(MessageType::FATAL_ERROR,
                                      "VERSION may be specified at most once.");
         cmSystemTools::SetFatalErrorOccured();
         return true;
@@ -120,7 +126,7 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
       doing = DoingVersion;
       missedValueReporter = [this, &resetReporter]() {
         this->Makefile->IssueMessage(
-          cmake::WARNING,
+          MessageType::WARNING,
           "VERSION keyword not followed by a value or was followed by a "
           "value that expanded to nothing.");
         resetReporter();
@@ -128,7 +134,8 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
     } else if (args[i] == "DESCRIPTION") {
       if (haveDescription) {
         this->Makefile->IssueMessage(
-          cmake::FATAL_ERROR, "DESCRIPTION may be specified at most once.");
+          MessageType::FATAL_ERROR,
+          "DESCRIPTION may be specified at most once.");
         cmSystemTools::SetFatalErrorOccured();
         return true;
       }
@@ -139,7 +146,7 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
       doing = DoingDescription;
       missedValueReporter = [this, &resetReporter]() {
         this->Makefile->IssueMessage(
-          cmake::WARNING,
+          MessageType::WARNING,
           "DESCRIPTION keyword not followed by a value or was followed "
           "by a value that expanded to nothing.");
         resetReporter();
@@ -147,7 +154,8 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
     } else if (args[i] == "HOMEPAGE_URL") {
       if (haveHomepage) {
         this->Makefile->IssueMessage(
-          cmake::FATAL_ERROR, "HOMEPAGE_URL may be specified at most once.");
+          MessageType::FATAL_ERROR,
+          "HOMEPAGE_URL may be specified at most once.");
         cmSystemTools::SetFatalErrorOccured();
         return true;
       }
@@ -155,11 +163,13 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
       doing = DoingHomepage;
       missedValueReporter = [this, &resetReporter]() {
         this->Makefile->IssueMessage(
-          cmake::WARNING,
+          MessageType::WARNING,
           "HOMEPAGE_URL keyword not followed by a value or was followed "
           "by a value that expanded to nothing.");
         resetReporter();
       };
+    } else if (i == 1 && args[i] == "__CMAKE_INJECTED_PROJECT_COMMAND__") {
+      injectedProjectCommand = true;
     } else if (doing == DoingVersion) {
       doing = DoingLanguages;
       version = args[i];
@@ -185,14 +195,14 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
   if ((haveVersion || haveDescription || haveHomepage) && !haveLanguages &&
       !languages.empty()) {
     this->Makefile->IssueMessage(
-      cmake::FATAL_ERROR,
+      MessageType::FATAL_ERROR,
       "project with VERSION, DESCRIPTION or HOMEPAGE_URL must "
       "use LANGUAGES before language names.");
     cmSystemTools::SetFatalErrorOccured();
     return true;
   }
   if (haveLanguages && languages.empty()) {
-    languages.push_back("NONE");
+    languages.emplace_back("NONE");
   }
 
   cmPolicies::PolicyStatus cmp0048 =
@@ -201,17 +211,17 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
     // Set project VERSION variables to given values
     if (cmp0048 == cmPolicies::OLD || cmp0048 == cmPolicies::WARN) {
       this->Makefile->IssueMessage(
-        cmake::FATAL_ERROR,
+        MessageType::FATAL_ERROR,
         "VERSION not allowed unless CMP0048 is set to NEW");
       cmSystemTools::SetFatalErrorOccured();
       return true;
     }
 
     cmsys::RegularExpression vx(
-      "^([0-9]+(\\.[0-9]+(\\.[0-9]+(\\.[0-9]+)?)?)?)?$");
+      R"(^([0-9]+(\.[0-9]+(\.[0-9]+(\.[0-9]+)?)?)?)?$)");
     if (!vx.find(version)) {
       std::string e = "VERSION \"" + version + "\" format invalid.";
-      this->Makefile->IssueMessage(cmake::FATAL_ERROR, e);
+      this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e);
       cmSystemTools::SetFatalErrorOccured();
       return true;
     }
@@ -258,30 +268,32 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
   } else if (cmp0048 != cmPolicies::OLD) {
     // Set project VERSION variables to empty
     std::vector<std::string> vv;
-    vv.push_back("PROJECT_VERSION");
-    vv.push_back("PROJECT_VERSION_MAJOR");
-    vv.push_back("PROJECT_VERSION_MINOR");
-    vv.push_back("PROJECT_VERSION_PATCH");
-    vv.push_back("PROJECT_VERSION_TWEAK");
+    vv.emplace_back("PROJECT_VERSION");
+    vv.emplace_back("PROJECT_VERSION_MAJOR");
+    vv.emplace_back("PROJECT_VERSION_MINOR");
+    vv.emplace_back("PROJECT_VERSION_PATCH");
+    vv.emplace_back("PROJECT_VERSION_TWEAK");
     vv.push_back(projectName + "_VERSION");
     vv.push_back(projectName + "_VERSION_MAJOR");
     vv.push_back(projectName + "_VERSION_MINOR");
     vv.push_back(projectName + "_VERSION_PATCH");
     vv.push_back(projectName + "_VERSION_TWEAK");
     if (this->Makefile->IsRootMakefile()) {
-      vv.push_back("CMAKE_PROJECT_VERSION");
-      vv.push_back("CMAKE_PROJECT_VERSION_MAJOR");
-      vv.push_back("CMAKE_PROJECT_VERSION_MINOR");
-      vv.push_back("CMAKE_PROJECT_VERSION_PATCH");
-      vv.push_back("CMAKE_PROJECT_VERSION_TWEAK");
+      vv.emplace_back("CMAKE_PROJECT_VERSION");
+      vv.emplace_back("CMAKE_PROJECT_VERSION_MAJOR");
+      vv.emplace_back("CMAKE_PROJECT_VERSION_MINOR");
+      vv.emplace_back("CMAKE_PROJECT_VERSION_PATCH");
+      vv.emplace_back("CMAKE_PROJECT_VERSION_TWEAK");
     }
     std::string vw;
     for (std::string const& i : vv) {
       const char* v = this->Makefile->GetDefinition(i);
       if (v && *v) {
         if (cmp0048 == cmPolicies::WARN) {
-          vw += "\n  ";
-          vw += i;
+          if (!injectedProjectCommand) {
+            vw += "\n  ";
+            vw += i;
+          }
         } else {
           this->Makefile->AddDefinition(i, "");
         }
@@ -291,43 +303,59 @@ bool cmProjectCommand::InitialPass(std::vector<std::string> const& args,
       std::ostringstream w;
       w << cmPolicies::GetPolicyWarning(cmPolicies::CMP0048)
         << "\nThe following variable(s) would be set to empty:" << vw;
-      this->Makefile->IssueMessage(cmake::AUTHOR_WARNING, w.str());
+      this->Makefile->IssueMessage(MessageType::AUTHOR_WARNING, w.str());
     }
   }
 
-  if (haveDescription) {
-    this->Makefile->AddDefinition("PROJECT_DESCRIPTION", description.c_str());
-    this->Makefile->AddDefinition(projectName + "_DESCRIPTION",
-                                  description.c_str());
-    TopLevelCMakeVarCondSet("CMAKE_PROJECT_DESCRIPTION", description.c_str());
-  }
+  this->Makefile->AddDefinition("PROJECT_DESCRIPTION", description.c_str());
+  this->Makefile->AddDefinition(projectName + "_DESCRIPTION",
+                                description.c_str());
+  TopLevelCMakeVarCondSet("CMAKE_PROJECT_DESCRIPTION", description.c_str());
 
-  if (haveHomepage) {
-    this->Makefile->AddDefinition("PROJECT_HOMEPAGE_URL", homepage.c_str());
-    this->Makefile->AddDefinition(projectName + "_HOMEPAGE_URL",
-                                  homepage.c_str());
-    TopLevelCMakeVarCondSet("CMAKE_PROJECT_HOMEPAGE_URL", homepage.c_str());
-  }
+  this->Makefile->AddDefinition("PROJECT_HOMEPAGE_URL", homepage.c_str());
+  this->Makefile->AddDefinition(projectName + "_HOMEPAGE_URL",
+                                homepage.c_str());
+  TopLevelCMakeVarCondSet("CMAKE_PROJECT_HOMEPAGE_URL", homepage.c_str());
 
   if (languages.empty()) {
     // if no language is specified do c and c++
-    languages.push_back("C");
-    languages.push_back("CXX");
+    languages.emplace_back("C");
+    languages.emplace_back("CXX");
   }
   this->Makefile->EnableLanguage(languages, false);
-  std::string extraInclude = "CMAKE_PROJECT_" + projectName + "_INCLUDE";
-  const char* include = this->Makefile->GetDefinition(extraInclude);
-  if (include) {
-    bool readit = this->Makefile->ReadDependentFile(include);
-    if (!readit && !cmSystemTools::GetFatalErrorOccured()) {
-      std::string m = "could not find file:\n"
-                      "  ";
-      m += include;
-      this->SetError(m);
-      return false;
-    }
+
+  if (!this->IncludeByVariable("CMAKE_PROJECT_INCLUDE")) {
+    return false;
   }
+
+  if (!this->IncludeByVariable("CMAKE_PROJECT_" + projectName + "_INCLUDE")) {
+    return false;
+  }
+
   return true;
+}
+
+bool cmProjectCommand::IncludeByVariable(const std::string& variable)
+{
+  const char* include = this->Makefile->GetDefinition(variable);
+  if (!include) {
+    return true;
+  }
+
+  const bool readit = this->Makefile->ReadDependentFile(include);
+  if (readit) {
+    return true;
+  }
+
+  if (cmSystemTools::GetFatalErrorOccured()) {
+    return true;
+  }
+
+  std::string m = "could not find file:\n"
+                  "  ";
+  m += include;
+  this->SetError(m);
+  return false;
 }
 
 void cmProjectCommand::TopLevelCMakeVarCondSet(const char* const name,

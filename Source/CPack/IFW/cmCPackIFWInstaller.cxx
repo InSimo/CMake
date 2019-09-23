@@ -16,9 +16,7 @@
 #include <stddef.h>
 #include <utility>
 
-cmCPackIFWInstaller::cmCPackIFWInstaller()
-{
-}
+cmCPackIFWInstaller::cmCPackIFWInstaller() = default;
 
 void cmCPackIFWInstaller::printSkippedOptionWarning(
   const std::string& optionName, const std::string& optionValue)
@@ -151,6 +149,15 @@ void cmCPackIFWInstaller::ConfigureFromOptions()
         "Option CPACK_IFW_PACKAGE_WIZARD_STYLE has unknown value \""
           << option << "\". Expected values are: Modern, Aero, Mac, Classic."
           << std::endl);
+    }
+  }
+
+  // StyleSheet
+  if (const char* option = this->GetOption("CPACK_IFW_PACKAGE_STYLE_SHEET")) {
+    if (cmSystemTools::FileExists(option)) {
+      this->StyleSheet = option;
+    } else {
+      this->printSkippedOptionWarning("CPACK_IFW_PACKAGE_STYLE_SHEET", option);
     }
   }
 
@@ -288,8 +295,7 @@ protected:
       content = cmSystemTools::TrimWhitespace(content);
       std::string source = this->basePath + "/" + content;
       std::string destination = this->path + "/" + content;
-      if (!cmSystemTools::CopyFileIfDifferent(source.data(),
-                                              destination.data())) {
+      if (!cmSystemTools::CopyFileIfDifferent(source, destination)) {
         this->hasErrors = true;
       }
     }
@@ -306,7 +312,7 @@ void cmCPackIFWInstaller::GenerateInstallerFile()
   }
 
   // Output stream
-  cmGeneratedFileStream fout((this->Directory + "/config/config.xml").data());
+  cmGeneratedFileStream fout(this->Directory + "/config/config.xml");
   cmXMLWriter xout(fout);
 
   xout.StartDocument();
@@ -382,6 +388,14 @@ void cmCPackIFWInstaller::GenerateInstallerFile()
   // WizardStyle
   if (!this->WizardStyle.empty()) {
     xout.Element("WizardStyle", this->WizardStyle);
+  }
+
+  // Stylesheet
+  if (!this->StyleSheet.empty()) {
+    std::string name = cmSystemTools::GetFilenameName(this->StyleSheet);
+    std::string path = this->Directory + "/config/" + name;
+    cmsys::SystemTools::CopyFileIfDifferent(this->StyleSheet, path);
+    xout.Element("StyleSheet", name);
   }
 
   // WizardDefaultWidth

@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2018, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) 1998 - 2019, Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -31,6 +31,7 @@ struct ssl_connect_data;
 #define SSLSUPP_PINNEDPUBKEY (1<<2) /* supports CURLOPT_PINNEDPUBLICKEY */
 #define SSLSUPP_SSL_CTX      (1<<3) /* supports CURLOPT_SSL_CTX */
 #define SSLSUPP_HTTPS_PROXY  (1<<4) /* supports access via HTTPS proxies */
+#define SSLSUPP_TLS13_CIPHERSUITES (1<<5) /* supports TLS 1.3 ciphersuites */
 
 struct Curl_ssl {
   /*
@@ -46,7 +47,7 @@ struct Curl_ssl {
 
   size_t (*version)(char *buffer, size_t size);
   int (*check_cxn)(struct connectdata *cxn);
-  int (*shutdown)(struct connectdata *conn, int sockindex);
+  int (*shut_down)(struct connectdata *conn, int sockindex);
   bool (*data_pending)(const struct connectdata *conn,
                        int connindex);
 
@@ -55,7 +56,7 @@ struct Curl_ssl {
                      size_t length);
   bool (*cert_status_request)(void);
 
-  CURLcode (*connect)(struct connectdata *conn, int sockindex);
+  CURLcode (*connect_blocking)(struct connectdata *conn, int sockindex);
   CURLcode (*connect_nonblocking)(struct connectdata *conn, int sockindex,
                                   bool *done);
   void *(*get_internals)(struct ssl_connect_data *connssl, CURLINFO info);
@@ -93,6 +94,7 @@ CURLcode Curl_none_set_engine(struct Curl_easy *data, const char *engine);
 CURLcode Curl_none_set_engine_default(struct Curl_easy *data);
 struct curl_slist *Curl_none_engines_list(struct Curl_easy *data);
 bool Curl_none_false_start(void);
+bool Curl_ssl_tls13_ciphersuites(void);
 CURLcode Curl_none_md5sum(unsigned char *input, size_t inputlen,
                           unsigned char *md5sum, size_t md5len);
 
@@ -101,11 +103,11 @@ CURLcode Curl_none_md5sum(unsigned char *input, size_t inputlen,
 #include "nssg.h"           /* NSS versions */
 #include "gskit.h"          /* Global Secure ToolKit versions */
 #include "polarssl.h"       /* PolarSSL versions */
-#include "axtls.h"          /* axTLS versions */
 #include "cyassl.h"         /* CyaSSL versions */
 #include "schannel.h"       /* Schannel SSPI version */
-#include "darwinssl.h"      /* SecureTransport (Darwin) version */
+#include "sectransp.h"      /* SecureTransport (Darwin) version */
 #include "mbedtls.h"        /* mbedTLS versions */
+#include "mesalink.h"       /* MesaLink versions */
 
 #ifndef MAX_PINNED_PUBKEY_SIZE
 #define MAX_PINNED_PUBKEY_SIZE 1048576 /* 1MB */
@@ -246,7 +248,7 @@ bool Curl_ssl_false_start(void);
 
 #define SSL_SHUTDOWN_TIMEOUT 10000 /* ms */
 
-#else
+#else /* if not USE_SSL */
 
 /* When SSL support is not present, just define away these function calls */
 #define Curl_ssl_init() 1
@@ -270,6 +272,7 @@ bool Curl_ssl_false_start(void);
 #define Curl_ssl_random(x,y,z) ((void)x, CURLE_NOT_BUILT_IN)
 #define Curl_ssl_cert_status_request() FALSE
 #define Curl_ssl_false_start() FALSE
+#define Curl_ssl_tls13_ciphersuites() FALSE
 #endif
 
 #endif /* HEADER_CURL_VTLS_H */

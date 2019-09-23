@@ -1,35 +1,36 @@
 # Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
 # file Copyright.txt or https://cmake.org/licensing for details.
 
-#.rst:
-# FindOpenCL
-# ----------
-#
-# Try to find OpenCL
-#
-# IMPORTED Targets
-# ^^^^^^^^^^^^^^^^
-#
-# This module defines :prop_tgt:`IMPORTED` target ``OpenCL::OpenCL``, if
-# OpenCL has been found.
-#
-# Result Variables
-# ^^^^^^^^^^^^^^^^
-#
-# This module defines the following variables::
-#
-#   OpenCL_FOUND          - True if OpenCL was found
-#   OpenCL_INCLUDE_DIRS   - include directories for OpenCL
-#   OpenCL_LIBRARIES      - link against this library to use OpenCL
-#   OpenCL_VERSION_STRING - Highest supported OpenCL version (eg. 1.2)
-#   OpenCL_VERSION_MAJOR  - The major version of the OpenCL implementation
-#   OpenCL_VERSION_MINOR  - The minor version of the OpenCL implementation
-#
-# The module will also define two cache variables::
-#
-#   OpenCL_INCLUDE_DIR    - the OpenCL include directory
-#   OpenCL_LIBRARY        - the path to the OpenCL library
-#
+#[=======================================================================[.rst:
+FindOpenCL
+----------
+
+Finds Open Computing Language (OpenCL)
+
+IMPORTED Targets
+^^^^^^^^^^^^^^^^
+
+This module defines :prop_tgt:`IMPORTED` target ``OpenCL::OpenCL``, if
+OpenCL has been found.
+
+Result Variables
+^^^^^^^^^^^^^^^^
+
+This module defines the following variables::
+
+  OpenCL_FOUND          - True if OpenCL was found
+  OpenCL_INCLUDE_DIRS   - include directories for OpenCL
+  OpenCL_LIBRARIES      - link against this library to use OpenCL
+  OpenCL_VERSION_STRING - Highest supported OpenCL version (eg. 1.2)
+  OpenCL_VERSION_MAJOR  - The major version of the OpenCL implementation
+  OpenCL_VERSION_MINOR  - The minor version of the OpenCL implementation
+
+The module will also define two cache variables::
+
+  OpenCL_INCLUDE_DIR    - the OpenCL include directory
+  OpenCL_LIBRARY        - the path to the OpenCL library
+
+#]=======================================================================]
 
 function(_FIND_OPENCL_VERSION)
   include(CheckSymbolExists)
@@ -119,16 +120,27 @@ if(WIN32)
         OpenCL/common/lib/x64)
   endif()
 else()
-  find_library(OpenCL_LIBRARY
-    NAMES OpenCL
-    PATHS
-      ENV AMDAPPSDKROOT
-      ENV CUDA_PATH
-    PATH_SUFFIXES
-      lib/x86_64
-      lib/x64
-      lib
-      lib64)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    find_library(OpenCL_LIBRARY
+      NAMES OpenCL
+      PATHS
+        ENV AMDAPPSDKROOT
+        ENV CUDA_PATH
+      PATH_SUFFIXES
+        lib/x86
+        lib)
+  elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    find_library(OpenCL_LIBRARY
+      NAMES OpenCL
+      PATHS
+        ENV AMDAPPSDKROOT
+        ENV CUDA_PATH
+      PATH_SUFFIXES
+        lib/x86_64
+        lib/x64
+        lib
+        lib64)
+  endif()
 endif()
 
 set(OpenCL_LIBRARIES ${OpenCL_LIBRARY})

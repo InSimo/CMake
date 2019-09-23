@@ -12,14 +12,16 @@
 #include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h> // required for atoi
+#include <utility>
 
 #include "cmAlgorithms.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
 #include "cmPolicies.h"
+#include "cmRange.h"
 #include "cmStringReplaceHelper.h"
 #include "cmSystemTools.h"
-#include "cmake.h"
 
 class cmExecutionStatus;
 
@@ -40,6 +42,15 @@ bool cmListCommand::InitialPass(std::vector<std::string> const& args,
   }
   if (subCommand == "APPEND") {
     return this->HandleAppendCommand(args);
+  }
+  if (subCommand == "PREPEND") {
+    return this->HandlePrependCommand(args);
+  }
+  if (subCommand == "POP_BACK") {
+    return this->HandlePopBackCommand(args);
+  }
+  if (subCommand == "POP_FRONT") {
+    return this->HandlePopFrontCommand(args);
   }
   if (subCommand == "FIND") {
     return this->HandleFindCommand(args);
@@ -122,7 +133,7 @@ bool cmListCommand::GetList(std::vector<std::string>& list,
       warn += " List has value = [";
       warn += listString;
       warn += "].";
-      this->Makefile->IssueMessage(cmake::AUTHOR_WARNING, warn);
+      this->Makefile->IssueMessage(MessageType::AUTHOR_WARNING, warn);
       return true;
     }
     case cmPolicies::OLD:
@@ -137,7 +148,7 @@ bool cmListCommand::GetList(std::vector<std::string>& list,
     case cmPolicies::REQUIRED_IF_USED:
     case cmPolicies::REQUIRED_ALWAYS:
       this->Makefile->IssueMessage(
-        cmake::FATAL_ERROR,
+        MessageType::FATAL_ERROR,
         cmPolicies::GetRequiredPolicyError(cmPolicies::CMP0007));
       return false;
   }
@@ -152,7 +163,7 @@ bool cmListCommand::HandleLengthCommand(std::vector<std::string> const& args)
   }
 
   const std::string& listName = args[1];
-  const std::string& variableName = args[args.size() - 1];
+  const std::string& variableName = args.back();
   std::vector<std::string> varArgsExpanded;
   // do not check the return value here
   // if the list var is not found varArgsExpanded will have size 0
@@ -174,7 +185,7 @@ bool cmListCommand::HandleGetCommand(std::vector<std::string> const& args)
   }
 
   const std::string& listName = args[1];
-  const std::string& variableName = args[args.size() - 1];
+  const std::string& variableName = args.back();
   // expand the variable
   std::vector<std::string> varArgsExpanded;
   if (!this->GetList(varArgsExpanded, listName)) {
@@ -221,17 +232,138 @@ bool cmListCommand::HandleAppendCommand(std::vector<std::string> const& args)
     return true;
   }
 
-  const std::string& listName = args[1];
+  std::string const& listName = args[1];
   // expand the variable
   std::string listString;
   this->GetListString(listString, listName);
 
-  if (!listString.empty() && !args.empty()) {
-    listString += ";";
-  }
-  listString += cmJoin(cmMakeRange(args).advance(2), ";");
+  // If `listString` or `args` is empty, no need to append `;`,
+  // then index is going to be `1` and points to the end-of-string ";"
+  auto const offset =
+    std::string::size_type(listString.empty() || args.empty());
+  listString += &";"[offset] + cmJoin(cmMakeRange(args).advance(2), ";");
 
   this->Makefile->AddDefinition(listName, listString.c_str());
+  return true;
+}
+
+bool cmListCommand::HandlePrependCommand(std::vector<std::string> const& args)
+{
+  assert(args.size() >= 2);
+
+  // Skip if nothing to prepend.
+  if (args.size() < 3) {
+    return true;
+  }
+
+  std::string const& listName = args[1];
+  // expand the variable
+  std::string listString;
+  this->GetListString(listString, listName);
+
+  // If `listString` or `args` is empty, no need to append `;`,
+  // then `offset` is going to be `1` and points to the end-of-string ";"
+  auto const offset =
+    std::string::size_type(listString.empty() || args.empty());
+  listString.insert(0,
+                    cmJoin(cmMakeRange(args).advance(2), ";") + &";"[offset]);
+
+  this->Makefile->AddDefinition(listName, listString.c_str());
+  return true;
+}
+
+bool cmListCommand::HandlePopBackCommand(std::vector<std::string> const& args)
+{
+  assert(args.size() >= 2);
+
+  auto ai = args.cbegin();
+  ++ai; // Skip subcommand name
+  std::string const& listName = *ai++;
+  std::vector<std::string> varArgsExpanded;
+  if (!this->GetList(varArgsExpanded, listName)) {
+    // Can't get the list definition... undefine any vars given after.
+    for (; ai != args.cend(); ++ai) {
+      this->Makefile->RemoveDefinition(*ai);
+    }
+    return true;
+  }
+
+  if (!varArgsExpanded.empty()) {
+    if (ai == args.cend()) {
+      // No variables are given... Just remove one element.
+      varArgsExpanded.pop_back();
+    } else {
+      // Ok, assign elements to be removed to the given variables
+      for (; !varArgsExpanded.empty() && ai != args.cend(); ++ai) {
+        assert(!ai->empty());
+        this->Makefile->AddDefinition(*ai, varArgsExpanded.back().c_str());
+        varArgsExpanded.pop_back();
+      }
+      // Undefine the rest variables if the list gets empty earlier...
+      for (; ai != args.cend(); ++ai) {
+        this->Makefile->RemoveDefinition(*ai);
+      }
+    }
+
+    this->Makefile->AddDefinition(listName,
+                                  cmJoin(varArgsExpanded, ";").c_str());
+
+  } else if (ai !=
+             args.cend()) { // The list is empty, but some args were given
+    // Need to *undefine* 'em all, cuz there are no items to assign...
+    for (; ai != args.cend(); ++ai) {
+      this->Makefile->RemoveDefinition(*ai);
+    }
+  }
+
+  return true;
+}
+
+bool cmListCommand::HandlePopFrontCommand(std::vector<std::string> const& args)
+{
+  assert(args.size() >= 2);
+
+  auto ai = args.cbegin();
+  ++ai; // Skip subcommand name
+  std::string const& listName = *ai++;
+  std::vector<std::string> varArgsExpanded;
+  if (!this->GetList(varArgsExpanded, listName)) {
+    // Can't get the list definition... undefine any vars given after.
+    for (; ai != args.cend(); ++ai) {
+      this->Makefile->RemoveDefinition(*ai);
+    }
+    return true;
+  }
+
+  if (!varArgsExpanded.empty()) {
+    if (ai == args.cend()) {
+      // No variables are given... Just remove one element.
+      varArgsExpanded.erase(varArgsExpanded.begin());
+    } else {
+      // Ok, assign elements to be removed to the given variables
+      auto vi = varArgsExpanded.begin();
+      for (; vi != varArgsExpanded.end() && ai != args.cend(); ++ai, ++vi) {
+        assert(!ai->empty());
+        this->Makefile->AddDefinition(*ai, vi->c_str());
+      }
+      varArgsExpanded.erase(varArgsExpanded.begin(), vi);
+      // Undefine the rest variables if the list gets empty earlier...
+      for (; ai != args.cend(); ++ai) {
+        this->Makefile->RemoveDefinition(*ai);
+      }
+    }
+
+    this->Makefile->AddDefinition(listName,
+                                  cmJoin(varArgsExpanded, ";").c_str());
+
+  } else if (ai !=
+             args.cend()) { // The list is empty, but some args were given
+    // Need to *undefine* 'em all, cuz there are no items to assign...
+    for (; ai != args.cend(); ++ai) {
+      this->Makefile->RemoveDefinition(*ai);
+    }
+  }
+
   return true;
 }
 
@@ -243,7 +375,7 @@ bool cmListCommand::HandleFindCommand(std::vector<std::string> const& args)
   }
 
   const std::string& listName = args[1];
-  const std::string& variableName = args[args.size() - 1];
+  const std::string& variableName = args.back();
   // expand the variable
   std::vector<std::string> varArgsExpanded;
   if (!this->GetList(varArgsExpanded, listName)) {
@@ -289,12 +421,10 @@ bool cmListCommand::HandleInsertCommand(std::vector<std::string> const& args)
     if (item < 0) {
       item = static_cast<int>(nitem) + item;
     }
-    if (item < 0 || nitem <= static_cast<size_t>(item)) {
+    if (item < 0 || nitem < static_cast<size_t>(item)) {
       std::ostringstream str;
       str << "index: " << item << " out of range (-" << varArgsExpanded.size()
-          << ", "
-          << (varArgsExpanded.empty() ? 0 : (varArgsExpanded.size() - 1))
-          << ")";
+          << ", " << varArgsExpanded.size() << ")";
       this->SetError(str.str());
       return false;
     }
@@ -348,8 +478,7 @@ bool cmListCommand::HandleRemoveItemCommand(
   // expand the variable
   std::vector<std::string> varArgsExpanded;
   if (!this->GetList(varArgsExpanded, listName)) {
-    this->SetError("sub-command REMOVE_ITEM requires list to be present.");
-    return false;
+    return true;
   }
 
   std::vector<std::string> remove(args.begin() + 2, args.end());
@@ -378,8 +507,7 @@ bool cmListCommand::HandleReverseCommand(std::vector<std::string> const& args)
   // expand the variable
   std::vector<std::string> varArgsExpanded;
   if (!this->GetList(varArgsExpanded, listName)) {
-    this->SetError("sub-command REVERSE requires list to be present.");
-    return false;
+    return true;
   }
 
   std::string value = cmJoin(cmReverseRange(varArgsExpanded), ";");
@@ -401,9 +529,7 @@ bool cmListCommand::HandleRemoveDuplicatesCommand(
   // expand the variable
   std::vector<std::string> varArgsExpanded;
   if (!this->GetList(varArgsExpanded, listName)) {
-    this->SetError(
-      "sub-command REMOVE_DUPLICATES requires list to be present.");
-    return false;
+    return true;
   }
 
   std::vector<std::string>::const_iterator argsEnd =
@@ -431,7 +557,7 @@ public:
 class TransformSelector
 {
 public:
-  virtual ~TransformSelector() {}
+  virtual ~TransformSelector() = default;
 
   std::string Tag;
 
@@ -585,7 +711,7 @@ private:
 class TransformAction
 {
 public:
-  virtual ~TransformAction() {}
+  virtual ~TransformAction() = default;
 
   virtual std::string Transform(const std::string& input) = 0;
 };
@@ -664,15 +790,19 @@ bool cmListCommand::HandleTransformCommand(
   // Transform: lambda function implementing the action
   struct ActionDescriptor
   {
-    ActionDescriptor(const std::string& name)
-      : Name(name)
+    ActionDescriptor(std::string name)
+      : Name(std::move(name))
     {
     }
-    ActionDescriptor(const std::string& name, int arity,
-                     const transform_type& transform)
-      : Name(name)
+    ActionDescriptor(std::string name, int arity, transform_type transform)
+      : Name(std::move(name))
       , Arity(arity)
+#if defined(__GNUC__) && __GNUC__ == 6 && defined(__aarch64__)
+      // std::function move constructor miscompiles on this architecture
       , Transform(transform)
+#else
+      , Transform(std::move(transform))
+#endif
     {
     }
 
@@ -963,23 +1093,208 @@ bool cmListCommand::HandleTransformCommand(
   return true;
 }
 
+class cmStringSorter
+{
+public:
+  enum class Order
+  {
+    UNINITIALIZED,
+    ASCENDING,
+    DESCENDING,
+  };
+
+  enum class Compare
+  {
+    UNINITIALIZED,
+    STRING,
+    FILE_BASENAME,
+  };
+  enum class CaseSensitivity
+  {
+    UNINITIALIZED,
+    SENSITIVE,
+    INSENSITIVE,
+  };
+
+protected:
+  typedef std::string (*StringFilter)(const std::string& in);
+  StringFilter GetCompareFilter(Compare compare)
+  {
+    return (compare == Compare::FILE_BASENAME) ? cmSystemTools::GetFilenameName
+                                               : nullptr;
+  }
+
+  StringFilter GetCaseFilter(CaseSensitivity sensitivity)
+  {
+    return (sensitivity == CaseSensitivity::INSENSITIVE)
+      ? cmSystemTools::LowerCase
+      : nullptr;
+  }
+
+public:
+  cmStringSorter(Compare compare, CaseSensitivity caseSensitivity,
+                 Order desc = Order::ASCENDING)
+    : filters{ GetCompareFilter(compare), GetCaseFilter(caseSensitivity) }
+    , descending(desc == Order::DESCENDING)
+  {
+  }
+
+  std::string ApplyFilter(const std::string& argument)
+  {
+    std::string result = argument;
+    for (auto filter : filters) {
+      if (filter != nullptr) {
+        result = filter(result);
+      }
+    }
+    return result;
+  }
+
+  bool operator()(const std::string& a, const std::string& b)
+  {
+    std::string af = ApplyFilter(a);
+    std::string bf = ApplyFilter(b);
+    bool result;
+    if (descending) {
+      result = bf < af;
+    } else {
+      result = af < bf;
+    }
+    return result;
+  }
+
+protected:
+  StringFilter filters[2] = { nullptr, nullptr };
+  bool descending;
+};
+
 bool cmListCommand::HandleSortCommand(std::vector<std::string> const& args)
 {
   assert(args.size() >= 2);
-  if (args.size() > 2) {
-    this->SetError("sub-command SORT only takes one argument.");
+  if (args.size() > 8) {
+    this->SetError("sub-command SORT only takes up to six arguments.");
     return false;
+  }
+
+  auto sortCompare = cmStringSorter::Compare::UNINITIALIZED;
+  auto sortCaseSensitivity = cmStringSorter::CaseSensitivity::UNINITIALIZED;
+  auto sortOrder = cmStringSorter::Order::UNINITIALIZED;
+
+  size_t argumentIndex = 2;
+  const std::string messageHint = "sub-command SORT ";
+
+  while (argumentIndex < args.size()) {
+    const std::string option = args[argumentIndex++];
+    if (option == "COMPARE") {
+      if (sortCompare != cmStringSorter::Compare::UNINITIALIZED) {
+        std::string error = messageHint + "option \"" + option +
+          "\" has been specified multiple times.";
+        this->SetError(error);
+        return false;
+      }
+      if (argumentIndex < args.size()) {
+        const std::string argument = args[argumentIndex++];
+        if (argument == "STRING") {
+          sortCompare = cmStringSorter::Compare::STRING;
+        } else if (argument == "FILE_BASENAME") {
+          sortCompare = cmStringSorter::Compare::FILE_BASENAME;
+        } else {
+          std::string error = messageHint + "value \"" + argument +
+            "\" for option \"" + option + "\" is invalid.";
+          this->SetError(error);
+          return false;
+        }
+      } else {
+        std::string error =
+          messageHint + "missing argument for option \"" + option + "\".";
+        this->SetError(error);
+        return false;
+      }
+    } else if (option == "CASE") {
+      if (sortCaseSensitivity !=
+          cmStringSorter::CaseSensitivity::UNINITIALIZED) {
+        std::string error = messageHint + "option \"" + option +
+          "\" has been specified multiple times.";
+        this->SetError(error);
+        return false;
+      }
+      if (argumentIndex < args.size()) {
+        const std::string argument = args[argumentIndex++];
+        if (argument == "SENSITIVE") {
+          sortCaseSensitivity = cmStringSorter::CaseSensitivity::SENSITIVE;
+        } else if (argument == "INSENSITIVE") {
+          sortCaseSensitivity = cmStringSorter::CaseSensitivity::INSENSITIVE;
+        } else {
+          std::string error = messageHint + "value \"" + argument +
+            "\" for option \"" + option + "\" is invalid.";
+          this->SetError(error);
+          return false;
+        }
+      } else {
+        std::string error =
+          messageHint + "missing argument for option \"" + option + "\".";
+        this->SetError(error);
+        return false;
+      }
+    } else if (option == "ORDER") {
+
+      if (sortOrder != cmStringSorter::Order::UNINITIALIZED) {
+        std::string error = messageHint + "option \"" + option +
+          "\" has been specified multiple times.";
+        this->SetError(error);
+        return false;
+      }
+      if (argumentIndex < args.size()) {
+        const std::string argument = args[argumentIndex++];
+        if (argument == "ASCENDING") {
+          sortOrder = cmStringSorter::Order::ASCENDING;
+        } else if (argument == "DESCENDING") {
+          sortOrder = cmStringSorter::Order::DESCENDING;
+        } else {
+          std::string error = messageHint + "value \"" + argument +
+            "\" for option \"" + option + "\" is invalid.";
+          this->SetError(error);
+          return false;
+        }
+      } else {
+        std::string error =
+          messageHint + "missing argument for option \"" + option + "\".";
+        this->SetError(error);
+        return false;
+      }
+    } else {
+      std::string error =
+        messageHint + "option \"" + option + "\" is unknown.";
+      this->SetError(error);
+      return false;
+    }
+  }
+  // set Default Values if Option is not given
+  if (sortCompare == cmStringSorter::Compare::UNINITIALIZED) {
+    sortCompare = cmStringSorter::Compare::STRING;
+  }
+  if (sortCaseSensitivity == cmStringSorter::CaseSensitivity::UNINITIALIZED) {
+    sortCaseSensitivity = cmStringSorter::CaseSensitivity::SENSITIVE;
+  }
+  if (sortOrder == cmStringSorter::Order::UNINITIALIZED) {
+    sortOrder = cmStringSorter::Order::ASCENDING;
   }
 
   const std::string& listName = args[1];
   // expand the variable
   std::vector<std::string> varArgsExpanded;
   if (!this->GetList(varArgsExpanded, listName)) {
-    this->SetError("sub-command SORT requires list to be present.");
-    return false;
+    return true;
   }
 
-  std::sort(varArgsExpanded.begin(), varArgsExpanded.end());
+  if ((sortCompare == cmStringSorter::Compare::STRING) &&
+      (sortCaseSensitivity == cmStringSorter::CaseSensitivity::SENSITIVE) &&
+      (sortOrder == cmStringSorter::Order::ASCENDING)) {
+    std::sort(varArgsExpanded.begin(), varArgsExpanded.end());
+  } else {
+    cmStringSorter sorter(sortCompare, sortCaseSensitivity, sortOrder);
+    std::sort(varArgsExpanded.begin(), varArgsExpanded.end(), sorter);
+  }
 
   std::string value = cmJoin(varArgsExpanded, ";");
   this->Makefile->AddDefinition(listName, value.c_str());
@@ -997,7 +1312,7 @@ bool cmListCommand::HandleSublistCommand(std::vector<std::string> const& args)
   }
 
   const std::string& listName = args[1];
-  const std::string& variableName = args[args.size() - 1];
+  const std::string& variableName = args.back();
 
   // expand the variable
   std::vector<std::string> varArgsExpanded;
@@ -1046,13 +1361,17 @@ bool cmListCommand::HandleRemoveAtCommand(std::vector<std::string> const& args)
   const std::string& listName = args[1];
   // expand the variable
   std::vector<std::string> varArgsExpanded;
-  if (!this->GetList(varArgsExpanded, listName)) {
-    this->SetError("sub-command REMOVE_AT requires list to be present.");
-    return false;
-  }
-  // FIXME: Add policy to make non-existing lists an error like empty lists.
-  if (varArgsExpanded.empty()) {
-    this->SetError("REMOVE_AT given empty list");
+  if (!this->GetList(varArgsExpanded, listName) || varArgsExpanded.empty()) {
+    std::ostringstream str;
+    str << "index: ";
+    for (size_t i = 1; i < args.size(); ++i) {
+      str << args[i];
+      if (i != args.size() - 1) {
+        str << ", ";
+      }
+    }
+    str << " out of range (0, 0)";
+    this->SetError(str.str());
     return false;
   }
 
@@ -1105,14 +1424,6 @@ bool cmListCommand::HandleFilterCommand(std::vector<std::string> const& args)
     return false;
   }
 
-  const std::string& listName = args[1];
-  // expand the variable
-  std::vector<std::string> varArgsExpanded;
-  if (!this->GetList(varArgsExpanded, listName)) {
-    this->SetError("sub-command FILTER requires list to be present.");
-    return false;
-  }
-
   const std::string& op = args[2];
   bool includeMatches;
   if (op == "INCLUDE") {
@@ -1122,6 +1433,13 @@ bool cmListCommand::HandleFilterCommand(std::vector<std::string> const& args)
   } else {
     this->SetError("sub-command FILTER does not recognize operator " + op);
     return false;
+  }
+
+  const std::string& listName = args[1];
+  // expand the variable
+  std::vector<std::string> varArgsExpanded;
+  if (!this->GetList(varArgsExpanded, listName)) {
+    return true;
   }
 
   const std::string& mode = args[3];

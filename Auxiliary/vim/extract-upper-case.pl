@@ -13,6 +13,9 @@ my @properties;
 my @modules;
 my %keywords; # command => keyword-list
 
+# find cmake/Modules/ | sed -rn 's/.*CMakeDetermine(.+)Compiler.cmake/\1/p' | sort
+my @languages = qw(ASM ASM_MASM ASM_NASM C CSharp CUDA CXX Fortran Java RC Swift);
+
 # unwanted upper-cases
 my %unwanted = map { $_ => 1 } qw(VS CXX IDE NOTFOUND NO_ DFOO DBAR NEW);
 	# cannot remove ALL - exists for add_custom_command
@@ -30,8 +33,21 @@ push @modules, "ExternalProject";
 # variables
 open(CMAKE, "$cmake --help-variable-list|") or die "could not run cmake";
 while (<CMAKE>) {
-	next if /\</; # skip if containing < or >
 	chomp;
+
+	if (/<(.*?)>/) {
+		if ($1 eq 'LANG') {
+			foreach my $lang (@languages) {
+			(my $V = $_) =~ s/<.*>/$lang/;
+				push @variables, $V;
+			}
+
+			next
+		} else {
+			next; # skip if containing < or >
+		}
+	}
+
 	push @variables, $_;
 }
 close(CMAKE);
@@ -103,25 +119,25 @@ while(<IN>)
 			my @tmp = grep { ! exists $conditional{$_} and
 			                 ! exists $loop{$_} and
 			                 ! exists $deprecated{$_} } @commands;
-			print OUT " " x 12 , "\\ ", join(" ", @tmp), "\n";
+			print_list(\*OUT, @tmp);
 		} elsif ($1 eq "VARIABLE_LIST") {
-			print OUT " " x 12 , "\\ ", join(" ", sort keys %variables), "\n";
+			print_list(\*OUT, keys %variables);
 		} elsif ($1 eq "MODULES") {
-			print OUT " " x 12 , "\\ ", join("\n", @modules), "\n";
+			print_list(\*OUT, @modules);
 		} elsif ($1 eq "GENERATOR_EXPRESSIONS") {
-			print OUT " " x 12 , "\\ ", join(" ", @generator_expr), "\n";
+			print_list(\*OUT, @generator_expr);
 		} elsif ($1 eq "CONDITIONALS") {
-			print OUT " " x 12 , "\\ ", join(" ", sort keys %conditional), "\n";
+			print_list(\*OUT, keys %conditional);
 		} elsif ($1 eq "LOOPS") {
-			print OUT " " x 12 , "\\ ", join(" ", sort keys %loop), "\n";
+			print_list(\*OUT, keys %loop);
 		} elsif ($1 eq "DEPRECATED") {
-			print OUT " " x 12 , "\\ ", join(" ", sort keys %deprecated), "\n";
+			print_list(\*OUT, keys %deprecated);
 		} elsif ($1 eq "PROPERTIES") {
-			print OUT " " x 12 , "\\ ", join(" ", sort keys %properties), "\n";
+			print_list(\*OUT, keys %properties);
 		} elsif ($1 eq "KEYWORDS") {
 			foreach my $k (sort keys %keywords) {
 				print OUT "syn keyword cmakeKW$k contained\n";
-				print OUT " " x 12, "\\ ", join(" ", @{$keywords{$k}}), "\n";
+				print_list(\*OUT, @{$keywords{$k}});
 				print OUT "\n";
 				push @keyword_hi, "hi def link cmakeKW$k ModeMsg";
 			}
@@ -163,4 +179,11 @@ sub extract_upper
 	close(KW);
 
 	return @word;
+}
+
+sub print_list
+{
+	my $O = shift;
+	my $indent = " " x 12 . "\\ ";
+	print $O $indent, join("\n" . $indent, sort @_), "\n";
 }

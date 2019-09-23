@@ -3,31 +3,41 @@
 #include "cmCTestMultiProcessHandler.h"
 
 #include "cmAffinity.h"
+#include "cmAlgorithms.h"
 #include "cmCTest.h"
 #include "cmCTestRunTest.h"
-#include "cmCTestScriptHandler.h"
 #include "cmCTestTestHandler.h"
+#include "cmDuration.h"
+#include "cmListFileCache.h"
+#include "cmRange.h"
 #include "cmSystemTools.h"
 #include "cmWorkingDirectory.h"
 
+#include "cm_jsoncpp_value.h"
+#include "cm_jsoncpp_writer.h"
 #include "cm_uv.h"
 
 #include "cmUVSignalHackRAII.h" // IWYU pragma: keep
 
 #include "cmsys/FStream.hxx"
-#include "cmsys/String.hxx"
 #include "cmsys/SystemInformation.hxx"
 
 #include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <iomanip>
+#include <iostream>
 #include <list>
 #include <math.h>
 #include <sstream>
 #include <stack>
 #include <stdlib.h>
+#include <unordered_map>
 #include <utility>
+
+namespace cmsys {
+class RegularExpression;
+}
 
 class TestComparator
 {
@@ -36,7 +46,6 @@ public:
     : Handler(handler)
   {
   }
-  ~TestComparator() {}
 
   // Sorts tests in descending order of cost
   bool operator()(int index1, int index2) const
@@ -53,18 +62,16 @@ cmCTestMultiProcessHandler::cmCTestMultiProcessHandler()
 {
   this->ParallelLevel = 1;
   this->TestLoad = 0;
+  this->FakeLoadForTesting = 0;
   this->Completed = 0;
   this->RunningCount = 0;
   this->ProcessorsAvailable = cmAffinity::GetProcessorsAvailable();
   this->HaveAffinity = this->ProcessorsAvailable.size();
-  this->StopTimePassed = false;
   this->HasCycles = false;
   this->SerialTestRunning = false;
 }
 
-cmCTestMultiProcessHandler::~cmCTestMultiProcessHandler()
-{
-}
+cmCTestMultiProcessHandler::~cmCTestMultiProcessHandler() = default;
 
 // Set the tests
 void cmCTestMultiProcessHandler::SetTests(TestMap& tests,
@@ -97,6 +104,16 @@ void cmCTestMultiProcessHandler::SetParallelLevel(size_t level)
 void cmCTestMultiProcessHandler::SetTestLoad(unsigned long load)
 {
   this->TestLoad = load;
+
+  std::string fake_load_value;
+  if (cmSystemTools::GetEnv("__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING",
+                            fake_load_value)) {
+    if (!cmSystemTools::StringToULong(fake_load_value.c_str(),
+                                      &this->FakeLoadForTesting)) {
+      cmSystemTools::Error("Failed to parse fake load value: " +
+                           fake_load_value);
+    }
+  }
 }
 
 void cmCTestMultiProcessHandler::RunTests()
@@ -121,17 +138,6 @@ void cmCTestMultiProcessHandler::RunTests()
 
 bool cmCTestMultiProcessHandler::StartTestProcess(int test)
 {
-  std::chrono::system_clock::time_point stop_time = this->CTest->GetStopTime();
-  if (stop_time != std::chrono::system_clock::time_point() &&
-      stop_time <= std::chrono::system_clock::now()) {
-    cmCTestLog(this->CTest, ERROR_MESSAGE,
-               "The stop time has been passed. "
-               "Stopping all tests."
-                 << std::endl);
-    this->StopTimePassed = true;
-    return false;
-  }
-
   if (this->HaveAffinity && this->Properties[test]->WantAffinity) {
     size_t needProcessors = this->GetProcessorsUsed(test);
     if (needProcessors > this->ProcessorsAvailable.size()) {
@@ -181,13 +187,37 @@ bool cmCTestMultiProcessHandler::StartTestProcess(int test)
                           this->Properties[test]->Directory + " : " +
                           std::strerror(workdir.GetLastResult()));
   } else {
-    if (testRun->StartTest(this->Total)) {
+    if (testRun->StartTest(this->Completed, this->Total)) {
       return true;
     }
   }
 
   this->FinishTestProcess(testRun, false);
   return false;
+}
+
+bool cmCTestMultiProcessHandler::CheckStopTimePassed()
+{
+  if (!this->StopTimePassed) {
+    std::chrono::system_clock::time_point stop_time =
+      this->CTest->GetStopTime();
+    if (stop_time != std::chrono::system_clock::time_point() &&
+        stop_time <= std::chrono::system_clock::now()) {
+      this->SetStopTimePassed();
+    }
+  }
+  return this->StopTimePassed;
+}
+
+void cmCTestMultiProcessHandler::SetStopTimePassed()
+{
+  if (!this->StopTimePassed) {
+    cmCTestLog(this->CTest, ERROR_MESSAGE,
+               "The stop time has been passed. "
+               "Stopping all tests."
+                 << std::endl);
+    this->StopTimePassed = true;
+  }
 }
 
 void cmCTestMultiProcessHandler::LockResources(int index)
@@ -259,11 +289,22 @@ bool cmCTestMultiProcessHandler::StartTest(int test)
 
 void cmCTestMultiProcessHandler::StartNextTests()
 {
-  size_t numToStart = 0;
+  if (this->TestLoadRetryTimer.get() != nullptr) {
+    // This timer may be waiting to call StartNextTests again.
+    // Since we have been called it is no longer needed.
+    uv_timer_stop(this->TestLoadRetryTimer);
+  }
 
   if (this->Tests.empty()) {
+    this->TestLoadRetryTimer.reset();
     return;
   }
+
+  if (this->CheckStopTimePassed()) {
+    return;
+  }
+
+  size_t numToStart = 0;
 
   if (this->RunningCount < this->ParallelLevel) {
     numToStart = this->ParallelLevel - this->RunningCount;
@@ -280,7 +321,6 @@ void cmCTestMultiProcessHandler::StartNextTests()
   }
 
   bool allTestsFailedTestLoadCheck = false;
-  bool usedFakeLoadForTesting = false;
   size_t minProcessorsRequired = this->ParallelLevel;
   std::string testWithMinProcessors;
 
@@ -293,15 +333,11 @@ void cmCTestMultiProcessHandler::StartNextTests()
     allTestsFailedTestLoadCheck = true;
 
     // Check for a fake load average value used in testing.
-    std::string fake_load_value;
-    if (cmSystemTools::GetEnv("__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING",
-                              fake_load_value)) {
-      usedFakeLoadForTesting = true;
-      if (!cmSystemTools::StringToULong(fake_load_value.c_str(),
-                                        &systemLoad)) {
-        cmSystemTools::Error("Failed to parse fake load value: ",
-                             fake_load_value.c_str());
-      }
+    if (this->FakeLoadForTesting > 0) {
+      systemLoad = this->FakeLoadForTesting;
+      // Drop the fake load for the next iteration to a value low enough
+      // that the next iteration will start tests.
+      this->FakeLoadForTesting = 1;
     }
     // If it's not set, look up the true load average.
     else {
@@ -347,10 +383,6 @@ void cmCTestMultiProcessHandler::StartNextTests()
     }
 
     if (testLoadOk && processors <= numToStart && this->StartTest(test)) {
-      if (this->StopTimePassed) {
-        return;
-      }
-
       numToStart -= processors;
     } else if (numToStart == 0) {
       break;
@@ -385,16 +417,23 @@ void cmCTestMultiProcessHandler::StartNextTests()
     }
     cmCTestLog(this->CTest, HANDLER_OUTPUT, "*****" << std::endl);
 
-    if (usedFakeLoadForTesting) {
-      // Break out of the infinite loop of waiting for our fake load
-      // to come down.
-      this->StopTimePassed = true;
-    } else {
-      // Wait between 1 and 5 seconds before trying again.
-      cmCTestScriptHandler::SleepInSeconds(cmSystemTools::RandomSeed() % 5 +
-                                           1);
+    // Wait between 1 and 5 seconds before trying again.
+    unsigned int milliseconds = (cmSystemTools::RandomSeed() % 5 + 1) * 1000;
+    if (this->FakeLoadForTesting) {
+      milliseconds = 10;
     }
+    if (this->TestLoadRetryTimer.get() == nullptr) {
+      this->TestLoadRetryTimer.init(this->Loop, this);
+    }
+    this->TestLoadRetryTimer.start(
+      &cmCTestMultiProcessHandler::OnTestLoadRetryCB, milliseconds, 0);
   }
+}
+
+void cmCTestMultiProcessHandler::OnTestLoadRetryCB(uv_timer_t* timer)
+{
+  auto self = static_cast<cmCTestMultiProcessHandler*>(timer->data);
+  self->StartNextTests();
 }
 
 void cmCTestMultiProcessHandler::FinishTestProcess(cmCTestRunTest* runner,
@@ -406,8 +445,11 @@ void cmCTestMultiProcessHandler::FinishTestProcess(cmCTestRunTest* runner,
   auto properties = runner->GetTestProperties();
 
   bool testResult = runner->EndTest(this->Completed, this->Total, started);
+  if (runner->TimedOutForStopTime()) {
+    this->SetStopTimePassed();
+  }
   if (started) {
-    if (runner->StartAgain()) {
+    if (!this->StopTimePassed && runner->StartAgain(this->Completed)) {
       this->Completed--; // remove the completed test because run again
       return;
     }
@@ -458,7 +500,7 @@ void cmCTestMultiProcessHandler::UpdateCostData()
       if (line == "---") {
         break;
       }
-      std::vector<cmsys::String> parts = cmSystemTools::SplitString(line, ' ');
+      std::vector<std::string> parts = cmSystemTools::SplitString(line, ' ');
       // Format: <name> <previous_runs> <avg_cost>
       if (parts.size() < 3) {
         break;
@@ -495,7 +537,7 @@ void cmCTestMultiProcessHandler::UpdateCostData()
     fout << f << "\n";
   }
   fout.close();
-  cmSystemTools::RenameFile(tmpout.c_str(), fname.c_str());
+  cmSystemTools::RenameFile(tmpout, fname);
 }
 
 void cmCTestMultiProcessHandler::ReadCostData()
@@ -511,7 +553,7 @@ void cmCTestMultiProcessHandler::ReadCostData()
         break;
       }
 
-      std::vector<cmsys::String> parts = cmSystemTools::SplitString(line, ' ');
+      std::vector<std::string> parts = cmSystemTools::SplitString(line, ' ');
 
       // Probably an older version of the file, will be fixed next run
       if (parts.size() < 3) {
@@ -611,16 +653,11 @@ void cmCTestMultiProcessHandler::CreateParallelTestCostList()
 
   // Reverse iterate over the different dependency levels (deepest first).
   // Sort tests within each level by COST and append them to the cost list.
-  for (std::list<TestSet>::reverse_iterator i = priorityStack.rbegin();
-       i != priorityStack.rend(); ++i) {
-    TestSet const& currentSet = *i;
-    TestComparator comp(this);
-
+  for (TestSet const& currentSet : cmReverseRange(priorityStack)) {
     TestList sortedCopy;
-
-    sortedCopy.insert(sortedCopy.end(), currentSet.begin(), currentSet.end());
-
-    std::stable_sort(sortedCopy.begin(), sortedCopy.end(), comp);
+    cmAppend(sortedCopy, currentSet);
+    std::stable_sort(sortedCopy.begin(), sortedCopy.end(),
+                     TestComparator(this));
 
     for (auto const& j : sortedCopy) {
       if (alreadySortedTests.find(j) == alreadySortedTests.end()) {
@@ -649,8 +686,8 @@ void cmCTestMultiProcessHandler::CreateSerialTestCostList()
     presortedList.push_back(i.first);
   }
 
-  TestComparator comp(this);
-  std::stable_sort(presortedList.begin(), presortedList.end(), comp);
+  std::stable_sort(presortedList.begin(), presortedList.end(),
+                   TestComparator(this));
 
   TestSet alreadySortedTests;
 
@@ -692,9 +729,335 @@ void cmCTestMultiProcessHandler::MarkFinished()
   cmSystemTools::RemoveFile(fname);
 }
 
+static Json::Value DumpToJsonArray(const std::set<std::string>& values)
+{
+  Json::Value jsonArray = Json::arrayValue;
+  for (auto& it : values) {
+    jsonArray.append(it);
+  }
+  return jsonArray;
+}
+
+static Json::Value DumpToJsonArray(const std::vector<std::string>& values)
+{
+  Json::Value jsonArray = Json::arrayValue;
+  for (auto& it : values) {
+    jsonArray.append(it);
+  }
+  return jsonArray;
+}
+
+static Json::Value DumpRegExToJsonArray(
+  const std::vector<std::pair<cmsys::RegularExpression, std::string>>& values)
+{
+  Json::Value jsonArray = Json::arrayValue;
+  for (auto& it : values) {
+    jsonArray.append(it.second);
+  }
+  return jsonArray;
+}
+
+static Json::Value DumpMeasurementToJsonArray(
+  const std::map<std::string, std::string>& values)
+{
+  Json::Value jsonArray = Json::arrayValue;
+  for (auto& it : values) {
+    Json::Value measurement = Json::objectValue;
+    measurement["measurement"] = it.first;
+    measurement["value"] = it.second;
+    jsonArray.append(measurement);
+  }
+  return jsonArray;
+}
+
+static Json::Value DumpTimeoutAfterMatch(
+  cmCTestTestHandler::cmCTestTestProperties& testProperties)
+{
+  Json::Value timeoutAfterMatch = Json::objectValue;
+  timeoutAfterMatch["timeout"] = testProperties.AlternateTimeout.count();
+  timeoutAfterMatch["regex"] =
+    DumpRegExToJsonArray(testProperties.TimeoutRegularExpressions);
+  return timeoutAfterMatch;
+}
+
+static Json::Value DumpCTestProperty(std::string const& name,
+                                     Json::Value value)
+{
+  Json::Value property = Json::objectValue;
+  property["name"] = name;
+  property["value"] = std::move(value);
+  return property;
+}
+
+static Json::Value DumpCTestProperties(
+  cmCTestTestHandler::cmCTestTestProperties& testProperties)
+{
+  Json::Value properties = Json::arrayValue;
+  if (!testProperties.AttachOnFail.empty()) {
+    properties.append(DumpCTestProperty(
+      "ATTACHED_FILES_ON_FAIL", DumpToJsonArray(testProperties.AttachOnFail)));
+  }
+  if (!testProperties.AttachedFiles.empty()) {
+    properties.append(DumpCTestProperty(
+      "ATTACHED_FILES", DumpToJsonArray(testProperties.AttachedFiles)));
+  }
+  if (testProperties.Cost != 0.0f) {
+    properties.append(
+      DumpCTestProperty("COST", static_cast<double>(testProperties.Cost)));
+  }
+  if (!testProperties.Depends.empty()) {
+    properties.append(
+      DumpCTestProperty("DEPENDS", DumpToJsonArray(testProperties.Depends)));
+  }
+  if (testProperties.Disabled) {
+    properties.append(DumpCTestProperty("DISABLED", testProperties.Disabled));
+  }
+  if (!testProperties.Environment.empty()) {
+    properties.append(DumpCTestProperty(
+      "ENVIRONMENT", DumpToJsonArray(testProperties.Environment)));
+  }
+  if (!testProperties.ErrorRegularExpressions.empty()) {
+    properties.append(DumpCTestProperty(
+      "FAIL_REGULAR_EXPRESSION",
+      DumpRegExToJsonArray(testProperties.ErrorRegularExpressions)));
+  }
+  if (!testProperties.FixturesCleanup.empty()) {
+    properties.append(DumpCTestProperty(
+      "FIXTURES_CLEANUP", DumpToJsonArray(testProperties.FixturesCleanup)));
+  }
+  if (!testProperties.FixturesRequired.empty()) {
+    properties.append(DumpCTestProperty(
+      "FIXTURES_REQUIRED", DumpToJsonArray(testProperties.FixturesRequired)));
+  }
+  if (!testProperties.FixturesSetup.empty()) {
+    properties.append(DumpCTestProperty(
+      "FIXTURES_SETUP", DumpToJsonArray(testProperties.FixturesSetup)));
+  }
+  if (!testProperties.Labels.empty()) {
+    properties.append(
+      DumpCTestProperty("LABELS", DumpToJsonArray(testProperties.Labels)));
+  }
+  if (!testProperties.Measurements.empty()) {
+    properties.append(DumpCTestProperty(
+      "MEASUREMENT", DumpMeasurementToJsonArray(testProperties.Measurements)));
+  }
+  if (!testProperties.RequiredRegularExpressions.empty()) {
+    properties.append(DumpCTestProperty(
+      "PASS_REGULAR_EXPRESSION",
+      DumpRegExToJsonArray(testProperties.RequiredRegularExpressions)));
+  }
+  if (testProperties.WantAffinity) {
+    properties.append(
+      DumpCTestProperty("PROCESSOR_AFFINITY", testProperties.WantAffinity));
+  }
+  if (testProperties.Processors != 1) {
+    properties.append(
+      DumpCTestProperty("PROCESSORS", testProperties.Processors));
+  }
+  if (!testProperties.RequiredFiles.empty()) {
+    properties.append(DumpCTestProperty(
+      "REQUIRED_FILES", DumpToJsonArray(testProperties.RequiredFiles)));
+  }
+  if (!testProperties.LockedResources.empty()) {
+    properties.append(DumpCTestProperty(
+      "RESOURCE_LOCK", DumpToJsonArray(testProperties.LockedResources)));
+  }
+  if (testProperties.RunSerial) {
+    properties.append(
+      DumpCTestProperty("RUN_SERIAL", testProperties.RunSerial));
+  }
+  if (testProperties.SkipReturnCode != -1) {
+    properties.append(
+      DumpCTestProperty("SKIP_RETURN_CODE", testProperties.SkipReturnCode));
+  }
+  if (testProperties.ExplicitTimeout) {
+    properties.append(
+      DumpCTestProperty("TIMEOUT", testProperties.Timeout.count()));
+  }
+  if (!testProperties.TimeoutRegularExpressions.empty()) {
+    properties.append(DumpCTestProperty(
+      "TIMEOUT_AFTER_MATCH", DumpTimeoutAfterMatch(testProperties)));
+  }
+  if (testProperties.WillFail) {
+    properties.append(DumpCTestProperty("WILL_FAIL", testProperties.WillFail));
+  }
+  if (!testProperties.Directory.empty()) {
+    properties.append(
+      DumpCTestProperty("WORKING_DIRECTORY", testProperties.Directory));
+  }
+  return properties;
+}
+
+class BacktraceData
+{
+  std::unordered_map<std::string, Json::ArrayIndex> CommandMap;
+  std::unordered_map<std::string, Json::ArrayIndex> FileMap;
+  std::unordered_map<cmListFileContext const*, Json::ArrayIndex> NodeMap;
+  Json::Value Commands = Json::arrayValue;
+  Json::Value Files = Json::arrayValue;
+  Json::Value Nodes = Json::arrayValue;
+
+  Json::ArrayIndex AddCommand(std::string const& command)
+  {
+    auto i = this->CommandMap.find(command);
+    if (i == this->CommandMap.end()) {
+      i = this->CommandMap.emplace(command, this->Commands.size()).first;
+      this->Commands.append(command);
+    }
+    return i->second;
+  }
+
+  Json::ArrayIndex AddFile(std::string const& file)
+  {
+    auto i = this->FileMap.find(file);
+    if (i == this->FileMap.end()) {
+      i = this->FileMap.emplace(file, this->Files.size()).first;
+      this->Files.append(file);
+    }
+    return i->second;
+  }
+
+public:
+  bool Add(cmListFileBacktrace const& bt, Json::ArrayIndex& index);
+  Json::Value Dump();
+};
+
+bool BacktraceData::Add(cmListFileBacktrace const& bt, Json::ArrayIndex& index)
+{
+  if (bt.Empty()) {
+    return false;
+  }
+  cmListFileContext const* top = &bt.Top();
+  auto found = this->NodeMap.find(top);
+  if (found != this->NodeMap.end()) {
+    index = found->second;
+    return true;
+  }
+  Json::Value entry = Json::objectValue;
+  entry["file"] = this->AddFile(top->FilePath);
+  if (top->Line) {
+    entry["line"] = static_cast<int>(top->Line);
+  }
+  if (!top->Name.empty()) {
+    entry["command"] = this->AddCommand(top->Name);
+  }
+  Json::ArrayIndex parent;
+  if (this->Add(bt.Pop(), parent)) {
+    entry["parent"] = parent;
+  }
+  index = this->NodeMap[top] = this->Nodes.size();
+  this->Nodes.append(std::move(entry)); // NOLINT(*)
+  return true;
+}
+
+Json::Value BacktraceData::Dump()
+{
+  Json::Value backtraceGraph;
+  this->CommandMap.clear();
+  this->FileMap.clear();
+  this->NodeMap.clear();
+  backtraceGraph["commands"] = std::move(this->Commands);
+  backtraceGraph["files"] = std::move(this->Files);
+  backtraceGraph["nodes"] = std::move(this->Nodes);
+  return backtraceGraph;
+}
+
+static void AddBacktrace(BacktraceData& backtraceGraph, Json::Value& object,
+                         cmListFileBacktrace const& bt)
+{
+  Json::ArrayIndex backtrace;
+  if (backtraceGraph.Add(bt, backtrace)) {
+    object["backtrace"] = backtrace;
+  }
+}
+
+static Json::Value DumpCTestInfo(
+  cmCTestRunTest& testRun,
+  cmCTestTestHandler::cmCTestTestProperties& testProperties,
+  BacktraceData& backtraceGraph)
+{
+  Json::Value testInfo = Json::objectValue;
+  // test name should always be present
+  testInfo["name"] = testProperties.Name;
+  std::string const& config = testRun.GetCTest()->GetConfigType();
+  if (!config.empty()) {
+    testInfo["config"] = config;
+  }
+  std::string const& command = testRun.GetActualCommand();
+  if (!command.empty()) {
+    std::vector<std::string> commandAndArgs;
+    commandAndArgs.push_back(command);
+    const std::vector<std::string>& args = testRun.GetArguments();
+    if (!args.empty()) {
+      commandAndArgs.reserve(args.size() + 1);
+      cmAppend(commandAndArgs, args);
+    }
+    testInfo["command"] = DumpToJsonArray(commandAndArgs);
+  }
+  Json::Value properties = DumpCTestProperties(testProperties);
+  if (!properties.empty()) {
+    testInfo["properties"] = properties;
+  }
+  if (!testProperties.Backtrace.Empty()) {
+    AddBacktrace(backtraceGraph, testInfo, testProperties.Backtrace);
+  }
+  return testInfo;
+}
+
+static Json::Value DumpVersion(int major, int minor)
+{
+  Json::Value version = Json::objectValue;
+  version["major"] = major;
+  version["minor"] = minor;
+  return version;
+}
+
+void cmCTestMultiProcessHandler::PrintOutputAsJson()
+{
+  this->TestHandler->SetMaxIndex(this->FindMaxIndex());
+
+  Json::Value result = Json::objectValue;
+  result["kind"] = "ctestInfo";
+  result["version"] = DumpVersion(1, 0);
+
+  BacktraceData backtraceGraph;
+  Json::Value tests = Json::arrayValue;
+  for (auto& it : this->Properties) {
+    cmCTestTestHandler::cmCTestTestProperties& p = *it.second;
+
+    // Don't worry if this fails, we are only showing the test list, not
+    // running the tests
+    cmWorkingDirectory workdir(p.Directory);
+    cmCTestRunTest testRun(*this);
+    testRun.SetIndex(p.Index);
+    testRun.SetTestProperties(&p);
+    testRun.ComputeArguments();
+
+    // Skip tests not available in this configuration.
+    if (p.Args.size() >= 2 && p.Args[1] == "NOT_AVAILABLE") {
+      continue;
+    }
+
+    Json::Value testInfo = DumpCTestInfo(testRun, p, backtraceGraph);
+    tests.append(testInfo);
+  }
+  result["backtraceGraph"] = backtraceGraph.Dump();
+  result["tests"] = std::move(tests);
+
+  Json::StreamWriterBuilder builder;
+  builder["indentation"] = "  ";
+  std::unique_ptr<Json::StreamWriter> jout(builder.newStreamWriter());
+  jout->write(result, &std::cout);
+}
+
 // For ShowOnly mode
 void cmCTestMultiProcessHandler::PrintTestList()
 {
+  if (this->CTest->GetOutputAsJson()) {
+    PrintOutputAsJson();
+    return;
+  }
+
   this->TestHandler->SetMaxIndex(this->FindMaxIndex());
   int count = 0;
 

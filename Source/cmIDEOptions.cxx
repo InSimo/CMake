@@ -6,6 +6,7 @@
 #include <iterator>
 #include <string.h>
 
+#include "cmAlgorithms.h"
 #include "cmIDEFlagTable.h"
 #include "cmSystemTools.h"
 
@@ -97,24 +98,24 @@ bool cmIDEOptions::CheckFlagTable(cmIDEFlagTable const* table,
 {
   const char* pf = flag.c_str() + 1;
   // Look for an entry in the flag table matching this flag.
-  for (cmIDEFlagTable const* entry = table; entry->IDEName; ++entry) {
+  for (cmIDEFlagTable const* entry = table; !entry->IDEName.empty(); ++entry) {
     bool entry_found = false;
     if (entry->special & cmIDEFlagTable::UserValue) {
       // This flag table entry accepts a user-specified value.  If
       // the entry specifies UserRequired we must match only if a
       // non-empty value is given.
-      int n = static_cast<int>(strlen(entry->commandFlag));
-      if ((strncmp(pf, entry->commandFlag, n) == 0 ||
+      int n = static_cast<int>(entry->commandFlag.length());
+      if ((strncmp(pf, entry->commandFlag.c_str(), n) == 0 ||
            (entry->special & cmIDEFlagTable::CaseInsensitive &&
-            cmsysString_strncasecmp(pf, entry->commandFlag, n))) &&
+            cmsysString_strncasecmp(pf, entry->commandFlag.c_str(), n))) &&
           (!(entry->special & cmIDEFlagTable::UserRequired) ||
            static_cast<int>(strlen(pf)) > n)) {
         this->FlagMapUpdate(entry, std::string(pf + n));
         entry_found = true;
       }
-    } else if (strcmp(pf, entry->commandFlag) == 0 ||
+    } else if (strcmp(pf, entry->commandFlag.c_str()) == 0 ||
                (entry->special & cmIDEFlagTable::CaseInsensitive &&
-                cmsysString_strcasecmp(pf, entry->commandFlag) == 0)) {
+                cmsysString_strcasecmp(pf, entry->commandFlag.c_str()) == 0)) {
       if (entry->special & cmIDEFlagTable::UserFollowing) {
         // This flag expects a value in the following argument.
         this->DoingFollowing = entry;
@@ -148,6 +149,8 @@ void cmIDEOptions::FlagMapUpdate(cmIDEFlagTable const* entry,
     this->FlagMap[entry->IDEName].push_back(new_value);
   } else if (entry->special & cmIDEFlagTable::SpaceAppendable) {
     this->FlagMap[entry->IDEName].append_with_space(new_value);
+  } else if (entry->special & cmIDEFlagTable::CommaAppendable) {
+    this->FlagMap[entry->IDEName].append_with_comma(new_value);
   } else {
     // Use the user-specified value.
     this->FlagMap[entry->IDEName] = new_value;
@@ -168,7 +171,7 @@ void cmIDEOptions::AddDefines(std::string const& defines)
 }
 void cmIDEOptions::AddDefines(const std::vector<std::string>& defines)
 {
-  this->Defines.insert(this->Defines.end(), defines.begin(), defines.end());
+  cmAppend(this->Defines, defines);
 }
 
 std::vector<std::string> const& cmIDEOptions::GetDefines() const
@@ -190,8 +193,7 @@ void cmIDEOptions::AddIncludes(std::string const& includes)
 }
 void cmIDEOptions::AddIncludes(const std::vector<std::string>& includes)
 {
-  this->Includes.insert(this->Includes.end(), includes.begin(),
-                        includes.end());
+  cmAppend(this->Includes, includes);
 }
 
 std::vector<std::string> const& cmIDEOptions::GetIncludes() const

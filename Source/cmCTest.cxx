@@ -9,7 +9,6 @@
 #include "cmsys/FStream.hxx"
 #include "cmsys/Glob.hxx"
 #include "cmsys/Process.h"
-#include "cmsys/String.hxx"
 #include "cmsys/SystemInformation.hxx"
 #include <algorithm>
 #include <chrono>
@@ -25,6 +24,11 @@
 #include <time.h>
 #include <utility>
 #include <vector>
+#if defined(_WIN32)
+#  include <windows.h> // IWYU pragma: keep
+#else
+#  include <unistd.h> // IWYU pragma: keep
+#endif
 
 #include "cmAlgorithms.h"
 #include "cmCTestBuildAndTestHandler.h"
@@ -39,7 +43,6 @@
 #include "cmCTestTestHandler.h"
 #include "cmCTestUpdateHandler.h"
 #include "cmCTestUploadHandler.h"
-#include "cmCurl.h"
 #include "cmDynamicLoader.h"
 #include "cmGeneratedFileStream.h"
 #include "cmGlobalGenerator.h"
@@ -58,12 +61,149 @@
 #  include <be/kernel/OS.h> /* disable_debugger() API. */
 #endif
 
-#define DEBUGOUT                                                              \
-  std::cout << __LINE__ << " ";                                               \
-  std::cout
-#define DEBUGERR                                                              \
-  std::cerr << __LINE__ << " ";                                               \
-  std::cerr
+struct cmCTest::Private
+{
+  /** Representation of one part.  */
+  struct PartInfo
+  {
+    void SetName(const std::string& name) { this->Name = name; }
+    const std::string& GetName() const { return this->Name; }
+
+    void Enable() { this->Enabled = true; }
+    explicit operator bool() const { return this->Enabled; }
+
+    std::vector<std::string> SubmitFiles;
+
+  private:
+    bool Enabled = false;
+    std::string Name;
+  };
+
+  int RepeatTests = 1; // default to run each test once
+  bool RepeatUntilFail = false;
+  std::string ConfigType;
+  std::string ScheduleType;
+  std::chrono::system_clock::time_point StopTime;
+  bool TestProgressOutput = false;
+  bool Verbose = false;
+  bool ExtraVerbose = false;
+  bool ProduceXML = false;
+  bool LabelSummary = true;
+  bool SubprojectSummary = true;
+  bool UseHTTP10 = false;
+  bool PrintLabels = false;
+  bool Failover = false;
+
+  bool FlushTestProgressLine = false;
+
+  bool ForceNewCTestProcess = false;
+
+  bool RunConfigurationScript = false;
+
+  // these are helper classes
+  cmCTestBuildHandler BuildHandler;
+  cmCTestBuildAndTestHandler BuildAndTestHandler;
+  cmCTestCoverageHandler CoverageHandler;
+  cmCTestScriptHandler ScriptHandler;
+  cmCTestTestHandler TestHandler;
+  cmCTestUpdateHandler UpdateHandler;
+  cmCTestConfigureHandler ConfigureHandler;
+  cmCTestMemCheckHandler MemCheckHandler;
+  cmCTestSubmitHandler SubmitHandler;
+  cmCTestUploadHandler UploadHandler;
+
+  std::vector<cmCTestGenericHandler*> GetTestingHandlers()
+  {
+    return { &this->BuildHandler,     &this->BuildAndTestHandler,
+             &this->CoverageHandler,  &this->ScriptHandler,
+             &this->TestHandler,      &this->UpdateHandler,
+             &this->ConfigureHandler, &this->MemCheckHandler,
+             &this->SubmitHandler,    &this->UploadHandler };
+  }
+
+  std::map<std::string, cmCTestGenericHandler*> GetNamedTestingHandlers()
+  {
+    return { { "build", &this->BuildHandler },
+             { "buildtest", &this->BuildAndTestHandler },
+             { "coverage", &this->CoverageHandler },
+             { "script", &this->ScriptHandler },
+             { "test", &this->TestHandler },
+             { "update", &this->UpdateHandler },
+             { "configure", &this->ConfigureHandler },
+             { "memcheck", &this->MemCheckHandler },
+             { "submit", &this->SubmitHandler },
+             { "upload", &this->UploadHandler } };
+  }
+
+  bool ShowOnly = false;
+  bool OutputAsJson = false;
+  int OutputAsJsonVersion = 1;
+
+  // TODO: The ctest configuration should be a hierarchy of
+  // configuration option sources: command-line, script, ini file.
+  // Then the ini file can get re-loaded whenever it changes without
+  // affecting any higher-precedence settings.
+  std::map<std::string, std::string> CTestConfiguration;
+  std::map<std::string, std::string> CTestConfigurationOverwrites;
+
+  PartInfo Parts[PartCount];
+  std::map<std::string, Part> PartMap;
+
+  std::string CurrentTag;
+  bool TomorrowTag = false;
+
+  int TestModel = cmCTest::EXPERIMENTAL;
+  std::string SpecificTrack;
+
+  cmDuration TimeOut = cmDuration::zero();
+
+  cmDuration GlobalTimeout = cmDuration::zero();
+
+  int MaxTestNameWidth = 30;
+
+  int ParallelLevel = 1;
+  bool ParallelLevelSetInCli = false;
+
+  unsigned long TestLoad = 0;
+
+  int CompatibilityMode;
+
+  // information for the --build-and-test options
+  std::string BinaryDir;
+
+  std::string NotesFiles;
+
+  bool InteractiveDebugMode = true;
+
+  bool ShortDateFormat = true;
+
+  bool CompressXMLFiles = false;
+  bool CompressTestOutput = true;
+
+  // By default we write output to the process output streams.
+  std::ostream* StreamOut = &std::cout;
+  std::ostream* StreamErr = &std::cerr;
+
+  bool SuppressUpdatingCTestConfiguration = false;
+
+  bool Debug = false;
+  bool ShowLineNumbers = false;
+  bool Quiet = false;
+
+  std::string BuildID;
+
+  std::vector<std::string> InitialCommandLineArguments;
+
+  int SubmitIndex = 0;
+
+  cmGeneratedFileStream* OutputLogFile = nullptr;
+  int OutputLogFileLastTag = -1;
+
+  bool OutputTestOutputOnTestFailure = false;
+  bool OutputColorCode = cmCTest::ColoredOutputSupportedByConsole();
+
+  std::map<std::string, std::string> Definitions;
+};
 
 struct tm* cmCTest::GetNightlyTime(std::string const& str, bool tomorrowtag)
 {
@@ -119,6 +259,11 @@ struct tm* cmCTest::GetNightlyTime(std::string const& str, bool tomorrowtag)
   return lctime;
 }
 
+bool cmCTest::GetTomorrowTag() const
+{
+  return this->Impl->TomorrowTag;
+}
+
 std::string cmCTest::CleanString(const std::string& str)
 {
   std::string::size_type spos = str.find_first_not_of(" \n\t\r\f\v");
@@ -138,7 +283,7 @@ std::string cmCTest::CurrentTime()
   struct tm* t = localtime(&currenttime);
   // return ::CleanString(ctime(&currenttime));
   char current_time[1024];
-  if (this->ShortDateFormat) {
+  if (this->Impl->ShortDateFormat) {
     strftime(current_time, 1000, "%b %d %H:%M %Z", t);
   } else {
     strftime(current_time, 1000, "%a %b %d %H:%M:%S %Z %Y", t);
@@ -154,88 +299,6 @@ std::string cmCTest::GetCostDataFile()
     fname = this->GetBinaryDir() + "/Testing/Temporary/CTestCostData.txt";
   }
   return fname;
-}
-
-#ifdef CMAKE_BUILD_WITH_CMAKE
-static size_t HTTPResponseCallback(void* ptr, size_t size, size_t nmemb,
-                                   void* data)
-{
-  int realsize = static_cast<int>(size * nmemb);
-
-  std::string* response = static_cast<std::string*>(data);
-  const char* chPtr = static_cast<char*>(ptr);
-  *response += chPtr;
-
-  return realsize;
-}
-
-int cmCTest::HTTPRequest(std::string url, HTTPMethod method,
-                         std::string& response, std::string const& fields,
-                         std::string const& putFile, int timeout)
-{
-  CURL* curl;
-  FILE* file;
-  ::curl_global_init(CURL_GLOBAL_ALL);
-  curl = ::curl_easy_init();
-  cmCurlSetCAInfo(curl);
-
-  // set request options based on method
-  switch (method) {
-    case cmCTest::HTTP_POST:
-      ::curl_easy_setopt(curl, CURLOPT_POST, 1);
-      ::curl_easy_setopt(curl, CURLOPT_POSTFIELDS, fields.c_str());
-      break;
-    case cmCTest::HTTP_PUT:
-      if (!cmSystemTools::FileExists(putFile)) {
-        response = "Error: File ";
-        response += putFile + " does not exist.\n";
-        return -1;
-      }
-      ::curl_easy_setopt(curl, CURLOPT_PUT, 1);
-      file = cmsys::SystemTools::Fopen(putFile, "rb");
-      ::curl_easy_setopt(curl, CURLOPT_INFILE, file);
-      // fall through to append GET fields
-      CM_FALLTHROUGH;
-    case cmCTest::HTTP_GET:
-      if (!fields.empty()) {
-        url += "?" + fields;
-      }
-      break;
-  }
-
-  ::curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  ::curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
-  ::curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
-
-  // set response options
-  ::curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, HTTPResponseCallback);
-  ::curl_easy_setopt(curl, CURLOPT_FILE, &response);
-  ::curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
-
-  CURLcode res = ::curl_easy_perform(curl);
-
-  ::curl_easy_cleanup(curl);
-  ::curl_global_cleanup();
-
-  return static_cast<int>(res);
-}
-#endif
-
-std::string cmCTest::MakeURLSafe(const std::string& str)
-{
-  std::ostringstream ost;
-  char buffer[10];
-  for (unsigned char ch : str) {
-    if ((ch > 126 || ch < 32 || ch == '&' || ch == '%' || ch == '+' ||
-         ch == '=' || ch == '@') &&
-        ch != 9) {
-      sprintf(buffer, "%02x;", static_cast<unsigned int>(ch));
-      ost << buffer;
-    } else {
-      ost << ch;
-    }
-  }
-  return ost.str();
 }
 
 std::string cmCTest::DecodeURL(const std::string& in)
@@ -254,82 +317,39 @@ std::string cmCTest::DecodeURL(const std::string& in)
 }
 
 cmCTest::cmCTest()
+  : Impl(new Private)
 {
-  this->LabelSummary = true;
-  this->SubprojectSummary = true;
-  this->ParallelLevel = 1;
-  this->ParallelLevelSetInCli = false;
-  this->TestLoad = 0;
-  this->SubmitIndex = 0;
-  this->Failover = false;
-  this->ForceNewCTestProcess = false;
-  this->TomorrowTag = false;
-  this->Verbose = false;
-
-  this->Debug = false;
-  this->ShowLineNumbers = false;
-  this->Quiet = false;
-  this->ExtraVerbose = false;
-  this->ProduceXML = false;
-  this->ShowOnly = false;
-  this->RunConfigurationScript = false;
-  this->UseHTTP10 = false;
-  this->PrintLabels = false;
-  this->CompressTestOutput = true;
-  this->TestModel = cmCTest::EXPERIMENTAL;
-  this->MaxTestNameWidth = 30;
-  this->InteractiveDebugMode = true;
-  this->TimeOut = cmDuration::zero();
-  this->GlobalTimeout = cmDuration::zero();
-  this->CompressXMLFiles = false;
-  this->ScheduleType.clear();
-  this->OutputLogFile = nullptr;
-  this->OutputLogFileLastTag = -1;
-  this->SuppressUpdatingCTestConfiguration = false;
-  this->DartVersion = 1;
-  this->DropSiteCDash = false;
-  this->OutputTestOutputOnTestFailure = false;
-  this->RepeatTests = 1; // default to run each test once
-  this->RepeatUntilFail = false;
-  std::string outOnFail;
-  if (cmSystemTools::GetEnv("CTEST_OUTPUT_ON_FAILURE", outOnFail)) {
-    this->OutputTestOutputOnTestFailure =
-      !cmSystemTools::IsOff(outOnFail.c_str());
+  std::string envValue;
+  if (cmSystemTools::GetEnv("CTEST_OUTPUT_ON_FAILURE", envValue)) {
+    this->Impl->OutputTestOutputOnTestFailure =
+      !cmSystemTools::IsOff(envValue);
   }
-  this->InitStreams();
+  envValue.clear();
+  if (cmSystemTools::GetEnv("CTEST_PROGRESS_OUTPUT", envValue)) {
+    this->Impl->TestProgressOutput = !cmSystemTools::IsOff(envValue);
+  }
 
-  this->Parts[PartStart].SetName("Start");
-  this->Parts[PartUpdate].SetName("Update");
-  this->Parts[PartConfigure].SetName("Configure");
-  this->Parts[PartBuild].SetName("Build");
-  this->Parts[PartTest].SetName("Test");
-  this->Parts[PartCoverage].SetName("Coverage");
-  this->Parts[PartMemCheck].SetName("MemCheck");
-  this->Parts[PartSubmit].SetName("Submit");
-  this->Parts[PartNotes].SetName("Notes");
-  this->Parts[PartExtraFiles].SetName("ExtraFiles");
-  this->Parts[PartUpload].SetName("Upload");
+  this->Impl->Parts[PartStart].SetName("Start");
+  this->Impl->Parts[PartUpdate].SetName("Update");
+  this->Impl->Parts[PartConfigure].SetName("Configure");
+  this->Impl->Parts[PartBuild].SetName("Build");
+  this->Impl->Parts[PartTest].SetName("Test");
+  this->Impl->Parts[PartCoverage].SetName("Coverage");
+  this->Impl->Parts[PartMemCheck].SetName("MemCheck");
+  this->Impl->Parts[PartSubmit].SetName("Submit");
+  this->Impl->Parts[PartNotes].SetName("Notes");
+  this->Impl->Parts[PartExtraFiles].SetName("ExtraFiles");
+  this->Impl->Parts[PartUpload].SetName("Upload");
+  this->Impl->Parts[PartDone].SetName("Done");
 
   // Fill the part name-to-id map.
   for (Part p = PartStart; p != PartCount; p = Part(p + 1)) {
-    this->PartMap[cmSystemTools::LowerCase(this->Parts[p].GetName())] = p;
+    this->Impl
+      ->PartMap[cmSystemTools::LowerCase(this->Impl->Parts[p].GetName())] = p;
   }
 
-  this->ShortDateFormat = true;
-
-  this->TestingHandlers["build"] = new cmCTestBuildHandler;
-  this->TestingHandlers["buildtest"] = new cmCTestBuildAndTestHandler;
-  this->TestingHandlers["coverage"] = new cmCTestCoverageHandler;
-  this->TestingHandlers["script"] = new cmCTestScriptHandler;
-  this->TestingHandlers["test"] = new cmCTestTestHandler;
-  this->TestingHandlers["update"] = new cmCTestUpdateHandler;
-  this->TestingHandlers["configure"] = new cmCTestConfigureHandler;
-  this->TestingHandlers["memcheck"] = new cmCTestMemCheckHandler;
-  this->TestingHandlers["submit"] = new cmCTestSubmitHandler;
-  this->TestingHandlers["upload"] = new cmCTestUploadHandler;
-
-  for (auto& handler : this->TestingHandlers) {
-    handler.second->SetCTestInstance(this);
+  for (auto& handler : this->Impl->GetTestingHandlers()) {
+    handler->SetCTestInstance(this);
   }
 
   // Make sure we can capture the build tool output.
@@ -338,31 +358,40 @@ cmCTest::cmCTest()
 
 cmCTest::~cmCTest()
 {
-  cmDeleteAll(this->TestingHandlers);
-  this->SetOutputLogFileName(nullptr);
+  delete this->Impl->OutputLogFile;
+}
+
+int cmCTest::GetParallelLevel() const
+{
+  return this->Impl->ParallelLevel;
 }
 
 void cmCTest::SetParallelLevel(int level)
 {
-  this->ParallelLevel = level < 1 ? 1 : level;
+  this->Impl->ParallelLevel = level < 1 ? 1 : level;
+}
+
+unsigned long cmCTest::GetTestLoad() const
+{
+  return this->Impl->TestLoad;
 }
 
 void cmCTest::SetTestLoad(unsigned long load)
 {
-  this->TestLoad = load;
+  this->Impl->TestLoad = load;
 }
 
 bool cmCTest::ShouldCompressTestOutput()
 {
-  return this->CompressTestOutput;
+  return this->Impl->CompressTestOutput;
 }
 
 cmCTest::Part cmCTest::GetPartFromName(const char* name)
 {
   // Look up by lower-case to make names case-insensitive.
   std::string lower_name = cmSystemTools::LowerCase(name);
-  PartMapType::const_iterator i = this->PartMap.find(lower_name);
-  if (i != this->PartMap.end()) {
+  auto const i = this->Impl->PartMap.find(lower_name);
+  if (i != this->Impl->PartMap.end()) {
     return i->second;
   }
 
@@ -378,19 +407,19 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
   }
 
   cmCTestOptionalLog(this, DEBUG, "Here: " << __LINE__ << std::endl, quiet);
-  if (!this->InteractiveDebugMode) {
+  if (!this->Impl->InteractiveDebugMode) {
     this->BlockTestErrorDiagnostics();
   } else {
     cmSystemTools::PutEnv("CTEST_INTERACTIVE_DEBUG_MODE=1");
   }
 
-  this->BinaryDir = binary_dir;
-  cmSystemTools::ConvertToUnixSlashes(this->BinaryDir);
+  this->Impl->BinaryDir = binary_dir;
+  cmSystemTools::ConvertToUnixSlashes(this->Impl->BinaryDir);
 
   this->UpdateCTestConfiguration();
 
   cmCTestOptionalLog(this, DEBUG, "Here: " << __LINE__ << std::endl, quiet);
-  if (this->ProduceXML) {
+  if (this->Impl->ProduceXML) {
     cmCTestOptionalLog(this, DEBUG, "Here: " << __LINE__ << std::endl, quiet);
     cmCTestOptionalLog(this, OUTPUT,
                        "   Site: "
@@ -401,7 +430,7 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
                          << std::endl,
                        quiet);
     cmCTestOptionalLog(this, DEBUG, "Produce XML is on" << std::endl, quiet);
-    if (this->TestModel == cmCTest::NIGHTLY &&
+    if (this->Impl->TestModel == cmCTest::NIGHTLY &&
         this->GetCTestConfiguration("NightlyStartTime").empty()) {
       cmCTestOptionalLog(
         this, WARNING,
@@ -415,23 +444,24 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
     }
   }
 
-  cmake cm(cmake::RoleScript);
+  cmake cm(cmake::RoleScript, cmState::CTest);
   cm.SetHomeDirectory("");
   cm.SetHomeOutputDirectory("");
   cm.GetCurrentSnapshot().SetDefaultDefinitions();
   cmGlobalGenerator gg(&cm);
   cmMakefile mf(&gg, cm.GetCurrentSnapshot());
-  if (!this->ReadCustomConfigurationFileTree(this->BinaryDir.c_str(), &mf)) {
+  if (!this->ReadCustomConfigurationFileTree(this->Impl->BinaryDir.c_str(),
+                                             &mf)) {
     cmCTestOptionalLog(
       this, DEBUG, "Cannot find custom configuration file tree" << std::endl,
       quiet);
     return 0;
   }
 
-  if (this->ProduceXML) {
+  if (this->Impl->ProduceXML) {
     // Verify "Testing" directory exists:
     //
-    std::string testingDir = this->BinaryDir + "/Testing";
+    std::string testingDir = this->Impl->BinaryDir + "/Testing";
     if (cmSystemTools::FileExists(testingDir)) {
       if (!cmSystemTools::FileIsDirectory(testingDir)) {
         cmCTestLog(this, ERROR_MESSAGE,
@@ -461,7 +491,7 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
 
     if (createNewTag) {
       time_t tctime = time(nullptr);
-      if (this->TomorrowTag) {
+      if (this->Impl->TomorrowTag) {
         tctime += (24 * 60 * 60);
       }
       struct tm* lctime = gmtime(&tctime);
@@ -478,25 +508,29 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
           tag.clear();
         }
         std::string track;
-        if (cmSystemTools::GetLineFromStream(tfin, track)) {
-          this->SpecificTrack = track;
+        if (cmSystemTools::GetLineFromStream(tfin, track) &&
+            !this->Impl->Parts[PartStart] && !command) {
+          this->Impl->SpecificTrack = track;
         }
         std::string model;
-        if (cmSystemTools::GetLineFromStream(tfin, model)) {
-          this->TestModel = GetTestModelFromString(model.c_str());
+        if (cmSystemTools::GetLineFromStream(tfin, model) &&
+            !this->Impl->Parts[PartStart] && !command) {
+          this->Impl->TestModel = GetTestModelFromString(model.c_str());
         }
         tfin.close();
       }
-      if (tag.empty() || (nullptr != command) || this->Parts[PartStart]) {
+      if (tag.empty() || (nullptr != command) ||
+          this->Impl->Parts[PartStart]) {
         cmCTestOptionalLog(
           this, DEBUG,
           "TestModel: " << this->GetTestModelString() << std::endl, quiet);
-        cmCTestOptionalLog(
-          this, DEBUG, "TestModel: " << this->TestModel << std::endl, quiet);
-        if (this->TestModel == cmCTest::NIGHTLY) {
+        cmCTestOptionalLog(this, DEBUG,
+                           "TestModel: " << this->Impl->TestModel << std::endl,
+                           quiet);
+        if (this->Impl->TestModel == cmCTest::NIGHTLY) {
           lctime = this->GetNightlyTime(
             this->GetCTestConfiguration("NightlyStartTime"),
-            this->TomorrowTag);
+            this->Impl->TomorrowTag);
         }
         char datestring[100];
         sprintf(datestring, "%04d%02d%02d-%02d%02d", lctime->tm_year + 1900,
@@ -507,7 +541,7 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
         if (ofs) {
           ofs << tag << std::endl;
           ofs << this->GetTestModelString() << std::endl;
-          switch (this->TestModel) {
+          switch (this->Impl->TestModel) {
             case cmCTest::EXPERIMENTAL:
               ofs << "Experimental" << std::endl;
               break;
@@ -549,7 +583,7 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
         return 0;
       }
 
-      if (this->TestModel == cmCTest::UNKNOWN) {
+      if (this->Impl->TestModel == cmCTest::UNKNOWN) {
         if (model == cmCTest::UNKNOWN) {
           cmCTestLog(this, ERROR_MESSAGE,
                      "TAG file does not contain model and "
@@ -561,8 +595,8 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
         this->SetTestModel(model);
       }
 
-      if (model != this->TestModel && model != cmCTest::UNKNOWN &&
-          this->TestModel != cmCTest::UNKNOWN) {
+      if (model != this->Impl->TestModel && model != cmCTest::UNKNOWN &&
+          this->Impl->TestModel != cmCTest::UNKNOWN) {
         cmCTestOptionalLog(this, WARNING,
                            "Model given in TAG does not match "
                            "model given in ctest_start()"
@@ -570,14 +604,15 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
                            quiet);
       }
 
-      if (!this->SpecificTrack.empty() && track != this->SpecificTrack) {
+      if (!this->Impl->SpecificTrack.empty() &&
+          track != this->Impl->SpecificTrack) {
         cmCTestOptionalLog(this, WARNING,
                            "Track given in TAG does not match "
                            "track given in ctest_start()"
                              << std::endl,
                            quiet);
       } else {
-        this->SpecificTrack = track;
+        this->Impl->SpecificTrack = track;
       }
 
       cmCTestOptionalLog(this, OUTPUT,
@@ -587,7 +622,7 @@ int cmCTest::Initialize(const char* binary_dir, cmCTestStartCommand* command)
                          quiet);
     }
 
-    this->CurrentTag = tag;
+    this->Impl->CurrentTag = tag;
   }
 
   return 1;
@@ -597,10 +632,9 @@ bool cmCTest::InitializeFromCommand(cmCTestStartCommand* command)
 {
   std::string src_dir = this->GetCTestConfiguration("SourceDirectory");
   std::string bld_dir = this->GetCTestConfiguration("BuildDirectory");
-  this->DartVersion = 1;
-  this->DropSiteCDash = false;
+  this->Impl->BuildID = "";
   for (Part p = PartStart; p != PartCount; p = Part(p + 1)) {
-    this->Parts[p].SubmitFiles.clear();
+    this->Impl->Parts[p].SubmitFiles.clear();
   }
 
   cmMakefile* mf = command->GetMakefile();
@@ -625,23 +659,13 @@ bool cmCTest::InitializeFromCommand(cmCTestStartCommand* command)
                        "   Reading ctest configuration file: " << fname
                                                                << std::endl,
                        command->ShouldBeQuiet());
-    bool readit = mf->ReadDependentFile(fname.c_str());
+    bool readit = mf->ReadDependentFile(fname);
     if (!readit) {
       std::string m = "Could not find include file: ";
       m += fname;
       command->SetError(m);
       return false;
     }
-  } else {
-    cmCTestOptionalLog(this, WARNING,
-                       "Cannot locate CTest configuration: in BuildDirectory: "
-                         << bld_dir_fname << std::endl,
-                       command->ShouldBeQuiet());
-    cmCTestOptionalLog(
-      this, WARNING,
-      "Cannot locate CTest configuration: in SourceDirectory: "
-        << src_dir_fname << std::endl,
-      command->ShouldBeQuiet());
   }
 
   this->SetCTestConfigurationFromCMakeVariable(mf, "NightlyStartTime",
@@ -651,18 +675,6 @@ bool cmCTest::InitializeFromCommand(cmCTestStartCommand* command)
                                                command->ShouldBeQuiet());
   this->SetCTestConfigurationFromCMakeVariable(
     mf, "BuildName", "CTEST_BUILD_NAME", command->ShouldBeQuiet());
-  const char* dartVersion = mf->GetDefinition("CTEST_DART_SERVER_VERSION");
-  if (dartVersion) {
-    this->DartVersion = atoi(dartVersion);
-    if (this->DartVersion < 0) {
-      cmCTestLog(this, ERROR_MESSAGE,
-                 "Invalid Dart server version: "
-                   << dartVersion << ". Please specify the version number."
-                   << std::endl);
-      return false;
-    }
-  }
-  this->DropSiteCDash = mf->IsOn("CTEST_DROP_SITE_CDASH");
 
   if (!this->Initialize(bld_dir.c_str(), command)) {
     return false;
@@ -676,18 +688,18 @@ bool cmCTest::InitializeFromCommand(cmCTestStartCommand* command)
 
 bool cmCTest::UpdateCTestConfiguration()
 {
-  if (this->SuppressUpdatingCTestConfiguration) {
+  if (this->Impl->SuppressUpdatingCTestConfiguration) {
     return true;
   }
-  std::string fileName = this->BinaryDir + "/CTestConfiguration.ini";
+  std::string fileName = this->Impl->BinaryDir + "/CTestConfiguration.ini";
   if (!cmSystemTools::FileExists(fileName)) {
-    fileName = this->BinaryDir + "/DartConfiguration.tcl";
+    fileName = this->Impl->BinaryDir + "/DartConfiguration.tcl";
   }
   cmCTestLog(this, HANDLER_VERBOSE_OUTPUT,
              "UpdateCTestConfiguration  from :" << fileName << "\n");
   if (!cmSystemTools::FileExists(fileName)) {
     // No need to exit if we are not producing XML
-    if (this->ProduceXML) {
+    if (this->Impl->ProduceXML) {
       cmCTestLog(this, ERROR_MESSAGE,
                  "Cannot find file: " << fileName << std::endl);
       return false;
@@ -711,7 +723,7 @@ bool cmCTest::UpdateCTestConfiguration()
       if (line.empty()) {
         continue;
       }
-      while (fin && (line[line.size() - 1] == '\\')) {
+      while (fin && (line.back() == '\\')) {
         line = line.substr(0, line.size() - 1);
         buffer[0] = 0;
         fin.getline(buffer, 1023);
@@ -727,15 +739,15 @@ bool cmCTest::UpdateCTestConfiguration()
       }
       std::string key = line.substr(0, cpos);
       std::string value = cmCTest::CleanString(line.substr(cpos + 1));
-      this->CTestConfiguration[key] = value;
+      this->Impl->CTestConfiguration[key] = value;
     }
     fin.close();
   }
   if (!this->GetCTestConfiguration("BuildDirectory").empty()) {
-    this->BinaryDir = this->GetCTestConfiguration("BuildDirectory");
-    cmSystemTools::ChangeDirectory(this->BinaryDir);
+    this->Impl->BinaryDir = this->GetCTestConfiguration("BuildDirectory");
+    cmSystemTools::ChangeDirectory(this->Impl->BinaryDir);
   }
-  this->TimeOut =
+  this->Impl->TimeOut =
     std::chrono::seconds(atoi(this->GetCTestConfiguration("TimeOut").c_str()));
   std::string const& testLoad = this->GetCTestConfiguration("TestLoad");
   if (!testLoad.empty()) {
@@ -747,9 +759,9 @@ bool cmCTest::UpdateCTestConfiguration()
                  "Invalid value for 'Test Load' : " << testLoad << std::endl);
     }
   }
-  if (this->ProduceXML) {
-    this->CompressXMLFiles = cmSystemTools::IsOn(
-      this->GetCTestConfiguration("CompressSubmission").c_str());
+  if (this->Impl->ProduceXML) {
+    this->Impl->CompressXMLFiles =
+      cmSystemTools::IsOn(this->GetCTestConfiguration("CompressSubmission"));
   }
   return true;
 }
@@ -767,21 +779,26 @@ void cmCTest::BlockTestErrorDiagnostics()
 
 void cmCTest::SetTestModel(int mode)
 {
-  this->InteractiveDebugMode = false;
-  this->TestModel = mode;
+  this->Impl->InteractiveDebugMode = false;
+  this->Impl->TestModel = mode;
+}
+
+int cmCTest::GetTestModel() const
+{
+  return this->Impl->TestModel;
 }
 
 bool cmCTest::SetTest(const char* ttype, bool report)
 {
   if (cmSystemTools::LowerCase(ttype) == "all") {
     for (Part p = PartStart; p != PartCount; p = Part(p + 1)) {
-      this->Parts[p].Enable();
+      this->Impl->Parts[p].Enable();
     }
     return true;
   }
   Part p = this->GetPartFromName(ttype);
   if (p != PartCount) {
-    this->Parts[p].Enable();
+    this->Impl->Parts[p].Enable();
     return true;
   }
   if (report) {
@@ -799,7 +816,7 @@ void cmCTest::Finalize()
 bool cmCTest::OpenOutputFile(const std::string& path, const std::string& name,
                              cmGeneratedFileStream& stream, bool compress)
 {
-  std::string testingDir = this->BinaryDir + "/Testing";
+  std::string testingDir = this->Impl->BinaryDir + "/Testing";
   if (!path.empty()) {
     testingDir += "/" + path;
   }
@@ -819,14 +836,14 @@ bool cmCTest::OpenOutputFile(const std::string& path, const std::string& name,
     }
   }
   std::string filename = testingDir + "/" + name;
-  stream.Open(filename.c_str());
+  stream.Open(filename);
   if (!stream) {
     cmCTestLog(this, ERROR_MESSAGE,
                "Problem opening file: " << filename << std::endl);
     return false;
   }
   if (compress) {
-    if (this->CompressXMLFiles) {
+    if (this->Impl->CompressXMLFiles) {
       stream.SetCompression(true);
     }
   }
@@ -851,40 +868,59 @@ bool cmCTest::AddIfExists(Part part, const char* file)
 
 bool cmCTest::CTestFileExists(const std::string& filename)
 {
-  std::string testingDir =
-    this->BinaryDir + "/Testing/" + this->CurrentTag + "/" + filename;
+  std::string testingDir = this->Impl->BinaryDir + "/Testing/" +
+    this->Impl->CurrentTag + "/" + filename;
   return cmSystemTools::FileExists(testingDir);
 }
 
-cmCTestGenericHandler* cmCTest::GetInitializedHandler(const char* handler)
+cmCTestBuildHandler* cmCTest::GetBuildHandler()
 {
-  cmCTest::t_TestingHandlers::iterator it =
-    this->TestingHandlers.find(handler);
-  if (it == this->TestingHandlers.end()) {
-    return nullptr;
-  }
-  it->second->Initialize();
-  return it->second;
+  return &this->Impl->BuildHandler;
 }
 
-cmCTestGenericHandler* cmCTest::GetHandler(const char* handler)
+cmCTestBuildAndTestHandler* cmCTest::GetBuildAndTestHandler()
 {
-  cmCTest::t_TestingHandlers::iterator it =
-    this->TestingHandlers.find(handler);
-  if (it == this->TestingHandlers.end()) {
-    return nullptr;
-  }
-  return it->second;
+  return &this->Impl->BuildAndTestHandler;
 }
 
-int cmCTest::ExecuteHandler(const char* shandler)
+cmCTestCoverageHandler* cmCTest::GetCoverageHandler()
 {
-  cmCTestGenericHandler* handler = this->GetHandler(shandler);
-  if (!handler) {
-    return -1;
-  }
-  handler->Initialize();
-  return handler->ProcessHandler();
+  return &this->Impl->CoverageHandler;
+}
+
+cmCTestScriptHandler* cmCTest::GetScriptHandler()
+{
+  return &this->Impl->ScriptHandler;
+}
+
+cmCTestTestHandler* cmCTest::GetTestHandler()
+{
+  return &this->Impl->TestHandler;
+}
+
+cmCTestUpdateHandler* cmCTest::GetUpdateHandler()
+{
+  return &this->Impl->UpdateHandler;
+}
+
+cmCTestConfigureHandler* cmCTest::GetConfigureHandler()
+{
+  return &this->Impl->ConfigureHandler;
+}
+
+cmCTestMemCheckHandler* cmCTest::GetMemCheckHandler()
+{
+  return &this->Impl->MemCheckHandler;
+}
+
+cmCTestSubmitHandler* cmCTest::GetSubmitHandler()
+{
+  return &this->Impl->SubmitHandler;
+}
+
+cmCTestUploadHandler* cmCTest::GetUploadHandler()
+{
+  return &this->Impl->UploadHandler;
 }
 
 int cmCTest::ProcessSteps()
@@ -894,11 +930,11 @@ int cmCTest::ProcessSteps()
   int update_count = 0;
 
   for (Part p = PartStart; notest && p != PartCount; p = Part(p + 1)) {
-    notest = !this->Parts[p];
+    notest = !this->Impl->Parts[p];
   }
-  if (this->Parts[PartUpdate] &&
+  if (this->Impl->Parts[PartUpdate] &&
       (this->GetRemainingTimeAllowed() > std::chrono::minutes(2))) {
-    cmCTestGenericHandler* uphandler = this->GetHandler("update");
+    cmCTestUpdateHandler* uphandler = this->GetUpdateHandler();
     uphandler->SetPersistentOption(
       "SourceDirectory",
       this->GetCTestConfiguration("SourceDirectory").c_str());
@@ -907,45 +943,45 @@ int cmCTest::ProcessSteps()
       res |= cmCTest::UPDATE_ERRORS;
     }
   }
-  if (this->TestModel == cmCTest::CONTINUOUS && !update_count) {
+  if (this->Impl->TestModel == cmCTest::CONTINUOUS && !update_count) {
     return 0;
   }
-  if (this->Parts[PartConfigure] &&
+  if (this->Impl->Parts[PartConfigure] &&
       (this->GetRemainingTimeAllowed() > std::chrono::minutes(2))) {
-    if (this->GetHandler("configure")->ProcessHandler() < 0) {
+    if (this->GetConfigureHandler()->ProcessHandler() < 0) {
       res |= cmCTest::CONFIGURE_ERRORS;
     }
   }
-  if (this->Parts[PartBuild] &&
+  if (this->Impl->Parts[PartBuild] &&
       (this->GetRemainingTimeAllowed() > std::chrono::minutes(2))) {
     this->UpdateCTestConfiguration();
-    if (this->GetHandler("build")->ProcessHandler() < 0) {
+    if (this->GetBuildHandler()->ProcessHandler() < 0) {
       res |= cmCTest::BUILD_ERRORS;
     }
   }
-  if ((this->Parts[PartTest] || notest) &&
+  if ((this->Impl->Parts[PartTest] || notest) &&
       (this->GetRemainingTimeAllowed() > std::chrono::minutes(2))) {
     this->UpdateCTestConfiguration();
-    if (this->GetHandler("test")->ProcessHandler() < 0) {
+    if (this->GetTestHandler()->ProcessHandler() < 0) {
       res |= cmCTest::TEST_ERRORS;
     }
   }
-  if (this->Parts[PartCoverage] &&
+  if (this->Impl->Parts[PartCoverage] &&
       (this->GetRemainingTimeAllowed() > std::chrono::minutes(2))) {
     this->UpdateCTestConfiguration();
-    if (this->GetHandler("coverage")->ProcessHandler() < 0) {
+    if (this->GetCoverageHandler()->ProcessHandler() < 0) {
       res |= cmCTest::COVERAGE_ERRORS;
     }
   }
-  if (this->Parts[PartMemCheck] &&
+  if (this->Impl->Parts[PartMemCheck] &&
       (this->GetRemainingTimeAllowed() > std::chrono::minutes(2))) {
     this->UpdateCTestConfiguration();
-    if (this->GetHandler("memcheck")->ProcessHandler() < 0) {
+    if (this->GetMemCheckHandler()->ProcessHandler() < 0) {
       res |= cmCTest::MEMORY_ERRORS;
     }
   }
   if (!notest) {
-    std::string notes_dir = this->BinaryDir + "/Testing/Notes";
+    std::string notes_dir = this->Impl->BinaryDir + "/Testing/Notes";
     if (cmSystemTools::FileIsDirectory(notes_dir)) {
       cmsys::Directory d;
       d.Load(notes_dir);
@@ -955,24 +991,24 @@ int cmCTest::ProcessSteps()
         std::string fullname = notes_dir + "/" + file;
         if (cmSystemTools::FileExists(fullname) &&
             !cmSystemTools::FileIsDirectory(fullname)) {
-          if (!this->NotesFiles.empty()) {
-            this->NotesFiles += ";";
+          if (!this->Impl->NotesFiles.empty()) {
+            this->Impl->NotesFiles += ";";
           }
-          this->NotesFiles += fullname;
-          this->Parts[PartNotes].Enable();
+          this->Impl->NotesFiles += fullname;
+          this->Impl->Parts[PartNotes].Enable();
         }
       }
     }
   }
-  if (this->Parts[PartNotes]) {
+  if (this->Impl->Parts[PartNotes]) {
     this->UpdateCTestConfiguration();
-    if (!this->NotesFiles.empty()) {
-      this->GenerateNotesFile(this->NotesFiles.c_str());
+    if (!this->Impl->NotesFiles.empty()) {
+      this->GenerateNotesFile(this->Impl->NotesFiles.c_str());
     }
   }
-  if (this->Parts[PartSubmit]) {
+  if (this->Impl->Parts[PartSubmit]) {
     this->UpdateCTestConfiguration();
-    if (this->GetHandler("submit")->ProcessHandler() < 0) {
+    if (this->GetSubmitHandler()->ProcessHandler() < 0) {
       res |= cmCTest::SUBMIT_ERRORS;
     }
   }
@@ -984,10 +1020,10 @@ int cmCTest::ProcessSteps()
 
 std::string cmCTest::GetTestModelString()
 {
-  if (!this->SpecificTrack.empty()) {
-    return this->SpecificTrack;
+  if (!this->Impl->SpecificTrack.empty()) {
+    return this->Impl->SpecificTrack;
   }
-  switch (this->TestModel) {
+  switch (this->Impl->TestModel) {
     case cmCTest::NIGHTLY:
       return "Nightly";
     case cmCTest::CONTINUOUS:
@@ -1016,7 +1052,7 @@ int cmCTest::GetTestModelFromString(const char* str)
 //######################################################################
 //######################################################################
 
-int cmCTest::RunMakeCommand(const char* command, std::string& output,
+int cmCTest::RunMakeCommand(const std::string& command, std::string& output,
                             int* retVal, const char* dir, cmDuration timeout,
                             std::ostream& ofs, Encoding encoding)
 {
@@ -1046,7 +1082,7 @@ int cmCTest::RunMakeCommand(const char* command, std::string& output,
 
   // Now create process object
   cmsysProcess* cp = cmsysProcess_New();
-  cmsysProcess_SetCommand(cp, &*argv.begin());
+  cmsysProcess_SetCommand(cp, argv.data());
   cmsysProcess_SetWorkingDirectory(cp, dir);
   cmsysProcess_SetOption(cp, cmsysProcess_Option_HideWindow, 1);
   cmsysProcess_SetTimeout(cp, timeout.count());
@@ -1146,8 +1182,9 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
   if (timeout != cmCTest::MaxDuration()) {
     timeout -= std::chrono::minutes(2);
   }
-  if (this->TimeOut > cmDuration::zero() && this->TimeOut < timeout) {
-    timeout = this->TimeOut;
+  if (this->Impl->TimeOut > cmDuration::zero() &&
+      this->Impl->TimeOut < timeout) {
+    timeout = this->Impl->TimeOut;
   }
   if (testTimeOut > cmDuration::zero() &&
       testTimeOut < this->GetRemainingTimeAllowed()) {
@@ -1165,10 +1202,10 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
                      : std::to_string(cmDurationTo<unsigned int>(timeout)))
                << "\n");
   if (cmSystemTools::SameFile(argv[0], cmSystemTools::GetCTestCommand()) &&
-      !this->ForceNewCTestProcess) {
+      !this->Impl->ForceNewCTestProcess) {
     cmCTest inst;
-    inst.ConfigType = this->ConfigType;
-    inst.TimeOut = timeout;
+    inst.Impl->ConfigType = this->Impl->ConfigType;
+    inst.Impl->TimeOut = timeout;
 
     // Capture output of the child ctest.
     std::ostringstream oss;
@@ -1183,12 +1220,12 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
         if (strcmp(i, "--build-generator") == 0 &&
             timeout != cmCTest::MaxDuration() &&
             timeout > cmDuration::zero()) {
-          args.push_back("--test-timeout");
+          args.emplace_back("--test-timeout");
           std::ostringstream msg;
           msg << cmDurationTo<unsigned int>(timeout);
           args.push_back(msg.str());
         }
-        args.push_back(i);
+        args.emplace_back(i);
       }
     }
     if (log) {
@@ -1229,7 +1266,7 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
   }
 
   cmsysProcess* cp = cmsysProcess_New();
-  cmsysProcess_SetCommand(cp, &*argv.begin());
+  cmsysProcess_SetCommand(cp, argv.data());
   cmCTestLog(this, DEBUG, "Command is: " << argv[0] << std::endl);
   if (cmSystemTools::GetRunCommandHideConsole()) {
     cmsysProcess_SetOption(cp, cmsysProcess_Option_HideWindow, 1);
@@ -1245,7 +1282,7 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
   while (cmsysProcess_WaitForData(cp, &data, &length, nullptr)) {
     processOutput.DecodeText(data, length, strdata);
     if (output) {
-      tempOutput.insert(tempOutput.end(), data, data + length);
+      cmAppend(tempOutput, data, data + length);
     }
     cmCTestLog(this, HANDLER_VERBOSE_OUTPUT,
                cmCTestLogWrite(strdata.c_str(), strdata.size()));
@@ -1265,7 +1302,7 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
   cmsysProcess_WaitForExit(cp, nullptr);
   processOutput.DecodeText(tempOutput, tempOutput);
   if (output && tempOutput.begin() != tempOutput.end()) {
-    output->append(&*tempOutput.begin(), tempOutput.size());
+    output->append(tempOutput.data(), tempOutput.size());
   }
   cmCTestLog(this, HANDLER_VERBOSE_OUTPUT,
              "-- Process completed" << std::endl);
@@ -1274,11 +1311,11 @@ int cmCTest::RunTest(std::vector<const char*> argv, std::string* output,
 
   if (result == cmsysProcess_State_Exited) {
     *retVal = cmsysProcess_GetExitValue(cp);
-    if (*retVal != 0 && this->OutputTestOutputOnTestFailure) {
+    if (*retVal != 0 && this->Impl->OutputTestOutputOnTestFailure) {
       OutputTestErrors(tempOutput);
     }
   } else if (result == cmsysProcess_State_Exception) {
-    if (this->OutputTestOutputOnTestFailure) {
+    if (this->Impl->OutputTestOutputOnTestFailure) {
       OutputTestErrors(tempOutput);
     }
     *retVal = cmsysProcess_GetExitException(cp);
@@ -1337,7 +1374,7 @@ std::string cmCTest::SafeBuildIdField(const std::string& value)
 
 void cmCTest::StartXML(cmXMLWriter& xml, bool append)
 {
-  if (this->CurrentTag.empty()) {
+  if (this->Impl->CurrentTag.empty()) {
     cmCTestLog(this, ERROR_MESSAGE,
                "Current Tag empty, this may mean"
                " NightlStartTime was not set correctly."
@@ -1353,7 +1390,7 @@ void cmCTest::StartXML(cmXMLWriter& xml, bool append)
 
   std::string buildname =
     cmCTest::SafeBuildIdField(this->GetCTestConfiguration("BuildName"));
-  std::string stamp = cmCTest::SafeBuildIdField(this->CurrentTag + "-" +
+  std::string stamp = cmCTest::SafeBuildIdField(this->Impl->CurrentTag + "-" +
                                                 this->GetTestModelString());
   std::string site =
     cmCTest::SafeBuildIdField(this->GetCTestConfiguration("Site"));
@@ -1401,8 +1438,7 @@ void cmCTest::StartXML(cmXMLWriter& xml, bool append)
 
 void cmCTest::AddSiteProperties(cmXMLWriter& xml)
 {
-  cmCTestScriptHandler* ch =
-    static_cast<cmCTestScriptHandler*>(this->GetHandler("script"));
+  cmCTestScriptHandler* ch = this->GetScriptHandler();
   cmake* cm = ch->GetCMake();
   // if no CMake then this is the old style script and props like
   // this will not work anyway.
@@ -1472,7 +1508,7 @@ void cmCTest::EndXML(cmXMLWriter& xml)
 }
 
 int cmCTest::GenerateCTestNotesOutput(cmXMLWriter& xml,
-                                      const cmCTest::VectorOfStrings& files)
+                                      std::vector<std::string> const& files)
 {
   std::string buildname =
     cmCTest::SafeBuildIdField(this->GetCTestConfiguration("BuildName"));
@@ -1484,14 +1520,14 @@ int cmCTest::GenerateCTestNotesOutput(cmXMLWriter& xml,
   xml.StartElement("Site");
   xml.Attribute("BuildName", buildname);
   xml.Attribute("BuildStamp",
-                this->CurrentTag + "-" + this->GetTestModelString());
+                this->Impl->CurrentTag + "-" + this->GetTestModelString());
   xml.Attribute("Name", this->GetCTestConfiguration("Site"));
   xml.Attribute("Generator",
-                std::string("ctest") + cmVersion::GetCMakeVersion());
+                std::string("ctest-") + cmVersion::GetCMakeVersion());
   this->AddSiteProperties(xml);
   xml.StartElement("Notes");
 
-  for (cmsys::String const& file : files) {
+  for (std::string const& file : files) {
     cmCTestLog(this, OUTPUT, "\tAdd file: " << file << std::endl);
     std::string note_time = this->CurrentTime();
     xml.StartElement("Note");
@@ -1522,10 +1558,10 @@ int cmCTest::GenerateCTestNotesOutput(cmXMLWriter& xml,
   return 1;
 }
 
-int cmCTest::GenerateNotesFile(const VectorOfStrings& files)
+int cmCTest::GenerateNotesFile(std::vector<std::string> const& files)
 {
   cmGeneratedFileStream ofs;
-  if (!this->OpenOutputFile(this->CurrentTag, "Notes.xml", ofs)) {
+  if (!this->OpenOutputFile(this->Impl->CurrentTag, "Notes.xml", ofs)) {
     cmCTestLog(this, ERROR_MESSAGE, "Cannot open notes file" << std::endl);
     return 1;
   }
@@ -1540,16 +1576,33 @@ int cmCTest::GenerateNotesFile(const char* cfiles)
     return 1;
   }
 
-  VectorOfStrings files;
-
   cmCTestLog(this, OUTPUT, "Create notes file" << std::endl);
 
-  files = cmSystemTools::SplitString(cfiles, ';');
+  std::vector<std::string> const files =
+    cmSystemTools::SplitString(cfiles, ';');
   if (files.empty()) {
     return 1;
   }
 
   return this->GenerateNotesFile(files);
+}
+
+int cmCTest::GenerateDoneFile()
+{
+  cmGeneratedFileStream ofs;
+  if (!this->OpenOutputFile(this->Impl->CurrentTag, "Done.xml", ofs)) {
+    cmCTestLog(this, ERROR_MESSAGE, "Cannot open done file" << std::endl);
+    return 1;
+  }
+  cmXMLWriter xml(ofs);
+  xml.StartDocument();
+  xml.StartElement("Done");
+  xml.Element("buildId", this->Impl->BuildID);
+  xml.Element("time", std::chrono::system_clock::now());
+  xml.EndElement(); // Done
+  xml.EndDocument();
+
+  return 0;
 }
 
 std::string cmCTest::Base64GzipEncodeFile(std::string const& file)
@@ -1558,8 +1611,8 @@ std::string cmCTest::Base64GzipEncodeFile(std::string const& file)
   std::vector<std::string> files;
   files.push_back(file);
 
-  if (!cmSystemTools::CreateTar(tarFile.c_str(), files,
-                                cmSystemTools::TarCompressGZip, false)) {
+  if (!cmSystemTools::CreateTar(tarFile, files, cmSystemTools::TarCompressGZip,
+                                false)) {
     cmCTestLog(this, ERROR_MESSAGE,
                "Error creating tar while "
                "encoding file: "
@@ -1593,9 +1646,9 @@ std::string cmCTest::Base64EncodeFile(std::string const& file)
   return std::string(&encoded_buffer[0], rlen);
 }
 
-bool cmCTest::SubmitExtraFiles(const VectorOfStrings& files)
+bool cmCTest::SubmitExtraFiles(std::vector<std::string> const& files)
 {
-  for (cmsys::String const& file : files) {
+  for (std::string const& file : files) {
     if (!cmSystemTools::FileExists(file)) {
       cmCTestLog(this, ERROR_MESSAGE,
                  "Cannot find extra file: " << file << " to submit."
@@ -1613,11 +1666,10 @@ bool cmCTest::SubmitExtraFiles(const char* cfiles)
     return true;
   }
 
-  VectorOfStrings files;
-
   cmCTestLog(this, OUTPUT, "Submit extra files" << std::endl);
 
-  files = cmSystemTools::SplitString(cfiles, ';');
+  std::vector<std::string> const files =
+    cmSystemTools::SplitString(cfiles, ';');
   if (files.empty()) {
     return true;
   }
@@ -1785,17 +1837,17 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
 {
   std::string arg = args[i];
   if (this->CheckArgument(arg, "-F")) {
-    this->Failover = true;
+    this->Impl->Failover = true;
   }
   if (this->CheckArgument(arg, "-j", "--parallel") && i < args.size() - 1) {
     i++;
     int plevel = atoi(args[i].c_str());
     this->SetParallelLevel(plevel);
-    this->ParallelLevelSetInCli = true;
+    this->Impl->ParallelLevelSetInCli = true;
   } else if (arg.find("-j") == 0) {
     int plevel = atoi(arg.substr(2).c_str());
     this->SetParallelLevel(plevel);
-    this->ParallelLevelSetInCli = true;
+    this->Impl->ParallelLevelSetInCli = true;
   }
   if (this->CheckArgument(arg, "--repeat-until-fail")) {
     if (i >= args.size() - 1) {
@@ -1809,9 +1861,9 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
         "'--repeat-until-fail' given non-integer value '" + args[i] + "'";
       return false;
     }
-    this->RepeatTests = static_cast<int>(repeat);
+    this->Impl->RepeatTests = static_cast<int>(repeat);
     if (repeat > 1) {
-      this->RepeatUntilFail = true;
+      this->Impl->RepeatUntilFail = true;
     }
   }
 
@@ -1827,21 +1879,21 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
   }
 
   if (this->CheckArgument(arg, "--no-compress-output")) {
-    this->CompressTestOutput = false;
+    this->Impl->CompressTestOutput = false;
   }
 
   if (this->CheckArgument(arg, "--print-labels")) {
-    this->PrintLabels = true;
+    this->Impl->PrintLabels = true;
   }
 
   if (this->CheckArgument(arg, "--http1.0")) {
-    this->UseHTTP10 = true;
+    this->Impl->UseHTTP10 = true;
   }
 
   if (this->CheckArgument(arg, "--timeout") && i < args.size() - 1) {
     i++;
     auto timeout = cmDuration(atof(args[i].c_str()));
-    this->GlobalTimeout = timeout;
+    this->Impl->GlobalTimeout = timeout;
   }
 
   if (this->CheckArgument(arg, "--stop-time") && i < args.size() - 1) {
@@ -1856,44 +1908,44 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
   }
 
   if (this->CheckArgument(arg, "--debug")) {
-    this->Debug = true;
-    this->ShowLineNumbers = true;
+    this->Impl->Debug = true;
+    this->Impl->ShowLineNumbers = true;
   }
   if (this->CheckArgument(arg, "--track") && i < args.size() - 1) {
     i++;
-    this->SpecificTrack = args[i];
+    this->Impl->SpecificTrack = args[i];
   }
   if (this->CheckArgument(arg, "--show-line-numbers")) {
-    this->ShowLineNumbers = true;
+    this->Impl->ShowLineNumbers = true;
   }
   if (this->CheckArgument(arg, "--no-label-summary")) {
-    this->LabelSummary = false;
+    this->Impl->LabelSummary = false;
   }
   if (this->CheckArgument(arg, "--no-subproject-summary")) {
-    this->SubprojectSummary = false;
+    this->Impl->SubprojectSummary = false;
   }
   if (this->CheckArgument(arg, "-Q", "--quiet")) {
-    this->Quiet = true;
+    this->Impl->Quiet = true;
+  }
+  if (this->CheckArgument(arg, "--progress")) {
+    this->Impl->TestProgressOutput = true;
   }
   if (this->CheckArgument(arg, "-V", "--verbose")) {
-    this->Verbose = true;
+    this->Impl->Verbose = true;
   }
   if (this->CheckArgument(arg, "-VV", "--extra-verbose")) {
-    this->ExtraVerbose = true;
-    this->Verbose = true;
+    this->Impl->ExtraVerbose = true;
+    this->Impl->Verbose = true;
   }
   if (this->CheckArgument(arg, "--output-on-failure")) {
-    this->OutputTestOutputOnTestFailure = true;
+    this->Impl->OutputTestOutputOnTestFailure = true;
   }
   if (this->CheckArgument(arg, "--test-output-size-passed") &&
       i < args.size() - 1) {
     i++;
     long outputSize;
     if (cmSystemTools::StringToLong(args[i].c_str(), &outputSize)) {
-      if (cmCTestTestHandler* pCTestTestHandler =
-            static_cast<cmCTestTestHandler*>(this->TestingHandlers["test"])) {
-        pCTestTestHandler->SetTestOutputSizePassed(int(outputSize));
-      }
+      this->Impl->TestHandler.SetTestOutputSizePassed(int(outputSize));
     } else {
       cmCTestLog(this, WARNING,
                  "Invalid value for '--test-output-size-passed': " << args[i]
@@ -1905,10 +1957,7 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
     i++;
     long outputSize;
     if (cmSystemTools::StringToLong(args[i].c_str(), &outputSize)) {
-      if (cmCTestTestHandler* pCTestTestHandler =
-            static_cast<cmCTestTestHandler*>(this->TestingHandlers["test"])) {
-        pCTestTestHandler->SetTestOutputSizeFailed(int(outputSize));
-      }
+      this->Impl->TestHandler.SetTestOutputSizeFailed(int(outputSize));
     } else {
       cmCTestLog(this, WARNING,
                  "Invalid value for '--test-output-size-failed': " << args[i]
@@ -1916,7 +1965,24 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
     }
   }
   if (this->CheckArgument(arg, "-N", "--show-only")) {
-    this->ShowOnly = true;
+    this->Impl->ShowOnly = true;
+  }
+  if (cmSystemTools::StringStartsWith(arg.c_str(), "--show-only=")) {
+    this->Impl->ShowOnly = true;
+
+    // Check if a specific format is requested. Defaults to human readable
+    // text.
+    std::string argWithFormat = "--show-only=";
+    std::string format = arg.substr(argWithFormat.length());
+    if (format == "json-v1") {
+      // Force quiet mode so the only output is the json object model.
+      this->Impl->Quiet = true;
+      this->Impl->OutputAsJson = true;
+      this->Impl->OutputAsJsonVersion = 1;
+    } else if (format != "human") {
+      errormsg = "'--show-only=' given unknown value '" + format + "'";
+      return false;
+    }
   }
 
   if (this->CheckArgument(arg, "-O", "--output-log") && i < args.size() - 1) {
@@ -1925,25 +1991,25 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
   }
 
   if (this->CheckArgument(arg, "--tomorrow-tag")) {
-    this->TomorrowTag = true;
+    this->Impl->TomorrowTag = true;
   }
   if (this->CheckArgument(arg, "--force-new-ctest-process")) {
-    this->ForceNewCTestProcess = true;
+    this->Impl->ForceNewCTestProcess = true;
   }
   if (this->CheckArgument(arg, "-W", "--max-width") && i < args.size() - 1) {
     i++;
-    this->MaxTestNameWidth = atoi(args[i].c_str());
+    this->Impl->MaxTestNameWidth = atoi(args[i].c_str());
   }
   if (this->CheckArgument(arg, "--interactive-debug-mode") &&
       i < args.size() - 1) {
     i++;
-    this->InteractiveDebugMode = cmSystemTools::IsOn(args[i].c_str());
+    this->Impl->InteractiveDebugMode = cmSystemTools::IsOn(args[i]);
   }
   if (this->CheckArgument(arg, "--submit-index") && i < args.size() - 1) {
     i++;
-    this->SubmitIndex = atoi(args[i].c_str());
-    if (this->SubmitIndex < 0) {
-      this->SubmitIndex = 0;
+    this->Impl->SubmitIndex = atoi(args[i].c_str());
+    if (this->Impl->SubmitIndex < 0) {
+      this->Impl->SubmitIndex = 0;
     }
   }
 
@@ -1952,7 +2018,7 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
     this->AddCTestConfigurationOverwrite(args[i]);
   }
   if (this->CheckArgument(arg, "-A", "--add-notes") && i < args.size() - 1) {
-    this->ProduceXML = true;
+    this->Impl->ProduceXML = true;
     this->SetTest("Notes");
     i++;
     this->SetNotesFiles(args[i].c_str());
@@ -1962,80 +2028,112 @@ bool cmCTest::HandleCommandLineArguments(size_t& i,
   if (this->CheckArgument(arg, "-I", "--tests-information") &&
       i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption("TestsToRunInformation",
-                                                  args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("TestsToRunInformation", args[i].c_str());
+    this->GetTestHandler()->SetPersistentOption("TestsToRunInformation",
+                                                args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption("TestsToRunInformation",
+                                                    args[i].c_str());
   }
   if (this->CheckArgument(arg, "-U", "--union")) {
-    this->GetHandler("test")->SetPersistentOption("UseUnion", "true");
-    this->GetHandler("memcheck")->SetPersistentOption("UseUnion", "true");
+    this->GetTestHandler()->SetPersistentOption("UseUnion", "true");
+    this->GetMemCheckHandler()->SetPersistentOption("UseUnion", "true");
   }
   if (this->CheckArgument(arg, "-R", "--tests-regex") && i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption("IncludeRegularExpression",
-                                                  args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("IncludeRegularExpression", args[i].c_str());
+    this->GetTestHandler()->SetPersistentOption("IncludeRegularExpression",
+                                                args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption("IncludeRegularExpression",
+                                                    args[i].c_str());
   }
   if (this->CheckArgument(arg, "-L", "--label-regex") && i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption("LabelRegularExpression",
-                                                  args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("LabelRegularExpression", args[i].c_str());
+    this->GetTestHandler()->SetPersistentOption("LabelRegularExpression",
+                                                args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption("LabelRegularExpression",
+                                                    args[i].c_str());
   }
   if (this->CheckArgument(arg, "-LE", "--label-exclude") &&
       i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption(
+    this->GetTestHandler()->SetPersistentOption(
       "ExcludeLabelRegularExpression", args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("ExcludeLabelRegularExpression", args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption(
+      "ExcludeLabelRegularExpression", args[i].c_str());
   }
 
   if (this->CheckArgument(arg, "-E", "--exclude-regex") &&
       i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption("ExcludeRegularExpression",
-                                                  args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("ExcludeRegularExpression", args[i].c_str());
+    this->GetTestHandler()->SetPersistentOption("ExcludeRegularExpression",
+                                                args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption("ExcludeRegularExpression",
+                                                    args[i].c_str());
   }
 
   if (this->CheckArgument(arg, "-FA", "--fixture-exclude-any") &&
       i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption(
+    this->GetTestHandler()->SetPersistentOption(
       "ExcludeFixtureRegularExpression", args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("ExcludeFixtureRegularExpression",
-                            args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption(
+      "ExcludeFixtureRegularExpression", args[i].c_str());
   }
   if (this->CheckArgument(arg, "-FS", "--fixture-exclude-setup") &&
       i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption(
+    this->GetTestHandler()->SetPersistentOption(
       "ExcludeFixtureSetupRegularExpression", args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("ExcludeFixtureSetupRegularExpression",
-                            args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption(
+      "ExcludeFixtureSetupRegularExpression", args[i].c_str());
   }
   if (this->CheckArgument(arg, "-FC", "--fixture-exclude-cleanup") &&
       i < args.size() - 1) {
     i++;
-    this->GetHandler("test")->SetPersistentOption(
+    this->GetTestHandler()->SetPersistentOption(
       "ExcludeFixtureCleanupRegularExpression", args[i].c_str());
-    this->GetHandler("memcheck")
-      ->SetPersistentOption("ExcludeFixtureCleanupRegularExpression",
-                            args[i].c_str());
+    this->GetMemCheckHandler()->SetPersistentOption(
+      "ExcludeFixtureCleanupRegularExpression", args[i].c_str());
   }
 
   if (this->CheckArgument(arg, "--rerun-failed")) {
-    this->GetHandler("test")->SetPersistentOption("RerunFailed", "true");
-    this->GetHandler("memcheck")->SetPersistentOption("RerunFailed", "true");
+    this->GetTestHandler()->SetPersistentOption("RerunFailed", "true");
+    this->GetMemCheckHandler()->SetPersistentOption("RerunFailed", "true");
   }
   return true;
+}
+
+#if !defined(_WIN32)
+bool cmCTest::ConsoleIsNotDumb()
+{
+  std::string term_env_variable;
+  if (cmSystemTools::GetEnv("TERM", term_env_variable)) {
+    return isatty(1) && term_env_variable != "dumb";
+  }
+  return false;
+}
+#endif
+
+bool cmCTest::ProgressOutputSupportedByConsole()
+{
+#if defined(_WIN32)
+  // On Windows we need a console buffer.
+  void* console = GetStdHandle(STD_OUTPUT_HANDLE);
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  return GetConsoleScreenBufferInfo(console, &csbi);
+#else
+  // On UNIX we need a non-dumb tty.
+  return ConsoleIsNotDumb();
+#endif
+}
+
+bool cmCTest::ColoredOutputSupportedByConsole()
+{
+#if defined(_WIN32)
+  // Not supported on Windows
+  return false;
+#else
+  // On UNIX we need a non-dumb tty.
+  return ConsoleIsNotDumb();
+#endif
 }
 
 // handle the -S -SR and -SP arguments
@@ -2045,10 +2143,9 @@ void cmCTest::HandleScriptArguments(size_t& i, std::vector<std::string>& args,
   std::string arg = args[i];
   if (this->CheckArgument(arg, "-SP", "--script-new-process") &&
       i < args.size() - 1) {
-    this->RunConfigurationScript = true;
+    this->Impl->RunConfigurationScript = true;
     i++;
-    cmCTestScriptHandler* ch =
-      static_cast<cmCTestScriptHandler*>(this->GetHandler("script"));
+    cmCTestScriptHandler* ch = this->GetScriptHandler();
     // -SR is an internal argument, -SP should be ignored when it is passed
     if (!SRArgumentSpecified) {
       ch->AddConfigurationScript(args[i].c_str(), false);
@@ -2057,18 +2154,16 @@ void cmCTest::HandleScriptArguments(size_t& i, std::vector<std::string>& args,
 
   if (this->CheckArgument(arg, "-SR", "--script-run") && i < args.size() - 1) {
     SRArgumentSpecified = true;
-    this->RunConfigurationScript = true;
+    this->Impl->RunConfigurationScript = true;
     i++;
-    cmCTestScriptHandler* ch =
-      static_cast<cmCTestScriptHandler*>(this->GetHandler("script"));
+    cmCTestScriptHandler* ch = this->GetScriptHandler();
     ch->AddConfigurationScript(args[i].c_str(), true);
   }
 
   if (this->CheckArgument(arg, "-S", "--script") && i < args.size() - 1) {
-    this->RunConfigurationScript = true;
+    this->Impl->RunConfigurationScript = true;
     i++;
-    cmCTestScriptHandler* ch =
-      static_cast<cmCTestScriptHandler*>(this->GetHandler("script"));
+    cmCTestScriptHandler* ch = this->GetScriptHandler();
     // -SR is an internal argument, -S should be ignored when it is passed
     if (!SRArgumentSpecified) {
       ch->AddConfigurationScript(args[i].c_str(), true);
@@ -2083,7 +2178,7 @@ bool cmCTest::AddVariableDefinition(const std::string& arg)
   cmStateEnums::CacheEntryType type = cmStateEnums::UNINITIALIZED;
 
   if (cmake::ParseCacheEntry(arg, name, value, type)) {
-    this->Definitions[name] = value;
+    this->Impl->Definitions[name] = value;
     return true;
   }
 
@@ -2099,15 +2194,14 @@ int cmCTest::Run(std::vector<std::string>& args, std::string* output)
   bool SRArgumentSpecified = false;
 
   // copy the command line
-  this->InitialCommandLineArguments.insert(
-    this->InitialCommandLineArguments.end(), args.begin(), args.end());
+  cmAppend(this->Impl->InitialCommandLineArguments, args);
 
   // process the command line arguments
   for (size_t i = 1; i < args.size(); ++i) {
     // handle the simple commandline arguments
     std::string errormsg;
     if (!this->HandleCommandLineArguments(i, args, errormsg)) {
-      cmSystemTools::Error(errormsg.c_str());
+      cmSystemTools::Error(errormsg);
       return 1;
     }
 
@@ -2117,7 +2211,7 @@ int cmCTest::Run(std::vector<std::string>& args, std::string* output)
     // --dashboard: handle a request for a dashboard
     std::string arg = args[i];
     if (this->CheckArgument(arg, "-D", "--dashboard") && i < args.size() - 1) {
-      this->ProduceXML = true;
+      this->Impl->ProduceXML = true;
       i++;
       std::string targ = args[i];
       // AddTestsForDashboard parses the dashboard type and converts it
@@ -2153,7 +2247,7 @@ int cmCTest::Run(std::vector<std::string>& args, std::string* output)
 
     // --extra-submit
     if (this->CheckArgument(arg, "--extra-submit") && i < args.size() - 1) {
-      this->ProduceXML = true;
+      this->Impl->ProduceXML = true;
       this->SetTest("Submit");
       i++;
       if (!this->SubmitExtraFiles(args[i].c_str())) {
@@ -2168,14 +2262,14 @@ int cmCTest::Run(std::vector<std::string>& args, std::string* output)
 
     // --schedule-random
     if (this->CheckArgument(arg, "--schedule-random")) {
-      this->ScheduleType = "Random";
+      this->Impl->ScheduleType = "Random";
     }
 
     // pass the argument to all the handlers as well, but i may no longer be
     // set to what it was originally so I'm not sure this is working as
     // intended
-    for (auto& handler : this->TestingHandlers) {
-      if (!handler.second->ProcessCommandLineArguments(arg, i, args)) {
+    for (auto& handler : this->Impl->GetTestingHandlers()) {
+      if (!handler->ProcessCommandLineArguments(arg, i, args)) {
         cmCTestLog(this, ERROR_MESSAGE,
                    "Problem parsing command line arguments within a handler");
         return 0;
@@ -2184,13 +2278,25 @@ int cmCTest::Run(std::vector<std::string>& args, std::string* output)
   } // the close of the for argument loop
 
   // handle CTEST_PARALLEL_LEVEL environment variable
-  if (!this->ParallelLevelSetInCli) {
+  if (!this->Impl->ParallelLevelSetInCli) {
     std::string parallel;
     if (cmSystemTools::GetEnv("CTEST_PARALLEL_LEVEL", parallel)) {
       int plevel = atoi(parallel.c_str());
       this->SetParallelLevel(plevel);
     }
   }
+
+  // TestProgressOutput only supported if console supports it and not logging
+  // to a file
+  this->Impl->TestProgressOutput = this->Impl->TestProgressOutput &&
+    !this->Impl->OutputLogFile && this->ProgressOutputSupportedByConsole();
+#ifdef _WIN32
+  if (this->Impl->TestProgressOutput) {
+    // Disable output line buffering so we can print content without
+    // a newline.
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+  }
+#endif
 
   // now what should cmake do? if --build-and-test was specified then
   // we run the build and test handler and return
@@ -2212,7 +2318,7 @@ bool cmCTest::HandleTestActionArgument(const char* ctestExec, size_t& i,
   std::string arg = args[i];
   if (this->CheckArgument(arg, "-T", "--test-action") &&
       (i < args.size() - 1)) {
-    this->ProduceXML = true;
+    this->Impl->ProduceXML = true;
     i++;
     if (!this->SetTest(args[i].c_str(), false)) {
       success = false;
@@ -2272,16 +2378,16 @@ int cmCTest::ExecuteTests()
 {
   int res;
   // call process directory
-  if (this->RunConfigurationScript) {
-    if (this->ExtraVerbose) {
+  if (this->Impl->RunConfigurationScript) {
+    if (this->Impl->ExtraVerbose) {
       cmCTestLog(this, OUTPUT, "* Extra verbosity turned on" << std::endl);
     }
-    for (auto& handler : this->TestingHandlers) {
-      handler.second->SetVerbose(this->ExtraVerbose);
-      handler.second->SetSubmitIndex(this->SubmitIndex);
+    for (auto& handler : this->Impl->GetTestingHandlers()) {
+      handler->SetVerbose(this->Impl->ExtraVerbose);
+      handler->SetSubmitIndex(this->Impl->SubmitIndex);
     }
-    this->GetHandler("script")->SetVerbose(this->Verbose);
-    res = this->GetHandler("script")->ProcessHandler();
+    this->GetScriptHandler()->SetVerbose(this->Impl->Verbose);
+    res = this->GetScriptHandler()->ProcessHandler();
     if (res != 0) {
       cmCTestLog(this, DEBUG,
                  "running script failing returning: " << res << std::endl);
@@ -2290,11 +2396,11 @@ int cmCTest::ExecuteTests()
   } else {
     // What is this?  -V seems to be the same as -VV,
     // and Verbose is always on in this case
-    this->ExtraVerbose = this->Verbose;
-    this->Verbose = true;
-    for (auto& handler : this->TestingHandlers) {
-      handler.second->SetVerbose(this->Verbose);
-      handler.second->SetSubmitIndex(this->SubmitIndex);
+    this->Impl->ExtraVerbose = this->Impl->Verbose;
+    this->Impl->Verbose = true;
+    for (auto& handler : this->Impl->GetTestingHandlers()) {
+      handler->SetVerbose(this->Impl->Verbose);
+      handler->SetSubmitIndex(this->Impl->SubmitIndex);
     }
     std::string cwd = cmSystemTools::GetCurrentWorkingDirectory();
     if (!this->Initialize(cwd.c_str(), nullptr)) {
@@ -2315,9 +2421,8 @@ int cmCTest::ExecuteTests()
 
 int cmCTest::RunCMakeAndTest(std::string* output)
 {
-  this->Verbose = true;
-  cmCTestBuildAndTestHandler* handler =
-    static_cast<cmCTestBuildAndTestHandler*>(this->GetHandler("buildtest"));
+  this->Impl->Verbose = true;
+  cmCTestBuildAndTestHandler* handler = this->GetBuildAndTestHandler();
   int retv = handler->ProcessHandler();
   *output = handler->GetOutput();
 #ifdef CMAKE_BUILD_WITH_CMAKE
@@ -2335,7 +2440,12 @@ void cmCTest::SetNotesFiles(const char* notes)
   if (!notes) {
     return;
   }
-  this->NotesFiles = notes;
+  this->Impl->NotesFiles = notes;
+}
+
+std::chrono::system_clock::time_point cmCTest::GetStopTime() const
+{
+  return this->Impl->StopTime;
 }
 
 void cmCTest::SetStopTime(std::string const& time_str)
@@ -2365,21 +2475,29 @@ void cmCTest::SetStopTime(std::string const& time_str)
 
   time_t stop_time = curl_getdate(buf, &current_time);
   if (stop_time == -1) {
-    this->StopTime = std::chrono::system_clock::time_point();
+    this->Impl->StopTime = std::chrono::system_clock::time_point();
     return;
   }
-  this->StopTime = std::chrono::system_clock::from_time_t(stop_time);
+  this->Impl->StopTime = std::chrono::system_clock::from_time_t(stop_time);
 
   if (stop_time < current_time) {
-    this->StopTime += std::chrono::hours(24);
+    this->Impl->StopTime += std::chrono::hours(24);
   }
+}
+
+std::string cmCTest::GetScheduleType() const
+{
+  return this->Impl->ScheduleType;
+}
+
+void cmCTest::SetScheduleType(std::string const& type)
+{
+  this->Impl->ScheduleType = type;
 }
 
 int cmCTest::ReadCustomConfigurationFileTree(const char* dir, cmMakefile* mf)
 {
   bool found = false;
-  VectorOfStrings dirs;
-  VectorOfStrings ndirs;
   cmCTestLog(this, DEBUG,
              "* Read custom CTest configuration directory: " << dir
                                                              << std::endl);
@@ -2394,8 +2512,7 @@ int cmCTest::ReadCustomConfigurationFileTree(const char* dir, cmMakefile* mf)
     bool erroroc = cmSystemTools::GetErrorOccuredFlag();
     cmSystemTools::ResetErrorOccuredFlag();
 
-    if (!mf->ReadListFile(fname.c_str()) ||
-        cmSystemTools::GetErrorOccuredFlag()) {
+    if (!mf->ReadListFile(fname) || cmSystemTools::GetErrorOccuredFlag()) {
       cmCTestLog(this, ERROR_MESSAGE,
                  "Problem reading custom configuration: " << fname
                                                           << std::endl);
@@ -2414,15 +2531,13 @@ int cmCTest::ReadCustomConfigurationFileTree(const char* dir, cmMakefile* mf)
     gl.RecurseOn();
     gl.FindFiles(rexpr);
     std::vector<std::string>& files = gl.GetFiles();
-    std::vector<std::string>::iterator fileIt;
-    for (fileIt = files.begin(); fileIt != files.end(); ++fileIt) {
+    for (const std::string& file : files) {
       cmCTestLog(this, DEBUG,
-                 "* Read custom CTest configuration file: " << *fileIt
+                 "* Read custom CTest configuration file: " << file
                                                             << std::endl);
-      if (!mf->ReadListFile(fileIt->c_str()) ||
-          cmSystemTools::GetErrorOccuredFlag()) {
+      if (!mf->ReadListFile(file) || cmSystemTools::GetErrorOccuredFlag()) {
         cmCTestLog(this, ERROR_MESSAGE,
-                   "Problem reading custom configuration: " << *fileIt
+                   "Problem reading custom configuration: " << file
                                                             << std::endl);
       }
     }
@@ -2430,7 +2545,7 @@ int cmCTest::ReadCustomConfigurationFileTree(const char* dir, cmMakefile* mf)
   }
 
   if (found) {
-    for (auto& handler : this->TestingHandlers) {
+    for (auto& handler : this->Impl->GetNamedTestingHandlers()) {
       cmCTestLog(this, DEBUG,
                  "* Read custom CTest configuration vectors for handler: "
                    << handler.first << " (" << handler.second << ")"
@@ -2509,7 +2624,7 @@ std::string cmCTest::GetShortPathToFile(const char* cfname)
     cmSystemTools::ConvertToUnixSlashes(*res);
 
     path = "./" + *res;
-    if (path[path.size() - 1] == '/') {
+    if (path.back() == '/') {
       path = path.substr(0, path.size() - 1);
     }
   }
@@ -2521,16 +2636,16 @@ std::string cmCTest::GetShortPathToFile(const char* cfname)
 
 std::string cmCTest::GetCTestConfiguration(const std::string& name)
 {
-  if (this->CTestConfigurationOverwrites.find(name) !=
-      this->CTestConfigurationOverwrites.end()) {
-    return this->CTestConfigurationOverwrites[name];
+  if (this->Impl->CTestConfigurationOverwrites.find(name) !=
+      this->Impl->CTestConfigurationOverwrites.end()) {
+    return this->Impl->CTestConfigurationOverwrites[name];
   }
-  return this->CTestConfiguration[name];
+  return this->Impl->CTestConfiguration[name];
 }
 
 void cmCTest::EmptyCTestConfiguration()
 {
-  this->CTestConfiguration.clear();
+  this->Impl->CTestConfiguration.clear();
 }
 
 void cmCTest::SetCTestConfiguration(const char* name, const char* value,
@@ -2545,67 +2660,224 @@ void cmCTest::SetCTestConfiguration(const char* name, const char* value,
     return;
   }
   if (!value) {
-    this->CTestConfiguration.erase(name);
+    this->Impl->CTestConfiguration.erase(name);
     return;
   }
-  this->CTestConfiguration[name] = value;
+  this->Impl->CTestConfiguration[name] = value;
+}
+
+std::string cmCTest::GetSubmitURL()
+{
+  std::string url = this->GetCTestConfiguration("SubmitURL");
+  if (url.empty()) {
+    std::string method = this->GetCTestConfiguration("DropMethod");
+    std::string user = this->GetCTestConfiguration("DropSiteUser");
+    std::string password = this->GetCTestConfiguration("DropSitePassword");
+    std::string site = this->GetCTestConfiguration("DropSite");
+    std::string location = this->GetCTestConfiguration("DropLocation");
+
+    url = method.empty() ? "http" : method;
+    url += "://";
+    if (!user.empty()) {
+      url += user;
+      if (!password.empty()) {
+        url += ':';
+        url += password;
+      }
+      url += '@';
+    }
+    url += site;
+    url += location;
+  }
+  return url;
 }
 
 std::string cmCTest::GetCurrentTag()
 {
-  return this->CurrentTag;
+  return this->Impl->CurrentTag;
 }
 
 std::string cmCTest::GetBinaryDir()
 {
-  return this->BinaryDir;
+  return this->Impl->BinaryDir;
 }
 
 std::string const& cmCTest::GetConfigType()
 {
-  return this->ConfigType;
+  return this->Impl->ConfigType;
+}
+
+cmDuration cmCTest::GetTimeOut() const
+{
+  return this->Impl->TimeOut;
+}
+
+void cmCTest::SetTimeOut(cmDuration t)
+{
+  this->Impl->TimeOut = t;
+}
+
+cmDuration cmCTest::GetGlobalTimeout() const
+{
+  return this->Impl->GlobalTimeout;
 }
 
 bool cmCTest::GetShowOnly()
 {
-  return this->ShowOnly;
+  return this->Impl->ShowOnly;
+}
+
+bool cmCTest::GetOutputAsJson()
+{
+  return this->Impl->OutputAsJson;
+}
+
+int cmCTest::GetOutputAsJsonVersion()
+{
+  return this->Impl->OutputAsJsonVersion;
+}
+
+bool cmCTest::ShouldUseHTTP10() const
+{
+  return this->Impl->UseHTTP10;
+}
+
+bool cmCTest::ShouldPrintLabels() const
+{
+  return this->Impl->PrintLabels;
 }
 
 int cmCTest::GetMaxTestNameWidth() const
 {
-  return this->MaxTestNameWidth;
+  return this->Impl->MaxTestNameWidth;
+}
+
+void cmCTest::SetMaxTestNameWidth(int w)
+{
+  this->Impl->MaxTestNameWidth = w;
 }
 
 void cmCTest::SetProduceXML(bool v)
 {
-  this->ProduceXML = v;
+  this->Impl->ProduceXML = v;
 }
 
 bool cmCTest::GetProduceXML()
 {
-  return this->ProduceXML;
+  return this->Impl->ProduceXML;
+}
+
+std::vector<std::string>& cmCTest::GetInitialCommandLineArguments()
+{
+  return this->Impl->InitialCommandLineArguments;
 }
 
 const char* cmCTest::GetSpecificTrack()
 {
-  if (this->SpecificTrack.empty()) {
+  if (this->Impl->SpecificTrack.empty()) {
     return nullptr;
   }
-  return this->SpecificTrack.c_str();
+  return this->Impl->SpecificTrack.c_str();
 }
 
 void cmCTest::SetSpecificTrack(const char* track)
 {
   if (!track) {
-    this->SpecificTrack.clear();
+    this->Impl->SpecificTrack.clear();
     return;
   }
-  this->SpecificTrack = track;
+  this->Impl->SpecificTrack = track;
+}
+
+void cmCTest::SetFailover(bool failover)
+{
+  this->Impl->Failover = failover;
+}
+
+bool cmCTest::GetFailover() const
+{
+  return this->Impl->Failover;
+}
+
+bool cmCTest::GetTestProgressOutput() const
+{
+  return this->Impl->TestProgressOutput;
+}
+
+bool cmCTest::GetVerbose() const
+{
+  return this->Impl->Verbose;
+}
+
+bool cmCTest::GetExtraVerbose() const
+{
+  return this->Impl->ExtraVerbose;
+}
+
+void cmCTest::SetStreams(std::ostream* out, std::ostream* err)
+{
+  this->Impl->StreamOut = out;
+  this->Impl->StreamErr = err;
+}
+
+bool cmCTest::GetLabelSummary() const
+{
+  return this->Impl->LabelSummary;
+}
+
+bool cmCTest::GetSubprojectSummary() const
+{
+  return this->Impl->SubprojectSummary;
+}
+
+bool cmCTest::GetOutputTestOutputOnTestFailure() const
+{
+  return this->Impl->OutputTestOutputOnTestFailure;
+}
+
+const std::map<std::string, std::string>& cmCTest::GetDefinitions() const
+{
+  return this->Impl->Definitions;
+}
+
+int cmCTest::GetTestRepeat() const
+{
+  return this->Impl->RepeatTests;
+}
+
+bool cmCTest::GetRepeatUntilFail() const
+{
+  return this->Impl->RepeatUntilFail;
+}
+
+void cmCTest::SetBuildID(const std::string& id)
+{
+  this->Impl->BuildID = id;
+}
+
+std::string cmCTest::GetBuildID() const
+{
+  return this->Impl->BuildID;
 }
 
 void cmCTest::AddSubmitFile(Part part, const char* name)
 {
-  this->Parts[part].SubmitFiles.push_back(name);
+  this->Impl->Parts[part].SubmitFiles.emplace_back(name);
+}
+
+std::vector<std::string> const& cmCTest::GetSubmitFiles(Part part) const
+{
+  return this->Impl->Parts[part].SubmitFiles;
+}
+
+void cmCTest::ClearSubmitFiles(Part part)
+{
+  this->Impl->Parts[part].SubmitFiles.clear();
+}
+
+void cmCTest::SetSuppressUpdatingCTestConfiguration(bool val)
+{
+  this->Impl->SuppressUpdatingCTestConfiguration = val;
 }
 
 void cmCTest::AddCTestConfigurationOverwrite(const std::string& overStr)
@@ -2621,14 +2893,14 @@ void cmCTest::AddCTestConfigurationOverwrite(const std::string& overStr)
   }
   std::string key = overStr.substr(0, epos);
   std::string value = overStr.substr(epos + 1);
-  this->CTestConfigurationOverwrites[key] = value;
+  this->Impl->CTestConfigurationOverwrites[key] = value;
 }
 
 void cmCTest::SetConfigType(const char* ct)
 {
-  this->ConfigType = ct ? ct : "";
-  cmSystemTools::ReplaceString(this->ConfigType, ".\\", "");
-  std::string confTypeEnv = "CMAKE_CONFIG_TYPE=" + this->ConfigType;
+  this->Impl->ConfigType = ct ? ct : "";
+  cmSystemTools::ReplaceString(this->Impl->ConfigType, ".\\", "");
+  std::string confTypeEnv = "CMAKE_CONFIG_TYPE=" + this->Impl->ConfigType;
   cmSystemTools::PutEnv(confTypeEnv);
 }
 
@@ -2665,7 +2937,7 @@ bool cmCTest::RunCommand(std::vector<std::string> const& args,
   stdErr->clear();
 
   cmsysProcess* cp = cmsysProcess_New();
-  cmsysProcess_SetCommand(cp, &*argv.begin());
+  cmsysProcess_SetCommand(cp, argv.data());
   cmsysProcess_SetWorkingDirectory(cp, dir);
   if (cmSystemTools::GetRunCommandHideConsole()) {
     cmsysProcess_SetOption(cp, cmsysProcess_Option_HideWindow, 1);
@@ -2685,35 +2957,35 @@ bool cmCTest::RunCommand(std::vector<std::string> const& args,
     res = cmsysProcess_WaitForData(cp, &data, &length, nullptr);
     switch (res) {
       case cmsysProcess_Pipe_STDOUT:
-        tempOutput.insert(tempOutput.end(), data, data + length);
+        cmAppend(tempOutput, data, data + length);
         break;
       case cmsysProcess_Pipe_STDERR:
-        tempError.insert(tempError.end(), data, data + length);
+        cmAppend(tempError, data, data + length);
         break;
       default:
         done = true;
     }
     if ((res == cmsysProcess_Pipe_STDOUT || res == cmsysProcess_Pipe_STDERR) &&
-        this->ExtraVerbose) {
+        this->Impl->ExtraVerbose) {
       processOutput.DecodeText(data, length, strdata);
-      cmSystemTools::Stdout(strdata.c_str(), strdata.size());
+      cmSystemTools::Stdout(strdata);
     }
   }
-  if (this->ExtraVerbose) {
+  if (this->Impl->ExtraVerbose) {
     processOutput.DecodeText(std::string(), strdata);
     if (!strdata.empty()) {
-      cmSystemTools::Stdout(strdata.c_str(), strdata.size());
+      cmSystemTools::Stdout(strdata);
     }
   }
 
   cmsysProcess_WaitForExit(cp, nullptr);
   if (!tempOutput.empty()) {
     processOutput.DecodeText(tempOutput, tempOutput);
-    stdOut->append(&*tempOutput.begin(), tempOutput.size());
+    stdOut->append(tempOutput.data(), tempOutput.size());
   }
   if (!tempError.empty()) {
     processOutput.DecodeText(tempError, tempError);
-    stdErr->append(&*tempError.begin(), tempError.size());
+    stdErr->append(tempError.data(), tempError.size());
   }
 
   bool result = true;
@@ -2748,12 +3020,12 @@ bool cmCTest::RunCommand(std::vector<std::string> const& args,
 
 void cmCTest::SetOutputLogFileName(const char* name)
 {
-  if (this->OutputLogFile) {
-    delete this->OutputLogFile;
-    this->OutputLogFile = nullptr;
+  if (this->Impl->OutputLogFile) {
+    delete this->Impl->OutputLogFile;
+    this->Impl->OutputLogFile = nullptr;
   }
   if (name) {
-    this->OutputLogFile = new cmGeneratedFileStream(name);
+    this->Impl->OutputLogFile = new cmGeneratedFileStream(name);
   }
 }
 
@@ -2761,22 +3033,18 @@ static const char* cmCTestStringLogType[] = { "DEBUG",
                                               "OUTPUT",
                                               "HANDLER_OUTPUT",
                                               "HANDLER_PROGRESS_OUTPUT",
+                                              "HANDLER_TEST_PROGRESS_OUTPUT",
                                               "HANDLER_VERBOSE_OUTPUT",
                                               "WARNING",
                                               "ERROR_MESSAGE",
                                               nullptr };
 
 #define cmCTestLogOutputFileLine(stream)                                      \
-  if (this->ShowLineNumbers) {                                                \
-    (stream) << std::endl << file << ":" << line << " ";                      \
-  }
-
-void cmCTest::InitStreams()
-{
-  // By default we write output to the process output streams.
-  this->StreamOut = &std::cout;
-  this->StreamErr = &std::cerr;
-}
+  do {                                                                        \
+    if (this->Impl->ShowLineNumbers) {                                        \
+      (stream) << std::endl << file << ":" << line << " ";                    \
+    }                                                                         \
+  } while (false)
 
 void cmCTest::Log(int logType, const char* file, int line, const char* msg,
                   bool suppress)
@@ -2788,42 +3056,70 @@ void cmCTest::Log(int logType, const char* file, int line, const char* msg,
     return;
   }
   if (logType == cmCTest::HANDLER_PROGRESS_OUTPUT &&
-      (this->Debug || this->ExtraVerbose)) {
+      (this->Impl->Debug || this->Impl->ExtraVerbose)) {
     return;
   }
-  if (this->OutputLogFile) {
+  if (this->Impl->OutputLogFile) {
     bool display = true;
-    if (logType == cmCTest::DEBUG && !this->Debug) {
+    if (logType == cmCTest::DEBUG && !this->Impl->Debug) {
       display = false;
     }
-    if (logType == cmCTest::HANDLER_VERBOSE_OUTPUT && !this->Debug &&
-        !this->ExtraVerbose) {
+    if (logType == cmCTest::HANDLER_VERBOSE_OUTPUT && !this->Impl->Debug &&
+        !this->Impl->ExtraVerbose) {
       display = false;
     }
     if (display) {
-      cmCTestLogOutputFileLine(*this->OutputLogFile);
-      if (logType != this->OutputLogFileLastTag) {
-        *this->OutputLogFile << "[";
+      cmCTestLogOutputFileLine(*this->Impl->OutputLogFile);
+      if (logType != this->Impl->OutputLogFileLastTag) {
+        *this->Impl->OutputLogFile << "[";
         if (logType >= OTHER || logType < 0) {
-          *this->OutputLogFile << "OTHER";
+          *this->Impl->OutputLogFile << "OTHER";
         } else {
-          *this->OutputLogFile << cmCTestStringLogType[logType];
+          *this->Impl->OutputLogFile << cmCTestStringLogType[logType];
         }
-        *this->OutputLogFile << "] " << std::endl << std::flush;
+        *this->Impl->OutputLogFile << "] " << std::endl << std::flush;
       }
-      *this->OutputLogFile << msg << std::flush;
-      if (logType != this->OutputLogFileLastTag) {
-        *this->OutputLogFile << std::endl << std::flush;
-        this->OutputLogFileLastTag = logType;
+      *this->Impl->OutputLogFile << msg << std::flush;
+      if (logType != this->Impl->OutputLogFileLastTag) {
+        *this->Impl->OutputLogFile << std::endl << std::flush;
+        this->Impl->OutputLogFileLastTag = logType;
       }
     }
   }
-  if (!this->Quiet) {
-    std::ostream& out = *this->StreamOut;
-    std::ostream& err = *this->StreamErr;
+  if (!this->Impl->Quiet) {
+    std::ostream& out = *this->Impl->StreamOut;
+    std::ostream& err = *this->Impl->StreamErr;
+
+    if (logType == HANDLER_TEST_PROGRESS_OUTPUT) {
+      if (this->Impl->TestProgressOutput) {
+        cmCTestLogOutputFileLine(out);
+        if (this->Impl->FlushTestProgressLine) {
+          printf("\r");
+          this->Impl->FlushTestProgressLine = false;
+          out.flush();
+        }
+
+        std::string msg_str{ msg };
+        auto const lineBreakIt = msg_str.find('\n');
+        if (lineBreakIt != std::string::npos) {
+          this->Impl->FlushTestProgressLine = true;
+          msg_str.erase(std::remove(msg_str.begin(), msg_str.end(), '\n'),
+                        msg_str.end());
+        }
+
+        out << msg_str;
+#ifndef _WIN32
+        printf("\x1B[K"); // move caret to end
+#endif
+        out.flush();
+        return;
+      }
+      logType = HANDLER_OUTPUT;
+    }
+
     switch (logType) {
       case DEBUG:
-        if (this->Debug) {
+        if (this->Impl->Debug) {
           cmCTestLogOutputFileLine(out);
           out << msg;
           out.flush();
@@ -2831,14 +3127,14 @@ void cmCTest::Log(int logType, const char* file, int line, const char* msg,
         break;
       case OUTPUT:
       case HANDLER_OUTPUT:
-        if (this->Debug || this->Verbose) {
+        if (this->Impl->Debug || this->Impl->Verbose) {
           cmCTestLogOutputFileLine(out);
           out << msg;
           out.flush();
         }
         break;
       case HANDLER_VERBOSE_OUTPUT:
-        if (this->Debug || this->ExtraVerbose) {
+        if (this->Impl->Debug || this->Impl->ExtraVerbose) {
           cmCTestLogOutputFileLine(out);
           out << msg;
           out.flush();
@@ -2863,16 +3159,23 @@ void cmCTest::Log(int logType, const char* file, int line, const char* msg,
   }
 }
 
-cmDuration cmCTest::GetRemainingTimeAllowed()
+std::string cmCTest::GetColorCode(Color color) const
 {
-  if (!this->GetHandler("script")) {
-    return cmCTest::MaxDuration();
+  if (this->Impl->OutputColorCode) {
+#if defined(_WIN32)
+    // Not supported on Windows
+    static_cast<void>(color);
+#else
+    return "\033[0;" + std::to_string(static_cast<int>(color)) + "m";
+#endif
   }
 
-  cmCTestScriptHandler* ch =
-    static_cast<cmCTestScriptHandler*>(this->GetHandler("script"));
+  return "";
+}
 
-  return ch->GetRemainingTimeAllowed();
+cmDuration cmCTest::GetRemainingTimeAllowed()
+{
+  return this->GetScriptHandler()->GetRemainingTimeAllowed();
 }
 
 cmDuration cmCTest::MaxDuration()
@@ -2882,17 +3185,14 @@ cmDuration cmCTest::MaxDuration()
 
 void cmCTest::SetRunCurrentScript(bool value)
 {
-  cmCTestScriptHandler* ch =
-    static_cast<cmCTestScriptHandler*>(this->GetHandler("script"));
-
-  ch->SetRunCurrentScript(value);
+  this->GetScriptHandler()->SetRunCurrentScript(value);
 }
 
 void cmCTest::OutputTestErrors(std::vector<char> const& process_output)
 {
   std::string test_outputs("\n*** Test Failed:\n");
   if (!process_output.empty()) {
-    test_outputs.append(&*process_output.begin(), process_output.size());
+    test_outputs.append(process_output.data(), process_output.size());
   }
   cmCTestLog(this, HANDLER_OUTPUT, test_outputs << std::endl << std::flush);
 }

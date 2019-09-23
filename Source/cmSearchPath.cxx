@@ -16,9 +16,7 @@ cmSearchPath::cmSearchPath(cmFindCommon* findCmd)
 {
 }
 
-cmSearchPath::~cmSearchPath()
-{
-}
+cmSearchPath::~cmSearchPath() = default;
 
 void cmSearchPath::ExtractWithout(const std::set<std::string>& ignore,
                                   std::vector<std::string>& outPaths,
@@ -69,7 +67,8 @@ void cmSearchPath::AddUserPath(const std::string& path)
 
   // Process them all from the current directory
   for (std::string const& p : outPaths) {
-    this->AddPathInternal(p, this->FC->Makefile->GetCurrentSourceDirectory());
+    this->AddPathInternal(
+      p, this->FC->Makefile->GetCurrentSourceDirectory().c_str());
   }
 }
 
@@ -83,8 +82,8 @@ void cmSearchPath::AddCMakePath(const std::string& variable)
     cmSystemTools::ExpandListArgument(value, expanded);
 
     for (std::string const& p : expanded) {
-      this->AddPathInternal(p,
-                            this->FC->Makefile->GetCurrentSourceDirectory());
+      this->AddPathInternal(
+        p, this->FC->Makefile->GetCurrentSourceDirectory().c_str());
     }
   }
 }
@@ -107,8 +106,8 @@ void cmSearchPath::AddCMakePrefixPath(const std::string& variable)
     std::vector<std::string> expanded;
     cmSystemTools::ExpandListArgument(value, expanded);
 
-    this->AddPrefixPaths(expanded,
-                         this->FC->Makefile->GetCurrentSourceDirectory());
+    this->AddPrefixPaths(
+      expanded, this->FC->Makefile->GetCurrentSourceDirectory().c_str());
   }
 }
 
@@ -145,7 +144,7 @@ void cmSearchPath::AddSuffixes(const std::vector<std::string>& suffixes)
     // this will get incorrectly considered a network
     // path on windows and cause huge delays.
     std::string p = inPath;
-    if (!p.empty() && *p.rbegin() != '/') {
+    if (!p.empty() && p.back() != '/') {
       p += "/";
     }
 
@@ -177,7 +176,7 @@ void cmSearchPath::AddPrefixPaths(const std::vector<std::string>& paths,
 
   for (std::string const& path : paths) {
     std::string dir = path;
-    if (!subdir.empty() && !dir.empty() && *dir.rbegin() != '/') {
+    if (!subdir.empty() && !dir.empty() && dir.back() != '/') {
       dir += "/";
     }
     if (subdir == "include" || subdir == "lib") {

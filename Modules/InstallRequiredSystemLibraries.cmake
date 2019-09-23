@@ -1,60 +1,61 @@
 # Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
 # file Copyright.txt or https://cmake.org/licensing for details.
 
-#.rst:
-# InstallRequiredSystemLibraries
-# ------------------------------
-#
-# Include this module to search for compiler-provided system runtime
-# libraries and add install rules for them.  Some optional variables
-# may be set prior to including the module to adjust behavior:
-#
-# ``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS``
-#   Specify additional runtime libraries that may not be detected.
-#   After inclusion any detected libraries will be appended to this.
-#
-# ``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP``
-#   Set to TRUE to skip calling the :command:`install(PROGRAMS)` command to
-#   allow the includer to specify its own install rule, using the value of
-#   ``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS`` to get the list of libraries.
-#
-# ``CMAKE_INSTALL_DEBUG_LIBRARIES``
-#   Set to TRUE to install the debug runtime libraries when available
-#   with MSVC tools.
-#
-# ``CMAKE_INSTALL_DEBUG_LIBRARIES_ONLY``
-#   Set to TRUE to install only the debug runtime libraries with MSVC
-#   tools even if the release runtime libraries are also available.
-#
-# ``CMAKE_INSTALL_UCRT_LIBRARIES``
-#   Set to TRUE to install the Windows Universal CRT libraries for
-#   app-local deployment (e.g. to Windows XP).  This is meaningful
-#   only with MSVC from Visual Studio 2015 or higher.
-#
-#   One may set a ``CMAKE_WINDOWS_KITS_10_DIR`` *environment variable*
-#   to an absolute path to tell CMake to look for Windows 10 SDKs in
-#   a custom location.  The specified directory is expected to contain
-#   ``Redist/ucrt/DLLs/*`` directories.
-#
-# ``CMAKE_INSTALL_MFC_LIBRARIES``
-#   Set to TRUE to install the MSVC MFC runtime libraries.
-#
-# ``CMAKE_INSTALL_OPENMP_LIBRARIES``
-#   Set to TRUE to install the MSVC OpenMP runtime libraries
-#
-# ``CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION``
-#   Specify the :command:`install(PROGRAMS)` command ``DESTINATION``
-#   option.  If not specified, the default is ``bin`` on Windows
-#   and ``lib`` elsewhere.
-#
-# ``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS``
-#   Set to TRUE to disable warnings about required library files that
-#   do not exist.  (For example, Visual Studio Express editions may
-#   not provide the redistributable files.)
-#
-# ``CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT``
-#   Specify the :command:`install(PROGRAMS)` command ``COMPONENT``
-#   option.  If not specified, no such option will be used.
+#[=======================================================================[.rst:
+InstallRequiredSystemLibraries
+------------------------------
+
+Include this module to search for compiler-provided system runtime
+libraries and add install rules for them.  Some optional variables
+may be set prior to including the module to adjust behavior:
+
+``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS``
+  Specify additional runtime libraries that may not be detected.
+  After inclusion any detected libraries will be appended to this.
+
+``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP``
+  Set to TRUE to skip calling the :command:`install(PROGRAMS)` command to
+  allow the includer to specify its own install rule, using the value of
+  ``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS`` to get the list of libraries.
+
+``CMAKE_INSTALL_DEBUG_LIBRARIES``
+  Set to TRUE to install the debug runtime libraries when available
+  with MSVC tools.
+
+``CMAKE_INSTALL_DEBUG_LIBRARIES_ONLY``
+  Set to TRUE to install only the debug runtime libraries with MSVC
+  tools even if the release runtime libraries are also available.
+
+``CMAKE_INSTALL_UCRT_LIBRARIES``
+  Set to TRUE to install the Windows Universal CRT libraries for
+  app-local deployment (e.g. to Windows XP).  This is meaningful
+  only with MSVC from Visual Studio 2015 or higher.
+
+  One may set a ``CMAKE_WINDOWS_KITS_10_DIR`` *environment variable*
+  to an absolute path to tell CMake to look for Windows 10 SDKs in
+  a custom location.  The specified directory is expected to contain
+  ``Redist/ucrt/DLLs/*`` directories.
+
+``CMAKE_INSTALL_MFC_LIBRARIES``
+  Set to TRUE to install the MSVC MFC runtime libraries.
+
+``CMAKE_INSTALL_OPENMP_LIBRARIES``
+  Set to TRUE to install the MSVC OpenMP runtime libraries
+
+``CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION``
+  Specify the :command:`install(PROGRAMS)` command ``DESTINATION``
+  option.  If not specified, the default is ``bin`` on Windows
+  and ``lib`` elsewhere.
+
+``CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS``
+  Set to TRUE to disable warnings about required library files that
+  do not exist.  (For example, Visual Studio Express editions may
+  not provide the redistributable files.)
+
+``CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT``
+  Specify the :command:`install(PROGRAMS)` command ``COMPONENT``
+  option.  If not specified, no such option will be used.
+#]=======================================================================]
 
 cmake_policy(PUSH)
 cmake_policy(SET CMP0054 NEW) # if() quoted variables not dereferenced
@@ -209,20 +210,28 @@ if(MSVC)
   set(_MSVC_IDE_VERSION "")
   if(MSVC_VERSION GREATER_EQUAL 2000)
     message(WARNING "MSVC ${MSVC_VERSION} not yet supported.")
-  elseif(MSVC_TOOLSET_VERSION)
-    set(MSVC_REDIST_NAME VC${MSVC_TOOLSET_VERSION})
+  elseif(MSVC_TOOLSET_VERSION GREATER_EQUAL 143)
+    message(WARNING "MSVC toolset v${MSVC_TOOLSET_VERSION} not yet supported.")
+  elseif(MSVC_TOOLSET_VERSION EQUAL 142)
+    set(MSVC_REDIST_NAME VC142)
+    set(_MSVC_DLL_VERSION 140)
+    set(_MSVC_IDE_VERSION 16)
+    if(MSVC_VERSION EQUAL 1920)
+      # VS2019 named this differently prior to update 1.
+      set(MSVC_REDIST_NAME VC141)
+    endif()
+  elseif(MSVC_TOOLSET_VERSION EQUAL 141)
+    set(MSVC_REDIST_NAME VC141)
+    set(_MSVC_DLL_VERSION 140)
+    set(_MSVC_IDE_VERSION 15)
     if(MSVC_VERSION EQUAL 1910)
       # VS2017 named this differently prior to update 3.
       set(MSVC_REDIST_NAME VC150)
     endif()
-
+  elseif(MSVC_TOOLSET_VERSION)
+    set(MSVC_REDIST_NAME VC${MSVC_TOOLSET_VERSION})
     math(EXPR _MSVC_DLL_VERSION "${MSVC_TOOLSET_VERSION} / 10 * 10")
-
-    if(MSVC_TOOLSET_VERSION EQUAL 141)
-      set(_MSVC_IDE_VERSION 15)
-    else()
-      math(EXPR _MSVC_IDE_VERSION "${MSVC_TOOLSET_VERSION} / 10")
-    endif()
+    math(EXPR _MSVC_IDE_VERSION "${MSVC_TOOLSET_VERSION} / 10")
   endif()
 
   set(_MSVCRT_DLL_VERSION "")
@@ -242,10 +251,18 @@ if(MSVC)
     endif()
     if(NOT vs VERSION_LESS 15)
       set(_vs_redist_paths "")
-      cmake_host_system_information(RESULT _vs_dir QUERY VS_${vs}_DIR) # undocumented query
-      if(IS_DIRECTORY "${_vs_dir}")
-        file(GLOB _vs_redist_paths "${_vs_dir}/VC/Redist/MSVC/*")
-      endif()
+      # The toolset and its redistributables may come with any VS version 15 or newer.
+      set(_MSVC_IDE_VERSIONS 16 15)
+      foreach(_vs_ver ${_MSVC_IDE_VERSIONS})
+        set(_vs_glob_redist_paths "")
+        cmake_host_system_information(RESULT _vs_dir QUERY VS_${_vs_ver}_DIR) # undocumented query
+        if(IS_DIRECTORY "${_vs_dir}")
+          file(GLOB _vs_glob_redist_paths "${_vs_dir}/VC/Redist/MSVC/*")
+          list(APPEND _vs_redist_paths ${_vs_glob_redist_paths})
+        endif()
+        unset(_vs_glob_redist_paths)
+      endforeach()
+      unset(_MSVC_IDE_VERSIONS)
       unset(_vs_dir)
     else()
       get_filename_component(_vs_dir
@@ -302,7 +319,15 @@ if(MSVC)
       get_filename_component(windows_kits_dir
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" ABSOLUTE)
       set(programfilesx86 "ProgramFiles(x86)")
-      find_path(WINDOWS_KITS_DIR NAMES Redist/ucrt/DLLs/${CMAKE_MSVC_ARCH}/ucrtbase.dll
+      if(";${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION};$ENV{UCRTVersion};$ENV{WindowsSDKVersion};" MATCHES [=[;(10\.[0-9.]+)[;\]]=])
+        set(__ucrt_version "${CMAKE_MATCH_1}/")
+      else()
+        set(__ucrt_version "")
+      endif()
+      find_path(WINDOWS_KITS_DIR
+        NAMES
+          Redist/${__ucrt_version}ucrt/DLLs/${CMAKE_MSVC_ARCH}/ucrtbase.dll
+          Redist/ucrt/DLLs/${CMAKE_MSVC_ARCH}/ucrtbase.dll
         PATHS
         $ENV{CMAKE_WINDOWS_KITS_10_DIR}
         "${windows_kits_dir}"
@@ -313,11 +338,19 @@ if(MSVC)
 
       # Glob the list of UCRT DLLs.
       if(NOT CMAKE_INSTALL_DEBUG_LIBRARIES_ONLY)
-        file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/Redist/ucrt/DLLs/${CMAKE_MSVC_ARCH}/*.dll")
+        if(EXISTS "${WINDOWS_KITS_DIR}/Redist/${__ucrt_version}ucrt/DLLs/${CMAKE_MSVC_ARCH}/ucrtbase.dll")
+          file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/Redist/${__ucrt_version}ucrt/DLLs/${CMAKE_MSVC_ARCH}/*.dll")
+        else()
+          file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/Redist/ucrt/DLLs/${CMAKE_MSVC_ARCH}/*.dll")
+        endif()
         list(APPEND __install__libs ${__ucrt_dlls})
       endif()
       if(CMAKE_INSTALL_DEBUG_LIBRARIES)
-        file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/bin/${CMAKE_MSVC_ARCH}/ucrt/*.dll")
+        if(EXISTS "${WINDOWS_KITS_DIR}/bin/${__ucrt_version}${CMAKE_MSVC_ARCH}/ucrt/ucrtbased.dll")
+          file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/bin/${__ucrt_version}${CMAKE_MSVC_ARCH}/ucrt/*.dll")
+        else()
+          file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/bin/${CMAKE_MSVC_ARCH}/ucrt/*.dll")
+        endif()
         list(APPEND __install__libs ${__ucrt_dlls})
       endif()
     endif()
@@ -362,7 +395,7 @@ if(MSVC)
           )
       endif()
 
-      # include the language dll's for vs8 as well as the actuall dll's
+      # include the language dll's for vs8 as well as the actual dll's
       set(MSVC_MFCLOC_DIR "${MSVC_REDIST_DIR}/${CMAKE_MSVC_ARCH}/Microsoft.VC80.MFCLOC")
       # Install the manifest that allows DLLs to be loaded from the
       # directory containing the executable.
@@ -406,7 +439,7 @@ if(MSVC)
           )
       endif()
 
-      # include the language dll's for vs9 as well as the actuall dll's
+      # include the language dll's for vs9 as well as the actual dll's
       set(MSVC_MFCLOC_DIR "${MSVC_REDIST_DIR}/${CMAKE_MSVC_ARCH}/Microsoft.VC90.MFCLOC")
       # Install the manifest that allows DLLs to be loaded from the
       # directory containing the executable.
@@ -487,7 +520,7 @@ if(MSVC)
         endif()
       endif()
 
-      # include the language dll's as well as the actuall dll's
+      # include the language dll's as well as the actual dll's
       set(MSVC_MFCLOC_DIR "${MSVC_REDIST_MFC_DIR}/${CMAKE_MSVC_ARCH}/Microsoft.${MSVC_REDIST_NAME}.MFCLOC")
       set(__install__libs ${__install__libs}
         "${MSVC_MFCLOC_DIR}/mfc${v}chs.dll"

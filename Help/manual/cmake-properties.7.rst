@@ -23,6 +23,7 @@ Properties of Global Scope
    /prop_gbl/AUTORCC_SOURCE_GROUP
    /prop_gbl/CMAKE_C_KNOWN_FEATURES
    /prop_gbl/CMAKE_CXX_KNOWN_FEATURES
+   /prop_gbl/CMAKE_ROLE
    /prop_gbl/DEBUG_CONFIGURATIONS
    /prop_gbl/DISABLED_FEATURES
    /prop_gbl/ENABLED_FEATURES
@@ -60,7 +61,7 @@ Properties on Directories
 .. toctree::
    :maxdepth: 1
 
-   /prop_dir/ADDITIONAL_MAKE_CLEAN_FILES
+   /prop_dir/ADDITIONAL_CLEAN_FILES
    /prop_dir/BINARY_DIR
    /prop_dir/BUILDSYSTEM_TARGETS
    /prop_dir/CACHE_VARIABLES
@@ -77,6 +78,7 @@ Properties on Directories
    /prop_dir/INTERPROCEDURAL_OPTIMIZATION
    /prop_dir/LABELS
    /prop_dir/LINK_DIRECTORIES
+   /prop_dir/LINK_OPTIONS
    /prop_dir/LISTFILE_STACK
    /prop_dir/MACROS
    /prop_dir/PARENT_DIRECTORY
@@ -100,6 +102,7 @@ Properties on Targets
 .. toctree::
    :maxdepth: 1
 
+   /prop_tgt/ADDITIONAL_CLEAN_FILES
    /prop_tgt/ALIASED_TARGET
    /prop_tgt/ANDROID_ANT_ADDITIONAL_OPTIONS
    /prop_tgt/ANDROID_API
@@ -123,20 +126,25 @@ Properties on Targets
    /prop_tgt/ARCHIVE_OUTPUT_NAME_CONFIG
    /prop_tgt/ARCHIVE_OUTPUT_NAME
    /prop_tgt/AUTOGEN_BUILD_DIR
+   /prop_tgt/AUTOGEN_ORIGIN_DEPENDS
    /prop_tgt/AUTOGEN_PARALLEL
    /prop_tgt/AUTOGEN_TARGET_DEPENDS
    /prop_tgt/AUTOMOC_COMPILER_PREDEFINES
    /prop_tgt/AUTOMOC_DEPEND_FILTERS
+   /prop_tgt/AUTOMOC_EXECUTABLE
    /prop_tgt/AUTOMOC_MACRO_NAMES
    /prop_tgt/AUTOMOC_MOC_OPTIONS
    /prop_tgt/AUTOMOC
    /prop_tgt/AUTOUIC
+   /prop_tgt/AUTOUIC_EXECUTABLE
    /prop_tgt/AUTOUIC_OPTIONS
    /prop_tgt/AUTOUIC_SEARCH_PATHS
    /prop_tgt/AUTORCC
+   /prop_tgt/AUTORCC_EXECUTABLE
    /prop_tgt/AUTORCC_OPTIONS
    /prop_tgt/BINARY_DIR
    /prop_tgt/BUILD_RPATH
+   /prop_tgt/BUILD_RPATH_USE_ORIGIN
    /prop_tgt/BUILD_WITH_INSTALL_NAME_DIR
    /prop_tgt/BUILD_WITH_INSTALL_RPATH
    /prop_tgt/BUNDLE_EXTENSION
@@ -172,6 +180,7 @@ Properties on Targets
    /prop_tgt/DEBUG_POSTFIX
    /prop_tgt/DEFINE_SYMBOL
    /prop_tgt/DEPLOYMENT_REMOTE_DIRECTORY
+   /prop_tgt/DEPLOYMENT_ADDITIONAL_FILES
    /prop_tgt/DOTNET_TARGET_FRAMEWORK_VERSION
    /prop_tgt/EchoString
    /prop_tgt/ENABLE_EXPORTS
@@ -186,6 +195,8 @@ Properties on Targets
    /prop_tgt/FRAMEWORK
    /prop_tgt/FRAMEWORK_VERSION
    /prop_tgt/GENERATOR_FILE_NAME
+   /prop_tgt/GHS_INTEGRITY_APP
+   /prop_tgt/GHS_NO_SOURCE_GROUP_FILE
    /prop_tgt/GNUtoMS
    /prop_tgt/HAS_CXX
    /prop_tgt/IMPLICIT_DEPENDS_INCLUDE_TRANSFORM
@@ -224,7 +235,10 @@ Properties on Targets
    /prop_tgt/INTERFACE_COMPILE_FEATURES
    /prop_tgt/INTERFACE_COMPILE_OPTIONS
    /prop_tgt/INTERFACE_INCLUDE_DIRECTORIES
+   /prop_tgt/INTERFACE_LINK_DEPENDS
+   /prop_tgt/INTERFACE_LINK_DIRECTORIES
    /prop_tgt/INTERFACE_LINK_LIBRARIES
+   /prop_tgt/INTERFACE_LINK_OPTIONS
    /prop_tgt/INTERFACE_POSITION_INDEPENDENT_CODE
    /prop_tgt/INTERFACE_SOURCES
    /prop_tgt/INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
@@ -247,6 +261,7 @@ Properties on Targets
    /prop_tgt/LINK_DEPENDS_NO_SHARED
    /prop_tgt/LINK_DEPENDS
    /prop_tgt/LINKER_LANGUAGE
+   /prop_tgt/LINK_DIRECTORIES
    /prop_tgt/LINK_FLAGS_CONFIG
    /prop_tgt/LINK_FLAGS
    /prop_tgt/LINK_INTERFACE_LIBRARIES_CONFIG
@@ -254,6 +269,7 @@ Properties on Targets
    /prop_tgt/LINK_INTERFACE_MULTIPLICITY_CONFIG
    /prop_tgt/LINK_INTERFACE_MULTIPLICITY
    /prop_tgt/LINK_LIBRARIES
+   /prop_tgt/LINK_OPTIONS
    /prop_tgt/LINK_SEARCH_END_STATIC
    /prop_tgt/LINK_SEARCH_START_STATIC
    /prop_tgt/LINK_WHAT_YOU_USE
@@ -265,6 +281,7 @@ Properties on Targets
    /prop_tgt/MACOSX_RPATH
    /prop_tgt/MANUALLY_ADDED_DEPENDENCIES
    /prop_tgt/MAP_IMPORTED_CONFIG_CONFIG
+   /prop_tgt/MSVC_RUNTIME_LIBRARY
    /prop_tgt/NAME
    /prop_tgt/NO_SONAME
    /prop_tgt/NO_SYSTEM_FROM_IMPORTED
@@ -295,13 +312,19 @@ Properties on Targets
    /prop_tgt/SOVERSION
    /prop_tgt/STATIC_LIBRARY_FLAGS_CONFIG
    /prop_tgt/STATIC_LIBRARY_FLAGS
+   /prop_tgt/STATIC_LIBRARY_OPTIONS
    /prop_tgt/SUFFIX
+   /prop_tgt/Swift_DEPENDENCIES_FILE
+   /prop_tgt/Swift_MODULE_DIRECTORY
+   /prop_tgt/Swift_MODULE_NAME
    /prop_tgt/TYPE
    /prop_tgt/VERSION
    /prop_tgt/VISIBILITY_INLINES_HIDDEN
    /prop_tgt/VS_CONFIGURATION_TYPE
-   /prop_tgt/VS_DEBUGGER_WORKING_DIRECTORY
    /prop_tgt/VS_DEBUGGER_COMMAND
+   /prop_tgt/VS_DEBUGGER_COMMAND_ARGUMENTS
+   /prop_tgt/VS_DEBUGGER_ENVIRONMENT
+   /prop_tgt/VS_DEBUGGER_WORKING_DIRECTORY
    /prop_tgt/VS_DESKTOP_EXTENSIONS_VERSION
    /prop_tgt/VS_DOTNET_REFERENCE_refname
    /prop_tgt/VS_DOTNET_REFERENCEPROP_refname_TAG_tagname
@@ -314,8 +337,12 @@ Properties on Targets
    /prop_tgt/VS_GLOBAL_variable
    /prop_tgt/VS_IOT_EXTENSIONS_VERSION
    /prop_tgt/VS_IOT_STARTUP_TASK
+   /prop_tgt/VS_JUST_MY_CODE_DEBUGGING
    /prop_tgt/VS_KEYWORD
    /prop_tgt/VS_MOBILE_EXTENSIONS_VERSION
+   /prop_tgt/VS_NO_SOLUTION_DEPLOY
+   /prop_tgt/VS_PACKAGE_REFERENCES
+   /prop_tgt/VS_PROJECT_IMPORT
    /prop_tgt/VS_SCC_AUXPATH
    /prop_tgt/VS_SCC_LOCALPATH
    /prop_tgt/VS_SCC_PROJECTNAME
@@ -330,7 +357,27 @@ Properties on Targets
    /prop_tgt/WINDOWS_EXPORT_ALL_SYMBOLS
    /prop_tgt/XCODE_ATTRIBUTE_an-attribute
    /prop_tgt/XCODE_EXPLICIT_FILE_TYPE
+   /prop_tgt/XCODE_GENERATE_SCHEME
    /prop_tgt/XCODE_PRODUCT_TYPE
+   /prop_tgt/XCODE_SCHEME_ADDRESS_SANITIZER
+   /prop_tgt/XCODE_SCHEME_ADDRESS_SANITIZER_USE_AFTER_RETURN
+   /prop_tgt/XCODE_SCHEME_ARGUMENTS
+   /prop_tgt/XCODE_SCHEME_DEBUG_AS_ROOT
+   /prop_tgt/XCODE_SCHEME_DISABLE_MAIN_THREAD_CHECKER
+   /prop_tgt/XCODE_SCHEME_DYNAMIC_LIBRARY_LOADS
+   /prop_tgt/XCODE_SCHEME_DYNAMIC_LINKER_API_USAGE
+   /prop_tgt/XCODE_SCHEME_ENVIRONMENT
+   /prop_tgt/XCODE_SCHEME_EXECUTABLE
+   /prop_tgt/XCODE_SCHEME_GUARD_MALLOC
+   /prop_tgt/XCODE_SCHEME_MAIN_THREAD_CHECKER_STOP
+   /prop_tgt/XCODE_SCHEME_MALLOC_GUARD_EDGES
+   /prop_tgt/XCODE_SCHEME_MALLOC_SCRIBBLE
+   /prop_tgt/XCODE_SCHEME_MALLOC_STACK
+   /prop_tgt/XCODE_SCHEME_THREAD_SANITIZER
+   /prop_tgt/XCODE_SCHEME_THREAD_SANITIZER_STOP
+   /prop_tgt/XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER
+   /prop_tgt/XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER_STOP
+   /prop_tgt/XCODE_SCHEME_ZOMBIE_OBJECTS
    /prop_tgt/XCTEST
 
 .. _`Test Properties`:
@@ -395,6 +442,8 @@ Properties on Source Files
    /prop_sf/SKIP_AUTOMOC
    /prop_sf/SKIP_AUTORCC
    /prop_sf/SKIP_AUTOUIC
+   /prop_sf/Swift_DEPENDENCIES_FILE
+   /prop_sf/Swift_DIAGNOSTICS_FILE
    /prop_sf/SYMBOLIC
    /prop_sf/VS_COPY_TO_OUT_DIR
    /prop_sf/VS_CSHARP_tagname
@@ -455,6 +504,7 @@ Deprecated Properties on Directories
 .. toctree::
    :maxdepth: 1
 
+   /prop_dir/ADDITIONAL_MAKE_CLEAN_FILES
    /prop_dir/COMPILE_DEFINITIONS_CONFIG
    /prop_dir/TEST_INCLUDE_FILE
 

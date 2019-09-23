@@ -1,9 +1,13 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
+#define _SCL_SECURE_NO_WARNINGS
+
 #include "cmStringCommand.h"
 
 #include "cmsys/RegularExpression.hxx"
+#include <algorithm>
 #include <ctype.h>
+#include <iterator>
 #include <memory> // IWYU pragma: keep
 #include <sstream>
 #include <stdio.h>
@@ -13,6 +17,8 @@
 #include "cmCryptoHash.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
+#include "cmRange.h"
 #include "cmStringReplaceHelper.h"
 #include "cmSystemTools.h"
 #include "cmTimestamp.h"
@@ -77,6 +83,9 @@ bool cmStringCommand::InitialPass(std::vector<std::string> const& args,
   }
   if (subCommand == "STRIP") {
     return this->HandleStripCommand(args);
+  }
+  if (subCommand == "REPEAT") {
+    return this->HandleRepeatCommand(args);
   }
   if (subCommand == "RANDOM") {
     return this->HandleRandomCommand(args);
@@ -156,7 +165,7 @@ bool cmStringCommand::HandleAsciiCommand(std::vector<std::string> const& args)
     return false;
   }
   std::string::size_type cc;
-  std::string const& outvar = args[args.size() - 1];
+  std::string const& outvar = args.back();
   std::string output;
   for (cc = 1; cc < args.size() - 1; cc++) {
     int ch = atoi(args[cc].c_str());
@@ -273,7 +282,7 @@ bool cmStringCommand::RegexMatch(std::vector<std::string> const& args)
 
   // Scan through the input for all matches.
   std::string output;
-  if (re.find(input.c_str())) {
+  if (re.find(input)) {
     this->Makefile->StoreMatches(re);
     std::string::size_type l = re.start();
     std::string::size_type r = re.end();
@@ -708,6 +717,59 @@ bool cmStringCommand::HandleStripCommand(std::vector<std::string> const& args)
   return true;
 }
 
+bool cmStringCommand::HandleRepeatCommand(std::vector<std::string> const& args)
+{
+  // `string(REPEAT "<str>" <times> OUTPUT_VARIABLE)`
+  enum ArgPos : std::size_t
+  {
+    SUB_COMMAND,
+    VALUE,
+    TIMES,
+    OUTPUT_VARIABLE,
+    TOTAL_ARGS
+  };
+
+  if (args.size() != ArgPos::TOTAL_ARGS) {
+    this->Makefile->IssueMessage(
+      MessageType::FATAL_ERROR,
+      "sub-command REPEAT requires three arguments.");
+    return true;
+  }
+
+  unsigned long times;
+  if (!cmSystemTools::StringToULong(args[ArgPos::TIMES].c_str(), &times)) {
+    this->Makefile->IssueMessage(MessageType::FATAL_ERROR,
+                                 "repeat count is not a positive number.");
+    return true;
+  }
+
+  const auto& stringValue = args[ArgPos::VALUE];
+  const auto& variableName = args[ArgPos::OUTPUT_VARIABLE];
+  const auto inStringLength = stringValue.size();
+
+  std::string result;
+  switch (inStringLength) {
+    case 0u:
+      // Nothing to do for zero length input strings
+      break;
+    case 1u:
+      // NOTE If the string to repeat consists of the only character,
+      // use the appropriate constructor.
+      result = std::string(times, stringValue[0]);
+      break;
+    default:
+      result = std::string(inStringLength * times, char{});
+      for (auto i = 0u; i < times; ++i) {
+        std::copy(cm::cbegin(stringValue), cm::cend(stringValue),
+                  &result[i * inStringLength]);
+      }
+      break;
+  }
+
+  this->Makefile->AddDefinition(variableName, result.c_str());
+  return true;
+}
+
 bool cmStringCommand::HandleRandomCommand(std::vector<std::string> const& args)
 {
   if (args.size() < 2 || args.size() == 3 || args.size() == 5) {
@@ -755,7 +817,7 @@ bool cmStringCommand::HandleRandomCommand(std::vector<std::string> const& args)
     this->SetError("sub-command RANDOM invoked with bad length.");
     return false;
   }
-  const std::string& variableName = args[args.size() - 1];
+  const std::string& variableName = args.back();
 
   std::vector<char> result;
 
@@ -765,14 +827,13 @@ bool cmStringCommand::HandleRandomCommand(std::vector<std::string> const& args)
   }
 
   const char* alphaPtr = alphabet.c_str();
-  int cc;
-  for (cc = 0; cc < length; cc++) {
+  for (int cc = 0; cc < length; cc++) {
     int idx = static_cast<int>(sizeofAlphabet * rand() / (RAND_MAX + 1.0));
     result.push_back(*(alphaPtr + idx));
   }
   result.push_back(0);
 
-  this->Makefile->AddDefinition(variableName, &*result.begin());
+  this->Makefile->AddDefinition(variableName, result.data());
   return true;
 }
 

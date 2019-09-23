@@ -22,7 +22,9 @@ Setting Policies by CMake Version
 
 The ``cmake_policy`` command is used to set policies to ``OLD`` or ``NEW``
 behavior.  While setting policies individually is supported, we
-encourage projects to set policies based on CMake versions::
+encourage projects to set policies based on CMake versions:
+
+.. code-block:: cmake
 
   cmake_policy(VERSION <min>[...<max>])
 
@@ -50,7 +52,7 @@ command implicitly calls ``cmake_policy(VERSION)`` too.
 Setting Policies Explicitly
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-::
+.. code-block:: cmake
 
   cmake_policy(SET CMP<NNNN> NEW)
   cmake_policy(SET CMP<NNNN> OLD)
@@ -66,7 +68,7 @@ policy state to ``NEW``.
 Checking Policy Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-::
+.. code-block:: cmake
 
   cmake_policy(GET CMP<NNNN> <variable>)
 
@@ -78,14 +80,16 @@ CMake Policy Stack
 ^^^^^^^^^^^^^^^^^^
 
 CMake keeps policy settings on a stack, so changes made by the
-cmake_policy command affect only the top of the stack.  A new entry on
+``cmake_policy`` command affect only the top of the stack.  A new entry on
 the policy stack is managed automatically for each subdirectory to
 protect its parents and siblings.  CMake also manages a new entry for
 scripts loaded by :command:`include` and :command:`find_package` commands
 except when invoked with the ``NO_POLICY_SCOPE`` option
 (see also policy :policy:`CMP0011`).
 The ``cmake_policy`` command provides an interface to manage custom
-entries on the policy stack::
+entries on the policy stack:
+
+.. code-block:: cmake
 
   cmake_policy(PUSH)
   cmake_policy(POP)

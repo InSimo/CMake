@@ -25,12 +25,16 @@ class cmVS10GeneratorOptions;
 
 class cmVisualStudio10TargetGenerator
 {
-  CM_DISABLE_COPY(cmVisualStudio10TargetGenerator)
-
 public:
   cmVisualStudio10TargetGenerator(cmGeneratorTarget* target,
                                   cmGlobalVisualStudio10Generator* gg);
   ~cmVisualStudio10TargetGenerator();
+
+  cmVisualStudio10TargetGenerator(cmVisualStudio10TargetGenerator const&) =
+    delete;
+  cmVisualStudio10TargetGenerator& operator=(
+    cmVisualStudio10TargetGenerator const&) = delete;
+
   void Generate();
 
 private:
@@ -57,20 +61,25 @@ private:
   void WriteProjectConfigurations(Elem& e0);
   void WriteProjectConfigurationValues(Elem& e0);
   void WriteMSToolConfigurationValues(Elem& e1, std::string const& config);
+  void WriteCEDebugProjectConfigurationValues(Elem& e0);
   void WriteMSToolConfigurationValuesManaged(Elem& e1,
                                              std::string const& config);
   void WriteHeaderSource(Elem& e1, cmSourceFile const* sf);
   void WriteExtraSource(Elem& e1, cmSourceFile const* sf);
   void WriteNsightTegraConfigurationValues(Elem& e1,
                                            std::string const& config);
-  void WriteSource(Elem& e2, std::string const& tool, cmSourceFile const* sf);
+  void WriteSource(Elem& e2, cmSourceFile const* sf);
   void WriteExcludeFromBuild(Elem& e2,
                              std::vector<size_t> const& exclude_configs);
   void WriteAllSources(Elem& e0);
+  void WritePackageReferences(Elem& e0);
+  void WritePackageReference(Elem& e1, std::string const& ref,
+                             std::string const& version);
   void WriteDotNetReferences(Elem& e0);
   void WriteDotNetReference(Elem& e1, std::string const& ref,
                             std::string const& hint,
                             std::string const& config);
+  void WriteImports(Elem& e0);
   void WriteDotNetReferenceCustomTags(Elem& e2, std::string const& ref);
   void WriteEmbeddedResourceGroup(Elem& e0);
   void WriteWinRTReferences(Elem& e0);
@@ -130,7 +139,8 @@ private:
   void WriteCustomRule(Elem& e0, cmSourceFile const* source,
                        cmCustomCommand const& command);
   void WriteCustomRuleCpp(Elem& e2, std::string const& config,
-                          std::string const& script, std::string const& inputs,
+                          std::string const& script,
+                          std::string const& additional_inputs,
                           std::string const& outputs,
                           std::string const& comment);
   void WriteCustomRuleCSharp(Elem& e0, std::string const& config,
@@ -160,7 +170,7 @@ private:
   void WriteGroupSources(Elem& e0, std::string const& name,
                          ToolSources const& sources,
                          std::vector<cmSourceGroup>&);
-  void AddMissingSourceGroups(std::set<cmSourceGroup*>& groupsUsed,
+  void AddMissingSourceGroups(std::set<cmSourceGroup const*>& groupsUsed,
                               const std::vector<cmSourceGroup>& allGroups);
   bool IsResxHeader(const std::string& headerFile);
   bool IsXamlHeader(const std::string& headerFile);
@@ -204,6 +214,8 @@ private:
   bool NsightTegra;
   unsigned int NsightTegraVersion[4];
   bool TargetCompileAsWinRT;
+  std::set<std::string> IPOEnabledConfigurations;
+  std::map<std::string, std::string> SpectreMitigation;
   cmGlobalVisualStudio10Generator* const GlobalGenerator;
   cmLocalVisualStudio10Generator* const LocalGenerator;
   std::set<std::string> CSharpCustomCommandNames;

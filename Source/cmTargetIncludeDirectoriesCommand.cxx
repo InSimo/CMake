@@ -8,9 +8,9 @@
 #include "cmGeneratorExpression.h"
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
-#include "cmake.h"
 
 class cmExecutionStatus;
 
@@ -27,7 +27,7 @@ void cmTargetIncludeDirectoriesCommand::HandleMissingTarget(
   std::ostringstream e;
   e << "Cannot specify include directories for target \"" << name
     << "\" which is not built by this project.";
-  this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
+  this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e.str());
 }
 
 std::string cmTargetIncludeDirectoriesCommand::Join(
@@ -35,8 +35,7 @@ std::string cmTargetIncludeDirectoriesCommand::Join(
 {
   std::string dirs;
   std::string sep;
-  std::string prefix =
-    this->Makefile->GetCurrentSourceDirectory() + std::string("/");
+  std::string prefix = this->Makefile->GetCurrentSourceDirectory() + "/";
   for (std::string const& it : content) {
     if (cmSystemTools::FileIsFullPath(it) ||
         cmGeneratorExpression::Find(it) == 0) {
@@ -56,8 +55,7 @@ bool cmTargetIncludeDirectoriesCommand::HandleDirectContent(
   cmListFileBacktrace lfbt = this->Makefile->GetBacktrace();
   tgt->InsertInclude(this->Join(content), lfbt, prepend);
   if (system) {
-    std::string prefix =
-      this->Makefile->GetCurrentSourceDirectory() + std::string("/");
+    std::string prefix = this->Makefile->GetCurrentSourceDirectory() + "/";
     std::set<std::string> sdirs;
     for (std::string const& it : content) {
       if (cmSystemTools::FileIsFullPath(it) ||

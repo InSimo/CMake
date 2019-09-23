@@ -2,6 +2,7 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCustomCommandGenerator.h"
 
+#include "cmAlgorithms.h"
 #include "cmCustomCommand.h"
 #include "cmCustomCommandLines.h"
 #include "cmGeneratorExpression.h"
@@ -16,14 +17,15 @@
 #include <utility>
 
 cmCustomCommandGenerator::cmCustomCommandGenerator(cmCustomCommand const& cc,
-                                                   const std::string& config,
+                                                   std::string config,
                                                    cmLocalGenerator* lg)
   : CC(cc)
-  , Config(config)
+  , Config(std::move(config))
   , LG(lg)
   , OldStyle(cc.GetEscapeOldStyle())
   , MakeVars(cc.GetEscapeAllowMakeVars())
   , GE(new cmGeneratorExpression(cc.GetBacktrace()))
+  , EmulatorsWithArguments(cc.GetCommandLines().size())
 {
   const cmCustomCommandLines& cmdlines = this->CC.GetCommandLines();
   for (cmCustomCommandLine const& cmdline : cmdlines) {
@@ -33,9 +35,7 @@ cmCustomCommandGenerator::cmCustomCommandGenerator(cmCustomCommand const& cc,
         this->GE->Parse(clarg);
       std::string parsed_arg = cge->Evaluate(this->LG, this->Config);
       if (this->CC.GetCommandExpandLists()) {
-        std::vector<std::string> ExpandedArg;
-        cmSystemTools::ExpandListArgument(parsed_arg, ExpandedArg);
-        argv.insert(argv.end(), ExpandedArg.begin(), ExpandedArg.end());
+        cmAppend(argv, cmSystemTools::ExpandedListArgument(parsed_arg));
       } else {
         argv.push_back(std::move(parsed_arg));
       }
@@ -54,16 +54,30 @@ cmCustomCommandGenerator::cmCustomCommandGenerator(cmCustomCommand const& cc,
   std::vector<std::string> depends = this->CC.GetDepends();
   for (std::string const& d : depends) {
     std::unique_ptr<cmCompiledGeneratorExpression> cge = this->GE->Parse(d);
-    std::vector<std::string> result;
-    cmSystemTools::ExpandListArgument(cge->Evaluate(this->LG, this->Config),
-                                      result);
+    std::vector<std::string> result = cmSystemTools::ExpandedListArgument(
+      cge->Evaluate(this->LG, this->Config));
     for (std::string& it : result) {
       if (cmSystemTools::FileIsFullPath(it)) {
         it = cmSystemTools::CollapseFullPath(it);
       }
     }
-    this->Depends.insert(this->Depends.end(), result.begin(), result.end());
+    cmAppend(this->Depends, result);
   }
+
+  const std::string& workingdirectory = this->CC.GetWorkingDirectory();
+  if (!workingdirectory.empty()) {
+    std::unique_ptr<cmCompiledGeneratorExpression> cge =
+      this->GE->Parse(workingdirectory);
+    this->WorkingDirectory = cge->Evaluate(this->LG, this->Config);
+    // Convert working directory to a full path.
+    if (!this->WorkingDirectory.empty()) {
+      std::string const& build_dir = this->LG->GetCurrentBinaryDirectory();
+      this->WorkingDirectory =
+        cmSystemTools::CollapseFullPath(this->WorkingDirectory, build_dir);
+    }
+  }
+
+  this->FillEmulatorsWithArguments();
 }
 
 cmCustomCommandGenerator::~cmCustomCommandGenerator()
@@ -76,19 +90,37 @@ unsigned int cmCustomCommandGenerator::GetNumberOfCommands() const
   return static_cast<unsigned int>(this->CC.GetCommandLines().size());
 }
 
-const char* cmCustomCommandGenerator::GetCrossCompilingEmulator(
-  unsigned int c) const
+void cmCustomCommandGenerator::FillEmulatorsWithArguments()
 {
   if (!this->LG->GetMakefile()->IsOn("CMAKE_CROSSCOMPILING")) {
-    return nullptr;
+    return;
   }
-  std::string const& argv0 = this->CommandLines[c][0];
-  cmGeneratorTarget* target = this->LG->FindGeneratorTargetToUse(argv0);
-  if (target && target->GetType() == cmStateEnums::EXECUTABLE &&
-      !target->IsImported()) {
-    return target->GetProperty("CROSSCOMPILING_EMULATOR");
+
+  for (unsigned int c = 0; c < this->GetNumberOfCommands(); ++c) {
+    std::string const& argv0 = this->CommandLines[c][0];
+    cmGeneratorTarget* target = this->LG->FindGeneratorTargetToUse(argv0);
+    if (target && target->GetType() == cmStateEnums::EXECUTABLE &&
+        !target->IsImported()) {
+
+      const char* emulator_property =
+        target->GetProperty("CROSSCOMPILING_EMULATOR");
+      if (!emulator_property) {
+        continue;
+      }
+
+      cmSystemTools::ExpandListArgument(emulator_property,
+                                        this->EmulatorsWithArguments[c]);
+    }
   }
-  return nullptr;
+}
+
+std::vector<std::string> cmCustomCommandGenerator::GetCrossCompilingEmulator(
+  unsigned int c) const
+{
+  if (c >= this->EmulatorsWithArguments.size()) {
+    return std::vector<std::string>();
+  }
+  return this->EmulatorsWithArguments[c];
 }
 
 cmGeneratorTarget* cmCustomCommandGenerator::GetCommandTarget(unsigned int c) const
@@ -125,8 +157,9 @@ bool cmCustomCommandGenerator::HasOnlyEmptyCommandLines() const
 
 std::string cmCustomCommandGenerator::GetCommand(unsigned int c) const
 {
-  if (const char* emulator = this->GetCrossCompilingEmulator(c)) {
-    return std::string(emulator);
+  std::vector<std::string> emulator = this->GetCrossCompilingEmulator(c);
+  if (!emulator.empty()) {
+    return emulator[0];
   }
   if (const char* location = this->GetArgv0Location(c)) {
     return std::string(location);
@@ -164,9 +197,20 @@ void cmCustomCommandGenerator::AppendArguments(unsigned int c,
                                                std::string& cmd) const
 {
   unsigned int offset = 1;
-  if (this->GetCrossCompilingEmulator(c) != nullptr) {
+  std::vector<std::string> emulator = this->GetCrossCompilingEmulator(c);
+  if (!emulator.empty()) {
+    for (unsigned j = 1; j < emulator.size(); ++j) {
+      cmd += " ";
+      if (this->OldStyle) {
+        cmd += escapeForShellOldStyle(emulator[j]);
+      } else {
+        cmd += this->LG->EscapeForShell(emulator[j], this->MakeVars);
+      }
+    }
+
     offset = 0;
   }
+
   cmCustomCommandLine const& commandLine = this->CommandLines[c];
   for (unsigned int j = offset; j < commandLine.size(); ++j) {
     std::string arg;
@@ -193,7 +237,7 @@ const char* cmCustomCommandGenerator::GetComment() const
 
 std::string cmCustomCommandGenerator::GetWorkingDirectory() const
 {
-  return this->CC.GetWorkingDirectory();
+  return this->WorkingDirectory;
 }
 
 std::vector<std::string> const& cmCustomCommandGenerator::GetOutputs() const

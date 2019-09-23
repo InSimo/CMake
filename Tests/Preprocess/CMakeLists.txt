@@ -28,6 +28,11 @@ endif()
 if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   set(PP_VS 1)
 endif()
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND
+   "x${CMAKE_C_SIMULATE_ID}" STREQUAL "xMSVC" AND
+   "x${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "xGNU")
+   set(CLANG_GNULIKE_WINDOWS 1)
+endif()
 if("${CMAKE_GENERATOR}" MATCHES "Fastbuild")
   set(PP_FASTBUILD 1)
 endif()
@@ -56,7 +61,7 @@ endif()
 
 string(APPEND STRING_EXTRA " ")
 
-if(NOT PP_BORLAND AND NOT PP_WATCOM AND NOT PP_FASTBUILD)
+if(NOT PP_BORLAND AND NOT PP_WATCOM AND NOT CLANG_GNULIKE_WINDOWS AND NOT PP_FASTBUILD)
   # Borland, WMake, FASTBuild: multiple spaces
   # The make tool seems to remove extra whitespace from inside
   # quoted strings when passing to the compiler.  It does not have
@@ -73,14 +78,14 @@ if(NOT PP_VS)
   string(APPEND STRING_EXTRA ",")
 endif()
 
-if(NOT PP_MINGW)
+if(NOT PP_MINGW AND NOT CLANG_GNULIKE_WINDOWS)
   # MinGW: &
   # When inside -D"FOO=\"a & b\"" MinGW make wants -D"FOO=\"a "&" b\""
   # but it does not like quoted ampersand elsewhere.
   string(APPEND STRING_EXTRA "&")
 endif()
 
-if(NOT PP_MINGW)
+if(NOT PP_MINGW AND NOT CLANG_GNULIKE_WINDOWS)
   # MinGW: |
   # When inside -D"FOO=\"a | b\"" MinGW make wants -D"FOO=\"a "|" b\""
   # but it does not like quoted pipe elsewhere.
@@ -103,7 +108,8 @@ endif()
 
 set(EXPR_OP1 "/")
 if((NOT MSVC OR PP_NMAKE) AND
-   NOT CMAKE_C_COMPILER_ID STREQUAL "Intel")
+   NOT CMAKE_C_COMPILER_ID STREQUAL "Intel" AND
+   NOT CLANG_GNULIKE_WINDOWS)
   # MSVC cl, Intel icl: %
   # When the cl compiler is invoked from the command line then % must
   # be written %% (to distinguish from %ENV% syntax).  However cl does

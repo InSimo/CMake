@@ -2,6 +2,7 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmLocalVisualStudioGenerator.h"
 
+#include "cmCustomCommand.h"
 #include "cmCustomCommandGenerator.h"
 #include "cmGeneratorTarget.h"
 #include "cmGlobalGenerator.h"
@@ -210,9 +211,10 @@ std::string cmLocalVisualStudioGenerator::ConstructScript(
     }
 
     if (workingDirectory.empty()) {
-      script += this->ConvertToOutputFormat(
-        this->ConvertToRelativePath(this->GetCurrentBinaryDirectory(), cmd),
-        cmOutputConverter::SHELL);
+      script +=
+        this->ConvertToOutputFormat(this->MaybeConvertToRelativePath(
+                                      this->GetCurrentBinaryDirectory(), cmd),
+                                    cmOutputConverter::SHELL);
     } else {
       script += this->ConvertToOutputFormat(cmd.c_str(), SHELL);
     }

@@ -22,14 +22,6 @@
 #include "cmake.h"
 
 cmState::cmState()
-  : IsInTryCompile(false)
-  , IsGeneratorMultiConfig(false)
-  , WindowsShell(false)
-  , WindowsVSIDE(false)
-  , WatcomWMake(false)
-  , MinGWMake(false)
-  , NMake(false)
-  , MSYSShell(false)
 {
   this->CacheManager = new cmCacheManager;
   this->GlobVerificationManager = new cmGlobVerificationManager;
@@ -83,14 +75,23 @@ const char* cmState::CacheEntryTypeToString(cmStateEnums::CacheEntryType type)
 
 cmStateEnums::CacheEntryType cmState::StringToCacheEntryType(const char* s)
 {
+  cmStateEnums::CacheEntryType type = cmStateEnums::STRING;
+  StringToCacheEntryType(s, type);
+  return type;
+}
+
+bool cmState::StringToCacheEntryType(const char* s,
+                                     cmStateEnums::CacheEntryType& type)
+{
   int i = 0;
   while (cmCacheEntryTypes[i]) {
     if (strcmp(s, cmCacheEntryTypes[i]) == 0) {
-      return static_cast<cmStateEnums::CacheEntryType>(i);
+      type = static_cast<cmStateEnums::CacheEntryType>(i);
+      return true;
     }
     ++i;
   }
-  return cmStateEnums::STRING;
+  return false;
 }
 
 bool cmState::IsCacheEntryType(std::string const& key)
@@ -140,7 +141,8 @@ const char* cmState::GetCacheEntryValue(std::string const& key) const
   return e->Value.c_str();
 }
 
-const char* cmState::GetInitializedCacheValue(std::string const& key) const
+const std::string* cmState::GetInitializedCacheValue(
+  std::string const& key) const
 {
   return this->CacheManager->GetInitializedCacheValue(key);
 }
@@ -267,6 +269,7 @@ cmStateSnapshot cmState::Reset()
 {
   this->GlobalProperties.clear();
   this->PropertyDefinitions.clear();
+  this->GlobVerificationManager->Reset();
 
   cmStateDetail::PositionType pos = this->SnapshotData.Truncate();
   this->ExecutionListFiles.Truncate();
@@ -280,6 +283,10 @@ cmStateSnapshot cmState::Reset()
     it->CompileDefinitionsBacktraces.clear();
     it->CompileOptions.clear();
     it->CompileOptionsBacktraces.clear();
+    it->LinkOptions.clear();
+    it->LinkOptionsBacktraces.clear();
+    it->LinkDirectories.clear();
+    it->LinkDirectoriesBacktraces.clear();
     it->DirectoryEnd = pos;
     it->NormalTargetNames.clear();
     it->Properties.clear();
@@ -295,9 +302,9 @@ cmStateSnapshot cmState::Reset()
 
   {
     std::string srcDir =
-      cmDefinitions::Get("CMAKE_SOURCE_DIR", pos->Vars, pos->Root);
+      *cmDefinitions::Get("CMAKE_SOURCE_DIR", pos->Vars, pos->Root);
     std::string binDir =
-      cmDefinitions::Get("CMAKE_BINARY_DIR", pos->Vars, pos->Root);
+      *cmDefinitions::Get("CMAKE_BINARY_DIR", pos->Vars, pos->Root);
     this->VarTree.Clear();
     pos->Vars = this->VarTree.Push(this->VarTree.Root());
     pos->Parent = this->VarTree.Root();
@@ -496,6 +503,16 @@ std::vector<std::string> cmState::GetCommandNames() const
   return commandNames;
 }
 
+void cmState::RemoveBuiltinCommand(std::string const& name)
+{
+  assert(name == cmSystemTools::LowerCase(name));
+  std::map<std::string, cmCommand*>::iterator i =
+    this->BuiltinCommands.find(name);
+  assert(i != this->BuiltinCommands.end());
+  delete i->second;
+  this->BuiltinCommands.erase(i);
+}
+
 void cmState::RemoveUserDefinedCommands()
 {
   cmDeleteAll(this->ScriptedCommands);
@@ -531,14 +548,36 @@ const char* cmState::GetGlobalProperty(const std::string& prop)
     std::string langs;
     langs = cmJoin(this->EnabledLanguages, ";");
     this->SetGlobalProperty("ENABLED_LANGUAGES", langs.c_str());
+  } else if (prop == "CMAKE_ROLE") {
+    std::string mode = this->GetModeString();
+    this->SetGlobalProperty("CMAKE_ROLE", mode.c_str());
   }
 #define STRING_LIST_ELEMENT(F) ";" #F
   if (prop == "CMAKE_C_KNOWN_FEATURES") {
-    return FOR_EACH_C_FEATURE(STRING_LIST_ELEMENT) + 1;
+    return &FOR_EACH_C_FEATURE(STRING_LIST_ELEMENT)[1];
+  }
+  if (prop == "CMAKE_C90_KNOWN_FEATURES") {
+    return &FOR_EACH_C90_FEATURE(STRING_LIST_ELEMENT)[1];
+  }
+  if (prop == "CMAKE_C99_KNOWN_FEATURES") {
+    return &FOR_EACH_C99_FEATURE(STRING_LIST_ELEMENT)[1];
+  }
+  if (prop == "CMAKE_C11_KNOWN_FEATURES") {
+    return &FOR_EACH_C11_FEATURE(STRING_LIST_ELEMENT)[1];
   }
   if (prop == "CMAKE_CXX_KNOWN_FEATURES") {
-    return FOR_EACH_CXX_FEATURE(STRING_LIST_ELEMENT) + 1;
+    return &FOR_EACH_CXX_FEATURE(STRING_LIST_ELEMENT)[1];
   }
+  if (prop == "CMAKE_CXX98_KNOWN_FEATURES") {
+    return &FOR_EACH_CXX98_FEATURE(STRING_LIST_ELEMENT)[1];
+  }
+  if (prop == "CMAKE_CXX11_KNOWN_FEATURES") {
+    return &FOR_EACH_CXX11_FEATURE(STRING_LIST_ELEMENT)[1];
+  }
+  if (prop == "CMAKE_CXX14_KNOWN_FEATURES") {
+    return &FOR_EACH_CXX14_FEATURE(STRING_LIST_ELEMENT)[1];
+  }
+
 #undef STRING_LIST_ELEMENT
   return this->GlobalProperties.GetPropertyValue(prop);
 }
@@ -583,6 +622,16 @@ void cmState::SetWindowsVSIDE(bool windowsVSIDE)
 bool cmState::UseWindowsVSIDE() const
 {
   return this->WindowsVSIDE;
+}
+
+void cmState::SetGhsMultiIDE(bool ghsMultiIDE)
+{
+  this->GhsMultiIDE = ghsMultiIDE;
+}
+
+bool cmState::UseGhsMultiIDE() const
+{
+  return this->GhsMultiIDE;
 }
 
 void cmState::SetWatcomWMake(bool watcomWMake)
@@ -635,6 +684,40 @@ unsigned int cmState::GetCacheMinorVersion() const
   return this->CacheManager->GetCacheMinorVersion();
 }
 
+cmState::Mode cmState::GetMode() const
+{
+  return this->CurrentMode;
+}
+
+std::string cmState::GetModeString() const
+{
+  return ModeToString(this->CurrentMode);
+}
+
+void cmState::SetMode(cmState::Mode mode)
+{
+  this->CurrentMode = mode;
+}
+
+std::string cmState::ModeToString(cmState::Mode mode)
+{
+  switch (mode) {
+    case Project:
+      return "PROJECT";
+    case Script:
+      return "SCRIPT";
+    case FindPackage:
+      return "FIND_PACKAGE";
+    case CTest:
+      return "CTEST";
+    case CPack:
+      return "CPACK";
+    case Unknown:
+      return "UNKNOWN";
+  }
+  return "UNKNOWN";
+}
+
 std::string const& cmState::GetBinaryDirectory() const
 {
   return this->BinaryDirectory;
@@ -655,6 +738,8 @@ cmStateSnapshot cmState::CreateBaseSnapshot()
   pos->IncludeDirectoryPosition = 0;
   pos->CompileDefinitionsPosition = 0;
   pos->CompileOptionsPosition = 0;
+  pos->LinkOptionsPosition = 0;
+  pos->LinkDirectoriesPosition = 0;
   pos->BuildSystemDirectory->DirectoryEnd = pos;
   pos->Policies = this->PolicyStack.Root();
   pos->PolicyRoot = this->PolicyStack.Root();
@@ -806,6 +891,10 @@ cmStateSnapshot cmState::Pop(cmStateSnapshot const& originSnapshot)
     prevPos->BuildSystemDirectory->CompileDefinitions.size();
   prevPos->CompileOptionsPosition =
     prevPos->BuildSystemDirectory->CompileOptions.size();
+  prevPos->LinkOptionsPosition =
+    prevPos->BuildSystemDirectory->LinkOptions.size();
+  prevPos->LinkDirectoriesPosition =
+    prevPos->BuildSystemDirectory->LinkDirectories.size();
   prevPos->BuildSystemDirectory->DirectoryEnd = prevPos;
 
   if (!pos->Keep && this->SnapshotData.IsLast(pos)) {
@@ -845,8 +934,8 @@ static bool ParseEntryWithoutType(const std::string& entry, std::string& var,
 
   // if value is enclosed in single quotes ('foo') then remove them
   // it is used to enclose trailing space or tab
-  if (flag && value.size() >= 2 && value[0] == '\'' &&
-      value[value.size() - 1] == '\'') {
+  if (flag && value.size() >= 2 && value.front() == '\'' &&
+      value.back() == '\'') {
     value = value.substr(1, value.size() - 2);
   }
 
@@ -878,8 +967,8 @@ bool cmState::ParseCacheEntry(const std::string& entry, std::string& var,
 
   // if value is enclosed in single quotes ('foo') then remove them
   // it is used to enclose trailing space or tab
-  if (flag && value.size() >= 2 && value[0] == '\'' &&
-      value[value.size() - 1] == '\'') {
+  if (flag && value.size() >= 2 && value.front() == '\'' &&
+      value.back() == '\'') {
     value = value.substr(1, value.size() - 2);
   }
 

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <utility>
 
+#include "cmAlgorithms.h"
 #include "cmMakefile.h"
 #include "cmSystemTools.h"
 
@@ -48,9 +49,7 @@ cmFindCommon::cmFindCommon()
   this->InitializeSearchPathGroups();
 }
 
-cmFindCommon::~cmFindCommon()
-{
-}
+cmFindCommon::~cmFindCommon() = default;
 
 void cmFindCommon::InitializeSearchPathGroups()
 {
@@ -178,13 +177,13 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
     cmSystemTools::ExpandListArgument(rootPath, roots);
   }
   if (sysrootCompile) {
-    roots.push_back(sysrootCompile);
+    roots.emplace_back(sysrootCompile);
   }
   if (sysrootLink) {
-    roots.push_back(sysrootLink);
+    roots.emplace_back(sysrootLink);
   }
   if (sysroot) {
-    roots.push_back(sysroot);
+    roots.emplace_back(sysroot);
   }
   for (std::string& r : roots) {
     cmSystemTools::ConvertToUnixSlashes(r);
@@ -223,7 +222,7 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
   // If searching both rooted and unrooted paths add the original
   // paths again.
   if (this->FindRootPathMode == RootPathModeBoth) {
-    paths.insert(paths.end(), unrootedPaths.begin(), unrootedPaths.end());
+    cmAppend(paths, unrootedPaths);
   }
 }
 
@@ -293,13 +292,13 @@ void cmFindCommon::AddPathSuffix(std::string const& arg)
   if (suffix.empty()) {
     return;
   }
-  if (suffix[0] == '/') {
+  if (suffix.front() == '/') {
     suffix = suffix.substr(1);
   }
   if (suffix.empty()) {
     return;
   }
-  if (suffix[suffix.size() - 1] == '/') {
+  if (suffix.back() == '/') {
     suffix = suffix.substr(0, suffix.size() - 1);
   }
   if (suffix.empty()) {
@@ -312,7 +311,7 @@ void cmFindCommon::AddPathSuffix(std::string const& arg)
 
 void AddTrailingSlash(std::string& s)
 {
-  if (!s.empty() && *s.rbegin() != '/') {
+  if (!s.empty() && s.back() != '/') {
     s += '/';
   }
 }

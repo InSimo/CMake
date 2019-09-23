@@ -28,7 +28,7 @@ bool cmUtilitySourceCommand::InitialPass(std::vector<std::string> const& args,
   // If it exists already and appears up to date then we are done.  If
   // the string contains "(IntDir)" but that is not the
   // CMAKE_CFG_INTDIR setting then the value is out of date.
-  const char* intDir =
+  std::string const& intDir =
     this->Makefile->GetRequiredDefinition("CMAKE_CFG_INTDIR");
 
   bool haveCacheValue = false;
@@ -40,13 +40,13 @@ bool cmUtilitySourceCommand::InitialPass(std::vector<std::string> const& args,
       msg += ". If your intention is to run this executable, you need to "
              "preload the cache with the full path to a version of that "
              "program, which runs on this build machine.";
-      cmSystemTools::Message(msg.c_str(), "Warning");
+      cmSystemTools::Message(msg, "Warning");
     }
   } else {
     cmState* state = this->Makefile->GetState();
     haveCacheValue = (cacheValue &&
                       (strstr(cacheValue, "(IntDir)") == nullptr ||
-                       (intDir && strcmp(intDir, "$(IntDir)") == 0)) &&
+                       (intDir == "$(IntDir)")) &&
                       (state->GetCacheMajorVersion() != 0 &&
                        state->GetCacheMinorVersion() != 0));
   }
@@ -79,7 +79,7 @@ bool cmUtilitySourceCommand::InitialPass(std::vector<std::string> const& args,
   }
 
   // The source exists.
-  std::string cmakeCFGout =
+  const std::string& cmakeCFGout =
     this->Makefile->GetRequiredDefinition("CMAKE_CFG_INTDIR");
   std::string utilityDirectory = this->Makefile->GetCurrentBinaryDirectory();
   std::string exePath;

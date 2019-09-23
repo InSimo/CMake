@@ -34,9 +34,7 @@ static const char* cmCTestUpdateHandlerUpdateToString(int type)
   return cmCTestUpdateHandlerUpdateStrings[type];
 }
 
-cmCTestUpdateHandler::cmCTestUpdateHandler()
-{
-}
+cmCTestUpdateHandler::cmCTestUpdateHandler() = default;
 
 void cmCTestUpdateHandler::Initialize()
 {
@@ -201,6 +199,10 @@ int cmCTestUpdateHandler::ProcessHandler()
   xml.Element("UpdateCommand", vc->GetUpdateCommandLine());
   xml.Element("UpdateType",
               cmCTestUpdateHandlerUpdateToString(this->UpdateType));
+  std::string changeId = this->CTest->GetCTestConfiguration("ChangeId");
+  if (!changeId.empty()) {
+    xml.Element("ChangeId", changeId);
+  }
 
   bool loadedMods = vc->WriteXML(xml);
 

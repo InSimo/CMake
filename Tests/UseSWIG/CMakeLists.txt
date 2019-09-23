@@ -88,3 +88,50 @@ add_test(NAME UseSWIG.ModuleVersion2 COMMAND
   --build-options ${build_options}
   --test-command ${CMAKE_CTEST_COMMAND} -V -C $<CONFIGURATION>
   )
+
+
+add_test(NAME UseSWIG.UseTargetINCLUDE_DIRECTORIES COMMAND
+  ${CMAKE_CTEST_COMMAND} -C $<CONFIGURATION>
+  --build-and-test
+  "${CMake_SOURCE_DIR}/Tests/UseSWIG/UseTargetINCLUDE_DIRECTORIES"
+  "${CMake_BINARY_DIR}/Tests/UseSWIG/UseTargetINCLUDE_DIRECTORIES"
+  ${build_generator_args}
+  --build-project TestUseTargetINCLUDE_DIRECTORIES
+  --build-options ${build_options}
+  )
+
+
+add_test(NAME UseSWIG.ModuleName COMMAND
+  ${CMAKE_CTEST_COMMAND} -C $<CONFIGURATION>
+  --build-and-test
+  "${CMake_SOURCE_DIR}/Tests/UseSWIG/ModuleName"
+  "${CMake_BINARY_DIR}/Tests/UseSWIG/ModuleName"
+  ${build_generator_args}
+  --build-project TestModuleName
+  --build-options ${build_options}
+  --test-command ${CMAKE_CTEST_COMMAND} -V -C $<CONFIGURATION>
+  )
+
+
+add_test(NAME UseSWIG.SwigSrcFileExtension COMMAND
+  ${CMAKE_CTEST_COMMAND} -C $<CONFIGURATION>
+  --build-and-test
+  "${CMake_SOURCE_DIR}/Tests/UseSWIG/SwigSrcFileExtension"
+  "${CMake_BINARY_DIR}/Tests/UseSWIG/SwigSrcFileExtension"
+  ${build_generator_args}
+  --build-project SwigSrcFileExtension
+  --build-options ${build_options}
+  --test-command ${CMAKE_CTEST_COMMAND} -V -C $<CONFIGURATION>
+  )
+
+
+add_test(NAME UseSWIG.AlternateLibraryName COMMAND
+  ${CMAKE_CTEST_COMMAND} -C $<CONFIGURATION>
+  --build-and-test
+  "${CMake_SOURCE_DIR}/Tests/UseSWIG/AlternateLibraryName"
+  "${CMake_BINARY_DIR}/Tests/UseSWIG/AlternateLibraryName"
+  ${build_generator_args}
+  --build-project TestAlternateLibraryName
+  --build-options ${build_options}
+  --test-command ${CMAKE_CTEST_COMMAND} -V -C $<CONFIGURATION>
+  )

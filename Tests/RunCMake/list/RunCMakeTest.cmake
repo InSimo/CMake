@@ -20,8 +20,11 @@ run_cmake(JOIN-TooManyArguments)
 run_cmake(LENGTH-TooManyArguments)
 run_cmake(REMOVE_DUPLICATES-TooManyArguments)
 run_cmake(REVERSE-TooManyArguments)
-run_cmake(SORT-TooManyArguments)
 run_cmake(SUBLIST-TooManyArguments)
+
+run_cmake(REMOVE_AT-EmptyList)
+
+run_cmake(REMOVE_DUPLICATES-PreserveOrder)
 
 run_cmake(FILTER-NotList)
 run_cmake(REMOVE_AT-NotList)
@@ -84,3 +87,28 @@ run_cmake(TRANSFORM-GENEX_STRIP)
 run_cmake(TRANSFORM-APPEND)
 run_cmake(TRANSFORM-PREPEND)
 run_cmake(TRANSFORM-REPLACE)
+
+# argument tests
+run_cmake(SORT-WrongOption)
+run_cmake(SORT-BadCaseOption)
+run_cmake(SORT-BadCompareOption)
+run_cmake(SORT-BadOrderOption)
+run_cmake(SORT-DuplicateOrderOption)
+run_cmake(SORT-DuplicateCompareOption)
+run_cmake(SORT-DuplicateCaseOption)
+run_cmake(SORT-NoCaseOption)
+
+# Successful tests
+run_cmake(SORT)
+
+# argument tests
+run_cmake(PREPEND-NoArgs)
+# Successful tests
+run_cmake(PREPEND)
+
+# argument tests
+run_cmake(POP_BACK-NoArgs)
+run_cmake(POP_FRONT-NoArgs)
+# Successful tests
+run_cmake(POP_BACK)
+run_cmake(POP_FRONT)

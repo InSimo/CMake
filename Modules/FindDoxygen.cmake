@@ -370,6 +370,9 @@ Deprecated Hint Variables
 
 #]=======================================================================]
 
+cmake_policy(PUSH)
+cmake_policy(SET CMP0057 NEW) # if IN_LIST
+
 # For backwards compatibility support
 if(Doxygen_FIND_QUIETLY)
     set(DOXYGEN_FIND_QUIETLY TRUE)
@@ -482,12 +485,18 @@ endmacro()
 # Find Graphviz Dot...
 #
 macro(_Doxygen_find_dot)
-    set(_x86 "(x86)")
-    file(
-        GLOB _Doxygen_GRAPHVIZ_BIN_DIRS
-        "$ENV{ProgramFiles}/Graphviz*/bin"
-        "$ENV{ProgramFiles${_x86}}/Graphviz*/bin"
-    )
+    if(WIN32)
+        set(_x86 "(x86)")
+        file(
+            GLOB _Doxygen_GRAPHVIZ_BIN_DIRS
+            "$ENV{ProgramFiles}/Graphviz*/bin"
+            "$ENV{ProgramFiles${_x86}}/Graphviz*/bin"
+        )
+        unset(_x86)
+    else()
+        set(_Doxygen_GRAPHVIZ_BIN_DIRS "")
+    endif()
+
     find_program(
         DOXYGEN_DOT_EXECUTABLE
         NAMES dot
@@ -526,7 +535,6 @@ macro(_Doxygen_find_dot)
     endif()
 
     unset(_Doxygen_GRAPHVIZ_BIN_DIRS)
-    unset(_x86)
 endmacro()
 
 #
@@ -705,7 +713,9 @@ if(TARGET Doxygen::doxygen)
         if(_line MATCHES "([A-Z][A-Z0-9_]+)( *=)(.*)")
             set(_key "${CMAKE_MATCH_1}")
             set(_eql "${CMAKE_MATCH_2}")
-            string(REPLACE ";" "\\\n" _value "${CMAKE_MATCH_3}")
+            set(_value "${CMAKE_MATCH_3}")
+            string(REPLACE "\\" "\\\\" _value "${_value}")
+            string(REPLACE ";" "\\\n" _value "${_value}")
             list(APPEND _Doxygen_tpl_params "${_key}${_eql}${_value}")
         endif()
     endforeach()
@@ -964,7 +974,7 @@ doxygen_add_docs() for target ${targetName}")
                 "${DOXYGEN_OUTPUT_DIRECTORY}/${DOXYGEN_HTML_OUTPUT}")
         endif()
         set_property(DIRECTORY APPEND PROPERTY
-            ADDITIONAL_MAKE_CLEAN_FILES "${_args_clean_html_dir}")
+            ADDITIONAL_CLEAN_FILES "${_args_clean_html_dir}")
     endif()
 
     # Build up a list of files we can identify from the inputs so we can list
@@ -1108,3 +1118,5 @@ doxygen_add_docs() for target ${targetName}")
     )
 
 endfunction()
+
+cmake_policy(POP)

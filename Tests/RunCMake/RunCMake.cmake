@@ -9,6 +9,10 @@ foreach(arg
 endforeach()
 
 function(run_cmake test)
+  if(DEFINED ENV{RunCMake_TEST_FILTER} AND NOT test MATCHES "$ENV{RunCMake_TEST_FILTER}")
+    return()
+  endif()
+
   set(top_src "${RunCMake_SOURCE_DIR}")
   set(top_bin "${RunCMake_BINARY_DIR}")
   if(EXISTS ${top_src}/${test}-result.txt)
@@ -45,6 +49,11 @@ function(run_cmake test)
     file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
   endif()
   file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  if(RunCMake-prep-file AND EXISTS ${top_src}/${RunCMake-prep-file})
+    include(${top_src}/${RunCMake-prep-file})
+  else()
+    include(${top_src}/${test}-prep.cmake OPTIONAL)
+  endif()
   if(NOT DEFINED RunCMake_TEST_OPTIONS)
     set(RunCMake_TEST_OPTIONS "")
   endif()
@@ -65,6 +74,13 @@ function(run_cmake test)
   else()
     set(maybe_timeout "")
   endif()
+  if(RunCMake-stdin-file AND EXISTS ${top_src}/${RunCMake-stdin-file})
+    set(maybe_input_file INPUT_FILE ${top_src}/${RunCMake-stdin-file})
+  elseif(EXISTS ${top_src}/${test}-stdin.txt)
+    set(maybe_input_file INPUT_FILE ${top_src}/${test}-stdin.txt)
+  else()
+    set(maybe_input_file "")
+  endif()
   if(RunCMake_TEST_COMMAND)
     execute_process(
       COMMAND ${RunCMake_TEST_COMMAND}
@@ -74,6 +90,7 @@ function(run_cmake test)
       RESULT_VARIABLE actual_result
       ENCODING UTF8
       ${maybe_timeout}
+      ${maybe_input_file}
       )
   else()
     if(RunCMake_GENERATOR_INSTANCE)
@@ -81,8 +98,14 @@ function(run_cmake test)
     else()
       set(_D_CMAKE_GENERATOR_INSTANCE "")
     endif()
+    if(NOT RunCMake_TEST_NO_SOURCE_DIR)
+      set(maybe_source_dir "${RunCMake_TEST_SOURCE_DIR}")
+    else()
+      set(maybe_source_dir "")
+    endif()
     execute_process(
-      COMMAND ${CMAKE_COMMAND} "${RunCMake_TEST_SOURCE_DIR}"
+      COMMAND ${CMAKE_COMMAND}
+                ${maybe_source_dir}
                 -G "${RunCMake_GENERATOR}"
                 -A "${RunCMake_GENERATOR_PLATFORM}"
                 -T "${RunCMake_GENERATOR_TOOLSET}"
@@ -96,6 +119,7 @@ function(run_cmake test)
       RESULT_VARIABLE actual_result
       ENCODING UTF8
       ${maybe_timeout}
+      ${maybe_input_file}
       )
   endif()
   set(msg "")
@@ -161,6 +185,11 @@ endfunction()
 
 function(run_cmake_command test)
   set(RunCMake_TEST_COMMAND "${ARGN}")
+  run_cmake(${test})
+endfunction()
+
+function(run_cmake_with_options test)
+  set(RunCMake_TEST_OPTIONS "${ARGN}")
   run_cmake(${test})
 endfunction()
 

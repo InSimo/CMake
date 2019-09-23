@@ -17,9 +17,7 @@ cmCPackProductBuildGenerator::cmCPackProductBuildGenerator()
   this->componentPackageMethod = ONE_PACKAGE;
 }
 
-cmCPackProductBuildGenerator::~cmCPackProductBuildGenerator()
-{
-}
+cmCPackProductBuildGenerator::~cmCPackProductBuildGenerator() = default;
 
 int cmCPackProductBuildGenerator::PackageFiles()
 {
@@ -144,14 +142,14 @@ bool cmCPackProductBuildGenerator::RunProductBuild(const std::string& command)
   tmpFile += "/ProductBuildOutput.log";
 
   cmCPackLogger(cmCPackLog::LOG_VERBOSE, "Execute: " << command << std::endl);
-  std::string output, error_output;
+  std::string output;
   int retVal = 1;
   bool res = cmSystemTools::RunSingleCommand(
-    command.c_str(), &output, &error_output, &retVal, nullptr,
-    this->GeneratorVerbose, cmDuration::zero());
+    command, &output, &output, &retVal, nullptr, this->GeneratorVerbose,
+    cmDuration::zero());
   cmCPackLogger(cmCPackLog::LOG_VERBOSE, "Done running command" << std::endl);
   if (!res || retVal) {
-    cmGeneratedFileStream ofs(tmpFile.c_str());
+    cmGeneratedFileStream ofs(tmpFile);
     ofs << "# Run command: " << command << std::endl
         << "# Output:" << std::endl
         << output << std::endl;

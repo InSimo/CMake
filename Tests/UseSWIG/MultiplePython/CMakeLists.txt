@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.1...3.13)
 
 project(TestMultiplePython CXX)
 
@@ -17,7 +17,6 @@ else()
   set (PS ":")
 endif()
 
-set(UseSWIG_TARGET_NAME_PREFERENCE STANDARD)
 unset(CMAKE_SWIG_FLAGS)
 
 set_property(SOURCE "../example.i" PROPERTY CPLUSPLUS ON)
@@ -35,7 +34,7 @@ set_target_properties (example1 PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Python2"
   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Python2"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Python2")
-target_link_libraries(example1 PRIVATE Python2::Python)
+target_link_libraries(example1 PRIVATE Python2::Module)
 
 # re-use sample interface file for another plugin
 swig_add_library(example2
@@ -47,7 +46,7 @@ set_target_properties (example2 PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Python3"
   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Python3"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Python3")
-target_link_libraries(example2 PRIVATE Python3::Python)
+target_link_libraries(example2 PRIVATE Python3::Module)
 
 
 

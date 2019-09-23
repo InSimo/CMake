@@ -70,6 +70,7 @@ void cmVisualStudioGeneratorOptions::FixExceptionHandlingDefault()
     case cmGlobalVisualStudioGenerator::VS12:
     case cmGlobalVisualStudioGenerator::VS14:
     case cmGlobalVisualStudioGenerator::VS15:
+    case cmGlobalVisualStudioGenerator::VS16:
       // by default VS puts <ExceptionHandling></ExceptionHandling> empty
       // for a project, to make our projects look the same put a new line
       // and space over for the closing </ExceptionHandling> as the default
@@ -269,7 +270,7 @@ void cmVisualStudioGeneratorOptions::FixManifestUACFlags()
 
     if (keyValue[1].front() == '\'' && keyValue[1].back() == '\'') {
       keyValue[1] =
-        keyValue[1].substr(1, std::max<int>(0, keyValue[1].size() - 2));
+        keyValue[1].substr(1, std::max(0, cm::isize(keyValue[1]) - 2));
     }
 
     if (keyValue[0] == "level") {
@@ -297,12 +298,12 @@ void cmVisualStudioGeneratorOptions::FixManifestUACFlags()
   AddFlag(ENABLE_UAC, "true");
 }
 
-void cmVisualStudioGeneratorOptions::Parse(const char* flags)
+void cmVisualStudioGeneratorOptions::Parse(const std::string& flags)
 {
   // Parse the input string as a windows command line since the string
   // is intended for writing directly into the build files.
   std::vector<std::string> args;
-  cmSystemTools::ParseWindowsCommandLine(flags, args);
+  cmSystemTools::ParseWindowsCommandLine(flags.c_str(), args);
 
   // Process flags that need to be represented specially in the IDE
   // project file.
@@ -366,26 +367,26 @@ void cmVisualStudioGeneratorOptions::Reparse(std::string const& key)
   std::string const original = i->second[0];
   i->second[0] = "";
   this->UnknownFlagField = key;
-  this->Parse(original.c_str());
+  this->Parse(original);
 }
 
 void cmVisualStudioGeneratorOptions::StoreUnknownFlag(std::string const& flag)
 {
   // Look for Intel Fortran flags that do not map well in the flag table.
   if (this->CurrentTool == FortranCompiler) {
-    if (flag == "/dbglibs") {
+    if (flag == "/dbglibs" || flag == "-dbglibs") {
       this->FortranRuntimeDebug = true;
       return;
     }
-    if (flag == "/threads") {
+    if (flag == "/threads" || flag == "-threads") {
       this->FortranRuntimeMT = true;
       return;
     }
-    if (flag == "/libs:dll") {
+    if (flag == "/libs:dll" || flag == "-libs:dll") {
       this->FortranRuntimeDLL = true;
       return;
     }
-    if (flag == "/libs:static") {
+    if (flag == "/libs:static" || flag == "-libs:static") {
       this->FortranRuntimeDLL = false;
       return;
     }
@@ -437,14 +438,13 @@ void cmVisualStudioGeneratorOptions::OutputPreprocessorDefinitions(
   const char* sep = "";
   std::vector<std::string>::const_iterator de =
     cmRemoveDuplicates(this->Defines);
-  for (std::vector<std::string>::const_iterator di = this->Defines.begin();
-       di != de; ++di) {
+  for (std::string const& di : cmMakeRange(this->Defines.cbegin(), de)) {
     // Escape the definition for the compiler.
     std::string define;
     if (this->Version < cmGlobalVisualStudioGenerator::VS10) {
-      define = this->LocalGenerator->EscapeForShell(*di, true);
+      define = this->LocalGenerator->EscapeForShell(di, true);
     } else {
-      define = *di;
+      define = di;
     }
     // Escape this flag for the MSBuild.
     if (this->Version >= cmGlobalVisualStudioGenerator::VS10) {

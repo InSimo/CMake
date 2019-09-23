@@ -35,6 +35,19 @@ public:
   cmState();
   ~cmState();
 
+  cmState(const cmState&) = delete;
+  cmState& operator=(const cmState&) = delete;
+
+  enum Mode
+  {
+    Unknown,
+    Project,
+    Script,
+    FindPackage,
+    CTest,
+    CPack,
+  };
+
   static const char* GetTargetTypeName(cmStateEnums::TargetType targetType);
 
   cmStateSnapshot CreateBaseSnapshot();
@@ -55,6 +68,8 @@ public:
   cmStateSnapshot Pop(cmStateSnapshot const& originSnapshot);
 
   static cmStateEnums::CacheEntryType StringToCacheEntryType(const char*);
+  static bool StringToCacheEntryType(const char*,
+                                     cmStateEnums::CacheEntryType& type);
   static const char* CacheEntryTypeToString(cmStateEnums::CacheEntryType);
   static bool IsCacheEntryType(std::string const& key);
 
@@ -68,7 +83,7 @@ public:
 
   std::vector<std::string> GetCacheEntryKeys() const;
   const char* GetCacheEntryValue(std::string const& key) const;
-  const char* GetInitializedCacheValue(std::string const& key) const;
+  const std::string* GetInitializedCacheValue(std::string const& key) const;
   cmStateEnums::CacheEntryType GetCacheEntryType(std::string const& key) const;
   void SetCacheEntryValue(std::string const& key, std::string const& value);
   void SetCacheValue(std::string const& key, std::string const& value);
@@ -92,7 +107,7 @@ public:
   void RemoveCacheEntryProperty(std::string const& key,
                                 std::string const& propertyName);
 
-  ///! Break up a line like VAR:type="value" into var, type and value
+  //! Break up a line like VAR:type="value" into var, type and value
   static bool ParseCacheEntry(const std::string& entry, std::string& var,
                               std::string& value,
                               cmStateEnums::CacheEntryType& type);
@@ -135,6 +150,7 @@ public:
                             cmPolicies::PolicyID policy, const char* message);
   void AddUnexpectedCommand(std::string const& name, const char* error);
   void AddScriptedCommand(std::string const& name, cmCommand* command);
+  void RemoveBuiltinCommand(std::string const& name);
   void RemoveUserDefinedCommands();
   std::vector<std::string> GetCommandNames() const;
 
@@ -153,6 +169,8 @@ public:
   bool UseWindowsShell() const;
   void SetWindowsVSIDE(bool windowsVSIDE);
   bool UseWindowsVSIDE() const;
+  void SetGhsMultiIDE(bool ghsMultiIDE);
+  bool UseGhsMultiIDE() const;
   void SetWatcomWMake(bool watcomWMake);
   bool UseWatcomWMake() const;
   void SetMinGWMake(bool minGWMake);
@@ -164,6 +182,12 @@ public:
 
   unsigned int GetCacheMajorVersion() const;
   unsigned int GetCacheMinorVersion() const;
+
+  Mode GetMode() const;
+  std::string GetModeString() const;
+  void SetMode(Mode mode);
+
+  static std::string ModeToString(Mode mode);
 
 private:
   friend class cmake;
@@ -201,14 +225,16 @@ private:
 
   std::string SourceDirectory;
   std::string BinaryDirectory;
-  bool IsInTryCompile;
-  bool IsGeneratorMultiConfig;
-  bool WindowsShell;
-  bool WindowsVSIDE;
-  bool WatcomWMake;
-  bool MinGWMake;
-  bool NMake;
-  bool MSYSShell;
+  bool IsInTryCompile = false;
+  bool IsGeneratorMultiConfig = false;
+  bool WindowsShell = false;
+  bool WindowsVSIDE = false;
+  bool GhsMultiIDE = false;
+  bool WatcomWMake = false;
+  bool MinGWMake = false;
+  bool NMake = false;
+  bool MSYSShell = false;
+  Mode CurrentMode = Unknown;
 };
 
 #endif

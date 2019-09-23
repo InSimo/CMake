@@ -26,6 +26,7 @@ Variable :variable:`VARIABLE_<PLACEHOLDER> <target>` with trailing placeholder a
 Environment variable :envvar:`SOME_ENV_VAR`.
 Environment variable :envvar:`some env var <SOME_ENV_VAR>` with space and target.
 Generator :generator:`Some Generator` with space.
+Generator :cpack_gen:`Some Generator` with space.
 Inline literal ``~!@#$%^&*( )_+-=\\[]{}'":;,<>.?/``.
 Inline link `Link Text <ExternalDest>`_.
 Inline link `Link Text \<With \\-escaped Brackets\> <ExternalDest>`_.
@@ -88,6 +89,10 @@ or after a paragraph ending in two colons::
 
 but not after a line ending in two colons::
 in the middle of a paragraph.
+
+A literal block can be empty::
+
+
 
 .. productionlist::
  grammar: `production`

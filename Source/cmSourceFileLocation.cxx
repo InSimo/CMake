@@ -5,17 +5,13 @@
 #include "cmAlgorithms.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
 #include <assert.h>
 
-cmSourceFileLocation::cmSourceFileLocation()
-  : Makefile(nullptr)
-  , AmbiguousDirectory(true)
-  , AmbiguousExtension(true)
-{
-}
+cmSourceFileLocation::cmSourceFileLocation() = default;
 
 cmSourceFileLocation::cmSourceFileLocation(const cmSourceFileLocation& loc)
   : Makefile(loc.Makefile)
@@ -44,6 +40,16 @@ cmSourceFileLocation::cmSourceFileLocation(cmMakefile const* mf,
   } else {
     this->UpdateExtension(name);
   }
+}
+
+std::string cmSourceFileLocation::GetFullPath() const
+{
+  std::string path = this->GetDirectory();
+  if (!path.empty()) {
+    path += '/';
+  }
+  path += this->GetName();
+  return path;
 }
 
 void cmSourceFileLocation::Update(cmSourceFileLocation const& loc)
@@ -197,7 +203,7 @@ bool cmSourceFileLocation::Matches(cmSourceFileLocation const& loc)
       // This can occur when referencing a source file from a different
       // directory.  This is not yet allowed.
       this->Makefile->IssueMessage(
-        cmake::INTERNAL_ERROR,
+        MessageType::INTERNAL_ERROR,
         "Matches error: Each side has a directory relative to a different "
         "location. This can occur when referencing a source file from a "
         "different directory.  This is not yet allowed.");
@@ -205,18 +211,18 @@ bool cmSourceFileLocation::Matches(cmSourceFileLocation const& loc)
     }
   } else if (this->AmbiguousDirectory) {
     // Compare possible directory combinations.
-    std::string const& srcDir = cmSystemTools::CollapseFullPath(
+    std::string const srcDir = cmSystemTools::CollapseFullPath(
       this->Directory, this->Makefile->GetCurrentSourceDirectory());
-    std::string const& binDir = cmSystemTools::CollapseFullPath(
+    std::string const binDir = cmSystemTools::CollapseFullPath(
       this->Directory, this->Makefile->GetCurrentBinaryDirectory());
     if (srcDir != loc.Directory && binDir != loc.Directory) {
       return false;
     }
   } else if (loc.AmbiguousDirectory) {
     // Compare possible directory combinations.
-    std::string const& srcDir = cmSystemTools::CollapseFullPath(
+    std::string const srcDir = cmSystemTools::CollapseFullPath(
       loc.Directory, loc.Makefile->GetCurrentSourceDirectory());
-    std::string const& binDir = cmSystemTools::CollapseFullPath(
+    std::string const binDir = cmSystemTools::CollapseFullPath(
       loc.Directory, loc.Makefile->GetCurrentBinaryDirectory());
     if (srcDir != this->Directory && binDir != this->Directory) {
       return false;

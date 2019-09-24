@@ -14,7 +14,9 @@ class cmStateDirectory;
 
 class cmFastbuildLinkLineComputer : public cmLinkLineComputer
 {
-  CM_DISABLE_COPY(cmFastbuildLinkLineComputer)
+  cmFastbuildLinkLineComputer(cmFastbuildLinkLineComputer const&) = delete;
+  cmFastbuildLinkLineComputer& operator=(cmFastbuildLinkLineComputer const&) =
+    delete;
 
 public:
   cmFastbuildLinkLineComputer(cmOutputConverter* outputConverter,

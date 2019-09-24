@@ -8,6 +8,7 @@
 #include "cmState.h"
 #include "cmSystemTools.h"
 #include "cmCustomCommandGenerator.h"
+#include "cmake.h"
 #ifdef _WIN32
 #include "windows.h"
 #endif
@@ -61,7 +62,7 @@ void cmLocalFastbuildGenerator::ComputeObjectFilenames(
 std::string cmLocalFastbuildGenerator::GetTargetDirectory(
 	cmGeneratorTarget const* target) const
 {
-	std::string dir = cmake::GetCMakeFilesDirectoryPostSlash();
+	std::string dir = "CMakeFiles/";
 	dir += target->GetName();
 #if defined(__VMS)
 	dir += "_dir";

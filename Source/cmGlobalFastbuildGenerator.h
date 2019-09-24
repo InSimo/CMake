@@ -24,16 +24,13 @@ public:
 		std::vector<std::string>const &  lang,
 		cmMakefile *mf, bool optional) override;
 	void Generate() override;
-	void GenerateBuildCommand(
-		std::vector<std::string>& makeCommand,
-		const std::string& makeProgram,
-		const std::string& projectName,
-		const std::string& projectDir,
-		const std::string& targetName,
-		const std::string& config,
-		bool fast, int jobs, bool verbose,
-		std::vector<std::string> const& makeOptions) override;
-
+    std::vector<GeneratedMakeCommand> GenerateBuildCommand(
+        const std::string& makeProgram, const std::string& projectName,
+        const std::string& projectDir,
+        std::vector<std::string> const& targetNames,
+        const std::string& config, bool fast, int jobs, bool verbose,
+        std::vector<std::string> const& makeOptions =
+        std::vector<std::string>()) override;
 	///! create the correct local generator
 	cmLocalGenerator *CreateLocalGenerator(cmMakefile* mf) override;
 	std::string GetName() const override;

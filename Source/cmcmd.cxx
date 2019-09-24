@@ -1785,7 +1785,7 @@ bool cmVSLink::Parse(std::vector<std::string>::const_iterator argBeg,
       // are here (i.e. the current argument is the link executable)
       if (this->LinkCommand.empty()) {
         this->LinkCommand.insert(this->LinkCommand.end(), ex_arg,
-            (std::vector<std::string>::const_iterator)expandedArgs.end());
+            expandedArgs.end());
         this->LinkCommand.insert(this->LinkCommand.end(), in_arg, argEnd);
       } else {
         // Parse the link command to extract information we need.

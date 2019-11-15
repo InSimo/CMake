@@ -1501,12 +1501,51 @@ public:
 			bool clIsX64 = (dirName == "amd64");
 
 			const std::string prefixBinCL = "$CompilerRoot$\\";
-			const std::string prefixBinMS = inSubdir ? prefixBinCL+"..\\" : prefixBinCL;
+			const std::string prefixBinMS = (inSubdir&&!clIsX64) ? prefixBinCL+"..\\" : prefixBinCL;
 			const std::string prefixBinUI = prefixBinCL + "1033\\";
-			const std::string prefixBinCRT = clIsX64 ? prefixBinMS + "..\\redist\\x64\\" : prefixBinMS + "..\\redist\\x86\\";
+			const std::string prefixBinCRT = (inSubdir ? prefixBinCL + "..\\" : prefixBinCL) + (clIsX64 ? "..\\redist\\x64\\" : "..\\redist\\x86\\");
+			if( version.compare(0,4,"19.2")!=std::string::npos ) {
+				// vs 2019
+				std::string vs_2019_extraFiles[12] = {
+					prefixBinCL + "c1.dll",
+					prefixBinCL + "c1xx.dll",
+					prefixBinCL + "c2.dll",
 
+					prefixBinCL + "msobj140.dll",
+					prefixBinCL + "mspdb140.dll",
+					prefixBinCL + "mspdbsrv.exe", // not sure this one makes sense...
+					prefixBinCL + "mspdbcore.dll",
+					prefixBinCL + "mspft140.dll",
+					prefixBinUI + "clui.dll",
+					prefixBinCL + "msvcp140.dll",
+					prefixBinCL + "vcruntime140.dll",
+					prefixBinCL + "tbbmalloc.dll"    // tbbmalloc.dll is added and used by vs 2019 compiler
+				};
+				extraFiles.insert(extraFiles.end(), &vs_2019_extraFiles[0], &vs_2019_extraFiles[12]);
+			}
+			else if( version.compare(0,4,"19.1")!=std::string::npos ) {
+				// vs 2017
+				// in certain versions of vs 2017 there are bugs that some of the mspdb files are not available
+				// for x64 x86 cross compilation, at least the latest version of vs 2017 have those fixed
+				std::string vs_2017_extraFiles[11] = {
+					prefixBinCL + "c1.dll",
+					prefixBinCL + "c1xx.dll",
+					prefixBinCL + "c2.dll",
 
-			if (version.compare(0, 3, "19.") != std::string::npos)
+					prefixBinCL + "msobj140.dll",
+					prefixBinCL + "mspdb140.dll",
+					prefixBinCL + "mspdbsrv.exe", // not sure this one makes sense...
+					prefixBinCL + "mspdbcore.dll",
+					prefixBinCL + "mspft140.dll",
+					prefixBinUI + "clui.dll",
+					prefixBinCL + "msvcp140.dll",
+					prefixBinCL + "vcruntime140.dll"
+					// the location of vccorlib140 seems to be harder to reach, but that seems not to be needed
+					// can be added later if necessary
+				};
+				extraFiles.insert(extraFiles.end(), &vs_2017_extraFiles[0], &vs_2017_extraFiles[11]);
+			}
+			else if (version.compare(0, 3, "19.") != std::string::npos)
 			{
 				// Using vs2015
 				std::string vs2015_extraFiles[12] = {
@@ -3908,7 +3947,13 @@ public:
 			std::string compilerVersion = mf->GetSafeDefinition(compilerVar + "_VERSION");
 			if (compilerId == "MSVC")
 			{
-				if (compilerVersion.compare(0, 3, "19.") != std::string::npos)
+				if (compilerVersion.compare(0, 4, "19.1") != std::string::npos) {
+					platformToolset = "v141";
+				}
+				else if (compilerVersion.compare(0, 4, "19.2") != std::string::npos) {
+					platformToolset = "v142";
+				}
+				else if (compilerVersion.compare(0, 3, "19.") != std::string::npos)
 				{
 					// Using vs2015 / vc14
 					platformToolset = "v140";

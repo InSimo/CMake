@@ -1501,12 +1501,29 @@ public:
 			bool clIsX64 = (dirName == "amd64");
 
 			const std::string prefixBinCL = "$CompilerRoot$\\";
-			const std::string prefixBinMS = inSubdir ? prefixBinCL+"..\\" : prefixBinCL;
+			const std::string prefixBinMS = (inSubdir&&!clIsX64) ? prefixBinCL+"..\\" : prefixBinCL;
 			const std::string prefixBinUI = prefixBinCL + "1033\\";
-			const std::string prefixBinCRT = clIsX64 ? prefixBinMS + "..\\redist\\x64\\" : prefixBinMS + "..\\redist\\x86\\";
+      const std::string prefixBinCRT = (inSubdir ? prefixBinCL + "..\\" : prefixBinCL) + (clIsX64 ? "..\\redist\\x64\\" : "..\\redist\\x86\\");
 
+      if (version.compare(0, 4, "19.1") != std::string::npos) {
+        //using vs2017
+        std::string vs2017_extraFiles[11] = {
+          prefixBinCL + "c1.dll",
+          prefixBinCL + "c1xx.dll",
+          prefixBinCL + "c2.dll",
 
-			if (version.compare(0, 3, "19.") != std::string::npos)
+          prefixBinCL + "msobj140.dll",
+          prefixBinCL + "mspdb140.dll",
+          prefixBinCL + "mspdbsrv.exe", // not sure this one makes sense...
+          prefixBinCL + "mspdbcore.dll",
+          prefixBinCL + "mspft140.dll",
+          prefixBinUI + "clui.dll",
+          prefixBinCL + "msvcp140.dll",
+          prefixBinCL + "vcruntime140.dll",
+        };
+        extraFiles.insert(extraFiles.end(), &vs2017_extraFiles[0], &vs2017_extraFiles[11]);
+      }
+			else if (version.compare(0, 3, "19.") != std::string::npos)
 			{
 				// Using vs2015
 				std::string vs2015_extraFiles[12] = {
@@ -3908,7 +3925,10 @@ public:
 			std::string compilerVersion = mf->GetSafeDefinition(compilerVar + "_VERSION");
 			if (compilerId == "MSVC")
 			{
-				if (compilerVersion.compare(0, 3, "19.") != std::string::npos)
+        if (compilerVersion.compare(0, 4, "19.1") != std::string::npos) {
+          platformToolset = "v141";
+        }
+				else if (compilerVersion.compare(0, 3, "19.") != std::string::npos)
 				{
 					// Using vs2015 / vc14
 					platformToolset = "v140";

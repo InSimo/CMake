@@ -128,7 +128,7 @@ void cmFastbuildUtilityTargetGenerator::WriteUtilBuildStatements(
               std::back_inserter(gg->GetByproductsForCleanTarget()));
   }
   lg->AppendTargetDepends(genTarget, deps, config, fileConfig,
-                          DependOnTargetArtifact);
+                          DependOnTargetArtifactFB);
 
   if (commands.empty()) {
     phonyBuild.Comment = "Utility command for " + this->GetTargetName();

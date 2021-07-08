@@ -516,7 +516,7 @@ codecvt::Encoding cmGlobalFastbuildGenerator::GetMakefileEncoding() const
 void cmGlobalFastbuildGenerator::GetDocumentation(cmDocumentationEntry& entry)
 {
   entry.Name = cmGlobalFastbuildGenerator::GetActualName();
-  entry.Brief = "Generates build.ninja files.";
+  entry.Brief = "Generates FBuild.bff files.";
 }
 
 // Implemented in all cmGlobaleGenerator sub-classes.
@@ -1183,7 +1183,7 @@ void cmGlobalFastbuildGenerator::AppendTargetOutputs(
     case cmStateEnums::SHARED_LIBRARY:
     case cmStateEnums::STATIC_LIBRARY:
     case cmStateEnums::MODULE_LIBRARY: {
-      if (depends == DependOnTargetOrdering) {
+      if (depends == DependOnTargetOrderingFB) {
         outputs.push_back(this->OrderDependsTargetForTarget(target, config));
         break;
       }
@@ -1195,7 +1195,7 @@ void cmGlobalFastbuildGenerator::AppendTargetOutputs(
       break;
     }
     case cmStateEnums::OBJECT_LIBRARY: {
-      if (depends == DependOnTargetOrdering) {
+      if (depends == DependOnTargetOrderingFB) {
         outputs.push_back(this->OrderDependsTargetForTarget(target, config));
         break;
       }
@@ -1340,7 +1340,7 @@ void cmGlobalFastbuildGenerator::AppendTargetDependsClosure(
   // finally generate the outputs of the target itself, if applicable
   cmFastbuildDeps outs;
   if (!omit_self) {
-    this->AppendTargetOutputs(target, outs, config, DependOnTargetArtifact);
+    this->AppendTargetOutputs(target, outs, config, DependOnTargetArtifactFB);
   }
   outputs.insert(outs.begin(), outs.end());
 }
@@ -1353,7 +1353,7 @@ void cmGlobalFastbuildGenerator::AddTargetAlias(const std::string& alias,
   std::string buildAlias = this->BuildAlias(outputPath, config);
   cmFastbuildDeps outputs;
   if (config != "all") {
-    this->AppendTargetOutputs(target, outputs, config, DependOnTargetArtifact);
+    this->AppendTargetOutputs(target, outputs, config, DependOnTargetArtifactFB);
   }
   // Mark the target's outputs as ambiguous to ensure that no other target
   // uses the output as an alias.
@@ -1421,11 +1421,11 @@ void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
       for (auto const& config : this->CrossConfigs) {
         this->AppendTargetOutputs(ta.second.GeneratorTarget,
                                   build.ExplicitDeps, config,
-                                  DependOnTargetArtifact);
+                                  DependOnTargetArtifactFB);
       }
     } else {
       this->AppendTargetOutputs(ta.second.GeneratorTarget, build.ExplicitDeps,
-                                ta.second.Config, DependOnTargetArtifact);
+                                ta.second.Config, DependOnTargetArtifactFB);
     }
     this->WriteBuild(this->EnableCrossConfigBuild() &&
                          (ta.second.Config == "all" ||
@@ -1454,7 +1454,7 @@ void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
         build.ExplicitDeps.clear();
         this->AppendTargetOutputs(ta.second.GeneratorTarget,
                                   build.ExplicitDeps, config,
-                                  DependOnTargetArtifact);
+                                  DependOnTargetArtifactFB);
         this->WriteBuild(*this->GetConfigFileStream(config), build);
       }
     }
@@ -1477,7 +1477,7 @@ void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
         for (auto const& config : this->DefaultConfigs) {
           this->AppendTargetOutputs(ta.second.GeneratorTarget,
                                     build.ExplicitDeps, config,
-                                    DependOnTargetArtifact);
+                                    DependOnTargetArtifactFB);
         }
         this->WriteBuild(*this->GetDefaultFileStream(), build);
       }
@@ -1515,7 +1515,7 @@ void cmGlobalFastbuildGenerator::WriteFolderTargets(std::ostream& os)
       for (DirectoryTarget::Target const& t : dt.Targets) {
         if (!this->IsExcludedFromAllInConfig(t, config)) {
           this->AppendTargetOutputs(t.GT, build.ExplicitDeps, config,
-                                    DependOnTargetArtifact);
+                                    DependOnTargetArtifactFB);
         }
       }
       for (DirectoryTarget::Dir const& d : dt.Children) {
@@ -2644,7 +2644,7 @@ cmGlobalFastbuildMultiGenerator::cmGlobalFastbuildMultiGenerator(cmake* cm)
 void cmGlobalFastbuildMultiGenerator::GetDocumentation(cmDocumentationEntry& entry)
 {
   entry.Name = cmGlobalFastbuildMultiGenerator::GetActualName();
-  entry.Brief = "Generates build-<Config>.ninja files.";
+  entry.Brief = "Generates FBuild-<Config>.bff files.";
 }
 
 std::string cmGlobalFastbuildMultiGenerator::ExpandCFGIntDir(

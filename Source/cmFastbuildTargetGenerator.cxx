@@ -1002,7 +1002,7 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
     cmFastbuildDeps& orderOnlyDeps = build.OrderOnlyDeps;
     this->GetLocalGenerator()->AppendTargetDepends(
       this->GeneratorTarget, orderOnlyDeps, config, fileConfig,
-      DependOnTargetOrdering);
+      DependOnTargetOrderingFB);
 
     // Add order-only dependencies on other files associated with the target.
     cm::append(orderOnlyDeps, this->Configs[config].ExtraFiles);
@@ -1070,7 +1070,7 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
     // dependency order so that we can collect the needed information.
     this->GetLocalGenerator()->AppendTargetDepends(
       this->GeneratorTarget, build.OrderOnlyDeps, config, fileConfig,
-      DependOnTargetArtifact);
+      DependOnTargetArtifactFB);
 
     this->GetGlobalGenerator()->WriteBuild(this->GetImplFileStream(fileConfig),
                                            build);

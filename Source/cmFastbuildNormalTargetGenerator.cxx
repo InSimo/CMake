@@ -924,7 +924,7 @@ void cmFastbuildNormalTargetGenerator::WriteNvidiaDeviceLinkStatement(
   // Gather order-only dependencies.
   this->GetLocalGenerator()->AppendTargetDepends(
     this->GetGeneratorTarget(), build.OrderOnlyDeps, config, config,
-    DependOnTargetArtifact);
+    DependOnTargetArtifactFB);
 
   // Write the build statement for this target.
   bool usedResponseFile = false;
@@ -1357,7 +1357,7 @@ void cmFastbuildNormalTargetGenerator::WriteLinkStatement(
 
   // Gather order-only dependencies.
   this->GetLocalGenerator()->AppendTargetDepends(
-    gt, linkBuild.OrderOnlyDeps, config, fileConfig, DependOnTargetArtifact);
+    gt, linkBuild.OrderOnlyDeps, config, fileConfig, DependOnTargetArtifactFB);
 
   // Add order-only dependencies on versioning symlinks of shared libs we link.
   if (!this->GeneratorTarget->IsDLLPlatform()) {

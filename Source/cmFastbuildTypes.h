@@ -12,8 +12,8 @@
 
 enum cmFastbuildTargetDepends
 {
-  DependOnTargetArtifact,
-  DependOnTargetOrdering
+  DependOnTargetArtifactFB,
+  DependOnTargetOrderingFB
 };
 
 using cmFastbuildDeps = std::vector<std::string>;

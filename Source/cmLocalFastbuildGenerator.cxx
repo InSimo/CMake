@@ -123,10 +123,10 @@ void cmLocalFastbuildGenerator::Generate()
               this->GetGlobalGenerator()->IsMultiConfig()) {
             cmFastbuildBuild phonyAlias("phony");
             this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(
-              target.get(), phonyAlias.Outputs, "", DependOnTargetArtifact);
+              target.get(), phonyAlias.Outputs, "", DependOnTargetArtifactFB);
             this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(
               target.get(), phonyAlias.ExplicitDeps, config,
-              DependOnTargetArtifact);
+              DependOnTargetArtifactFB);
             this->GetGlobalFastbuildGenerator()->WriteBuild(
               *this->GetGlobalFastbuildGenerator()->GetConfigFileStream(config),
               phonyAlias);
@@ -137,12 +137,12 @@ void cmLocalFastbuildGenerator::Generate()
           if (!this->GetGlobalFastbuildGenerator()->GetDefaultConfigs().empty()) {
             cmFastbuildBuild phonyAlias("phony");
             this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(
-              target.get(), phonyAlias.Outputs, "", DependOnTargetArtifact);
+              target.get(), phonyAlias.Outputs, "", DependOnTargetArtifactFB);
             for (auto const& config :
                  this->GetGlobalFastbuildGenerator()->GetDefaultConfigs()) {
               this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(
                 target.get(), phonyAlias.ExplicitDeps, config,
-                DependOnTargetArtifact);
+                DependOnTargetArtifactFB);
             }
             this->GetGlobalFastbuildGenerator()->WriteBuild(
               *this->GetGlobalFastbuildGenerator()->GetDefaultFileStream(),
@@ -150,11 +150,11 @@ void cmLocalFastbuildGenerator::Generate()
           }
           cmFastbuildBuild phonyAlias("phony");
           this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(
-            target.get(), phonyAlias.Outputs, "all", DependOnTargetArtifact);
+            target.get(), phonyAlias.Outputs, "all", DependOnTargetArtifactFB);
           for (auto const& config : this->GetConfigNames()) {
             this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(
               target.get(), phonyAlias.ExplicitDeps, config,
-              DependOnTargetArtifact);
+              DependOnTargetArtifactFB);
           }
           this->GetGlobalFastbuildGenerator()->WriteBuild(
             *this->GetGlobalFastbuildGenerator()->GetDefaultFileStream(),
@@ -380,7 +380,7 @@ void cmLocalFastbuildGenerator::AppendTargetOutputs(cmGeneratorTarget* target,
                                                 const std::string& config)
 {
   this->GetGlobalFastbuildGenerator()->AppendTargetOutputs(target, outputs, config,
-                                                       DependOnTargetArtifact);
+                                                       DependOnTargetArtifactFB);
 }
 
 void cmLocalFastbuildGenerator::AppendTargetDepends(cmGeneratorTarget* target,

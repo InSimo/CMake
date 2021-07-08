@@ -74,6 +74,7 @@ cmExtraEclipseCDT4Generator::GetFactory()
 // factory.AddSupportedGlobalGenerator("MSYS Makefiles");
 #endif
     factory.AddSupportedGlobalGenerator("Ninja");
+    factory.AddSupportedGlobalGenerator("Fastbuild");
     factory.AddSupportedGlobalGenerator("Unix Makefiles");
   }
 

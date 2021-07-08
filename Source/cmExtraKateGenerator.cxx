@@ -34,6 +34,7 @@ cmExternalMakefileProjectGeneratorFactory* cmExtraKateGenerator::GetFactory()
 // factory.AddSupportedGlobalGenerator("MSYS Makefiles");
 #endif
     factory.AddSupportedGlobalGenerator("Ninja");
+    factory.AddSupportedGlobalGenerator("Fastbuild");
     factory.AddSupportedGlobalGenerator("Unix Makefiles");
   }
 
@@ -48,6 +49,7 @@ void cmExtraKateGenerator::Generate()
     lg->GetProjectName(), mf->GetSafeDefinition("CMAKE_BUILD_TYPE"),
     this->GetPathBasename(lg->GetBinaryDirectory()));
   this->UseNinja = (this->GlobalGenerator->GetName() == "Ninja");
+  this->UseFastbuild = (this->GlobalGenerator->GetName() == "Fastbuild");
 
   this->CreateKateProjectFile(*lg);
   this->CreateDummyKateProjectFile(*lg);

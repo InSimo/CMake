@@ -41,6 +41,7 @@ cmExtraCodeLiteGenerator::GetFactory()
     factory.AddSupportedGlobalGenerator("NMake Makefiles");
 #endif
     factory.AddSupportedGlobalGenerator("Ninja");
+    factory.AddSupportedGlobalGenerator("Fastbuild");
     factory.AddSupportedGlobalGenerator("Unix Makefiles");
   }
 
@@ -628,7 +629,7 @@ std::string cmExtraCodeLiteGenerator::GetBuildCommand(
   const std::string& make = mf->GetRequiredDefinition("CMAKE_MAKE_PROGRAM");
   std::string buildCommand = make; // Default
   std::ostringstream ss;
-  if (generator == "NMake Makefiles" || generator == "Ninja") {
+  if (generator == "NMake Makefiles" || generator == "Ninja" || generator == "Fastbuild") {
     ss << make;
   } else if (generator == "MinGW Makefiles" || generator == "Unix Makefiles") {
     ss << make << " -f$(ProjectPath)/Makefile";
@@ -649,7 +650,7 @@ std::string cmExtraCodeLiteGenerator::GetCleanCommand(
   std::string generator = mf->GetSafeDefinition("CMAKE_GENERATOR");
   std::ostringstream ss;
   std::string buildcommand = this->GetBuildCommand(mf, "");
-  if (!targetName.empty() && generator == "Ninja") {
+  if (!targetName.empty() && (generator == "Ninja" || generator == "Fastbuild")) {
     ss << buildcommand << " -t clean " << targetName;
   } else {
     ss << buildcommand << " clean";

@@ -41,4 +41,5 @@ private:
 
   std::string ProjectName;
   bool UseNinja;
+  bool UseFastbuild;
 };

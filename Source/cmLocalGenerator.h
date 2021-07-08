@@ -547,6 +547,7 @@ public:
   bool IsMinGWMake() const;
   bool IsNMake() const;
   bool IsNinjaMulti() const;
+  bool IsFastbuildMulti() const;
 
   void IssueMessage(MessageType t, std::string const& text) const;
 

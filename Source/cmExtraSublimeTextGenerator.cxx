@@ -53,6 +53,7 @@ cmExtraSublimeTextGenerator::GetFactory()
 // factory.AddSupportedGlobalGenerator("MSYS Makefiles");
 #endif
     factory.AddSupportedGlobalGenerator("Ninja");
+    factory.AddSupportedGlobalGenerator("Fastbuild");
     factory.AddSupportedGlobalGenerator("Unix Makefiles");
   }
 
@@ -289,6 +290,8 @@ void cmExtraSublimeTextGenerator::AppendTarget(
   std::string makefileName;
   if (this->GlobalGenerator->GetName() == "Ninja") {
     makefileName = "build.ninja";
+  } else if(this->GlobalGenerator->GetName() == "Fastbuild") {
+    makefileName = "FBuild.bff";
   } else {
     makefileName = "Makefile";
   }
@@ -320,6 +323,11 @@ std::string cmExtraSublimeTextGenerator::BuildMakeCommand(
     command += makefileName + "\"";
     command += ", \"" + target + "\"";
   } else if (generator == "Ninja") {
+    std::string makefileName = cmSystemTools::ConvertToOutputPath(makefile);
+    command += R"(, "-f", ")";
+    command += makefileName + "\"";
+    command += ", \"" + target + "\"";
+  } else if (generator == "Fastbuild") {
     std::string makefileName = cmSystemTools::ConvertToOutputPath(makefile);
     command += R"(, "-f", ")";
     command += makefileName + "\"";

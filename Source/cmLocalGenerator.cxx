@@ -3540,6 +3540,11 @@ bool cmLocalGenerator::IsNinjaMulti() const
   return this->GetState()->UseNinjaMulti();
 }
 
+bool cmLocalGenerator::IsFastbuildMulti() const
+{
+  return this->GetState()->UseFastbuildMulti();
+}
+
 std::string cmLocalGenerator::GetObjectFileNameWithoutTarget(
   const cmSourceFile& source, std::string const& dir_max,
   bool* hasSourceExtension, char const* customOutputExtension)

@@ -2004,8 +2004,9 @@ bool cmGeneratorTarget::NeedRelinkBeforeInstall(
   bool have_rpath =
     this->HaveBuildTreeRPATH(config) || this->HaveInstallTreeRPATH(config);
   bool is_ninja = this->LocalGenerator->GetGlobalGenerator()->IsNinja();
+  bool is_fastbuild = this->LocalGenerator->GetGlobalGenerator()->IsFastbuild();
 
-  if (have_rpath && is_ninja) {
+  if (have_rpath && (is_ninja || is_fastbuild)) {
     std::ostringstream w;
     /* clang-format off */
     w <<

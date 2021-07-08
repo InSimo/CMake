@@ -56,6 +56,7 @@ cmExtraCodeBlocksGenerator::GetFactory()
 // this->AddSupportedGlobalGenerator("MSYS Makefiles");
 #endif
     factory.AddSupportedGlobalGenerator("Ninja");
+    factory.AddSupportedGlobalGenerator("Fastbuild");
     factory.AddSupportedGlobalGenerator("Unix Makefiles");
   }
 
@@ -740,6 +741,9 @@ std::string cmExtraCodeBlocksGenerator::BuildMakeCommand(
     command += " VERBOSE=1 ";
     command += target;
   } else if (generator == "Ninja") {
+    command += " -v ";
+    command += target;
+  } else if (generator == "Fastbuild") {
     command += " -v ";
     command += target;
   } else {

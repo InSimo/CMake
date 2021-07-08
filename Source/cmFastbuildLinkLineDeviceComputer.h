@@ -9,23 +9,23 @@
 
 #include "cmLinkLineDeviceComputer.h"
 
-class cmGlobalNinjaGenerator;
+class cmGlobalFastbuildGenerator;
 class cmOutputConverter;
 class cmStateDirectory;
 
-class cmNinjaLinkLineDeviceComputer : public cmLinkLineDeviceComputer
+class cmFastbuildLinkLineDeviceComputer : public cmLinkLineDeviceComputer
 {
 public:
-  cmNinjaLinkLineDeviceComputer(cmOutputConverter* outputConverter,
+  cmFastbuildLinkLineDeviceComputer(cmOutputConverter* outputConverter,
                                 cmStateDirectory const& stateDir,
-                                cmGlobalNinjaGenerator const* gg);
+                                cmGlobalFastbuildGenerator const* gg);
 
-  cmNinjaLinkLineDeviceComputer(cmNinjaLinkLineDeviceComputer const&) = delete;
-  cmNinjaLinkLineDeviceComputer& operator=(
-    cmNinjaLinkLineDeviceComputer const&) = delete;
+  cmFastbuildLinkLineDeviceComputer(cmFastbuildLinkLineDeviceComputer const&) = delete;
+  cmFastbuildLinkLineDeviceComputer& operator=(
+    cmFastbuildLinkLineDeviceComputer const&) = delete;
 
   std::string ConvertToLinkReference(std::string const& input) const override;
 
 private:
-  cmGlobalNinjaGenerator const* GG;
+  cmGlobalFastbuildGenerator const* GG;
 };

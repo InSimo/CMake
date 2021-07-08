@@ -28,6 +28,7 @@ public:
 
   void SetUseWatcomQuote(bool useWatcomQuote);
   void SetUseNinjaMulti(bool useNinjaMulti);
+  void SetUseFastbuildMulti(bool useFastbuildMulti);
   void SetForResponse(bool forResponse);
   void SetRelink(bool relink);
 
@@ -70,5 +71,6 @@ protected:
   bool ForResponse;
   bool UseWatcomQuote;
   bool UseNinjaMulti;
+  bool UseFastbuildMulti;
   bool Relink;
 };

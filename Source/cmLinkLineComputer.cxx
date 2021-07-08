@@ -23,6 +23,7 @@ cmLinkLineComputer::cmLinkLineComputer(cmOutputConverter* outputConverter,
   , ForResponse(false)
   , UseWatcomQuote(false)
   , UseNinjaMulti(false)
+  , UseFastbuildMulti(false)
   , Relink(false)
 {
 }
@@ -37,6 +38,11 @@ void cmLinkLineComputer::SetUseWatcomQuote(bool useWatcomQuote)
 void cmLinkLineComputer::SetUseNinjaMulti(bool useNinjaMulti)
 {
   this->UseNinjaMulti = useNinjaMulti;
+}
+
+void cmLinkLineComputer::SetUseFastbuildMulti(bool useFastbuildMulti)
+{
+  this->UseFastbuildMulti = useFastbuildMulti;
 }
 
 void cmLinkLineComputer::SetForResponse(bool forResponse)
@@ -105,6 +111,8 @@ std::string cmLinkLineComputer::ConvertToOutputFormat(std::string const& input)
     shellFormat = cmOutputConverter::WATCOMQUOTE;
   } else if (this->UseNinjaMulti) {
     shellFormat = cmOutputConverter::NINJAMULTI;
+  } else if (this->UseFastbuildMulti) {
+    shellFormat = cmOutputConverter::NINJAMULTI; //TEMPO
   }
 
   return this->OutputConverter->ConvertToOutputFormat(input, shellFormat);
@@ -120,6 +128,8 @@ std::string cmLinkLineComputer::ConvertToOutputForExisting(
     shellFormat = cmOutputConverter::WATCOMQUOTE;
   } else if (this->UseNinjaMulti) {
     shellFormat = cmOutputConverter::NINJAMULTI;
+  } else if (this->UseFastbuildMulti) {
+    shellFormat = cmOutputConverter::NINJAMULTI; //TEMPO
   }
 
   return this->OutputConverter->ConvertToOutputForExisting(input, shellFormat);

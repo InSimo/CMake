@@ -21,7 +21,7 @@
 #include "cmGeneratedFileStream.h"
 #include "cmGlobalCommonGenerator.h"
 #include "cmGlobalGeneratorFactory.h"
-#include "cmNinjaTypes.h"
+#include "cmFastbuildTypes.h"
 #include "cmPolicies.h"
 #include "cmStringAlgorithms.h"
 #include "cmTransformDepfile.h"
@@ -53,15 +53,15 @@ struct cmDocumentationEntry;
  * - We extensively use Ninja variable overloading system to minimize the
  *   number of generated rules.
  */
-class cmGlobalNinjaGenerator : public cmGlobalCommonGenerator
+class cmGlobalFastbuildGenerator : public cmGlobalCommonGenerator
 {
 public:
   /// The default name of Ninja's build file. Typically: build.ninja.
-  static const char* NINJA_BUILD_FILE;
+  static const char* FASTBUILD_BUILD_FILE;
 
   /// The default name of Ninja's rules file. Typically: rules.ninja.
   /// It is included in the main build.ninja file.
-  static const char* NINJA_RULES_FILE;
+  static const char* FASTBUILD_RULES_FILE;
 
   /// The indentation string used when generating Ninja's build file.
   static const char* INDENT;
@@ -107,16 +107,16 @@ public:
    * Write a build statement @a build to @a os.
    * @warning no escaping of any kind is done here.
    */
-  void WriteBuild(std::ostream& os, cmNinjaBuild const& build,
+  void WriteBuild(std::ostream& os, cmFastbuildBuild const& build,
                   int cmdLineLimit = 0, bool* usedResponseFile = nullptr);
 
   void WriteCustomCommandBuild(
     const std::string& command, const std::string& description,
     const std::string& comment, const std::string& depfile,
     const std::string& pool, bool uses_terminal, bool restat,
-    const cmNinjaDeps& outputs, const std::string& config,
-    const cmNinjaDeps& explicitDeps = cmNinjaDeps(),
-    const cmNinjaDeps& orderOnlyDeps = cmNinjaDeps());
+    const cmFastbuildDeps& outputs, const std::string& config,
+    const cmFastbuildDeps& explicitDeps = cmFastbuildDeps(),
+    const cmFastbuildDeps& orderOnlyDeps = cmFastbuildDeps());
 
   void WriteMacOSXContentBuild(std::string input, std::string output,
                                const std::string& config);
@@ -125,7 +125,7 @@ public:
    * Write a rule statement to @a os.
    * @warning no escaping of any kind is done here.
    */
-  static void WriteRule(std::ostream& os, cmNinjaRule const& rule);
+  static void WriteRule(std::ostream& os, cmFastbuildRule const& rule);
 
   /**
    * Write a variable named @a name to @a os with value @a value and an
@@ -147,17 +147,17 @@ public:
    * Write a default target statement specifying @a targets as
    * the default targets.
    */
-  static void WriteDefault(std::ostream& os, const cmNinjaDeps& targets,
+  static void WriteDefault(std::ostream& os, const cmFastbuildDeps& targets,
                            const std::string& comment = "");
 
   bool IsGCCOnWindows() const { return this->UsingGCCOnWindows; }
 
-  cmGlobalNinjaGenerator(cmake* cm);
+  cmGlobalFastbuildGenerator(cmake* cm);
 
   static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory()
   {
     return std::unique_ptr<cmGlobalGeneratorFactory>(
-      new cmGlobalGeneratorSimpleFactory<cmGlobalNinjaGenerator>());
+      new cmGlobalGeneratorSimpleFactory<cmGlobalFastbuildGenerator>());
   }
 
   std::unique_ptr<cmLocalGenerator> CreateLocalGenerator(
@@ -165,12 +165,12 @@ public:
 
   std::string GetName() const override
   {
-    return cmGlobalNinjaGenerator::GetActualName();
+    return cmGlobalFastbuildGenerator::GetActualName();
   }
 
-  static std::string GetActualName() { return "Ninja"; }
+  static std::string GetActualName() { return "Fastbuild"; }
 
-  bool IsNinja() const override { return true; }
+  bool IsFastbuild() const override { return true; }
 
   /** Get encoding used by generator for ninja files */
   codecvt::Encoding GetMakefileEncoding() const override;
@@ -244,21 +244,21 @@ public:
     return this->RulesFileStream.get();
   }
 
-  std::string const& ConvertToNinjaPath(const std::string& path) const;
+  std::string const& ConvertToFastbuildPath(const std::string& path) const;
 
-  struct MapToNinjaPathImpl
+  struct MapToFastbuildPathImpl
   {
-    cmGlobalNinjaGenerator* GG;
-    MapToNinjaPathImpl(cmGlobalNinjaGenerator* gg)
+    cmGlobalFastbuildGenerator* GG;
+    MapToFastbuildPathImpl(cmGlobalFastbuildGenerator* gg)
       : GG(gg)
     {
     }
     std::string operator()(std::string const& path) const
     {
-      return this->GG->ConvertToNinjaPath(path);
+      return this->GG->ConvertToFastbuildPath(path);
     }
   };
-  MapToNinjaPathImpl MapToNinjaPath() { return { this }; }
+  MapToFastbuildPathImpl MapToFastbuildPath() { return { this }; }
 
   // -- Additional clean files
   void AddAdditionalCleanFile(std::string fileName, const std::string& config);
@@ -280,7 +280,7 @@ public:
    * Call WriteRule() behind the scene but perform some check before like:
    * - Do not add twice the same rule.
    */
-  void AddRule(cmNinjaRule const& rule);
+  void AddRule(cmFastbuildRule const& rule);
 
   bool HasRule(const std::string& name);
 
@@ -310,7 +310,7 @@ public:
   }
 
   void AddAssumedSourceDependencies(const std::string& source,
-                                    const cmNinjaDeps& deps)
+                                    const cmFastbuildDeps& deps)
   {
     std::set<std::string>& ASD = this->AssumedSourceDependencies[source];
     // Because we may see the same source file multiple times (same source
@@ -323,19 +323,19 @@ public:
     cmGeneratorTarget const* target, const std::string& config) const;
 
   void AppendTargetOutputs(cmGeneratorTarget const* target,
-                           cmNinjaDeps& outputs, const std::string& config,
-                           cmNinjaTargetDepends depends) const;
+                           cmFastbuildDeps& outputs, const std::string& config,
+                           cmFastbuildTargetDepends depends) const;
   void AppendTargetDepends(cmGeneratorTarget const* target,
-                           cmNinjaDeps& outputs, const std::string& config,
+                           cmFastbuildDeps& outputs, const std::string& config,
                            const std::string& fileConfig,
-                           cmNinjaTargetDepends depends);
+                           cmFastbuildTargetDepends depends);
   void AppendTargetDependsClosure(cmGeneratorTarget const* target,
-                                  cmNinjaDeps& outputs,
+                                  cmFastbuildDeps& outputs,
                                   const std::string& config,
                                   const std::string& fileConfig,
                                   bool genexOutput);
   void AppendTargetDependsClosure(cmGeneratorTarget const* target,
-                                  cmNinjaOuts& outputs,
+                                  cmFastbuildOuts& outputs,
                                   const std::string& config,
                                   const std::string& fileConfig,
                                   bool genexOutput, bool omit_self);
@@ -345,14 +345,14 @@ public:
                                 const std::string& suffix,
                                 std::string& dir) override;
 
-  virtual void AppendNinjaFileArgument(GeneratedMakeCommand& /*command*/,
+  virtual void AppendFastbuildFileArgument(GeneratedMakeCommand& /*command*/,
                                        const std::string& /*config*/) const
   {
   }
 
-  virtual void AddRebuildManifestOutputs(cmNinjaDeps& outputs) const
+  virtual void AddRebuildManifestOutputs(cmFastbuildDeps& outputs) const
   {
-    outputs.push_back(this->NinjaOutputPath(NINJA_BUILD_FILE));
+    outputs.push_back(this->FastbuildOutputPath(FASTBUILD_BUILD_FILE));
   }
 
   int GetRuleCmdLength(const std::string& name)
@@ -366,25 +366,25 @@ public:
   void ComputeTargetObjectDirectory(cmGeneratorTarget* gt) const override;
 
   // Ninja generator uses 'deps' and 'msvc_deps_prefix' introduced in 1.3
-  static std::string RequiredNinjaVersion() { return "1.3"; }
-  static std::string RequiredNinjaVersionForConsolePool() { return "1.5"; }
-  static std::string RequiredNinjaVersionForImplicitOuts() { return "1.7"; }
-  static std::string RequiredNinjaVersionForManifestRestat() { return "1.8"; }
-  static std::string RequiredNinjaVersionForMultilineDepfile()
+  static std::string RequiredFastbuildVersion() { return "1.3"; }
+  static std::string RequiredFastbuildVersionForConsolePool() { return "1.5"; }
+  static std::string RequiredFastbuildVersionForImplicitOuts() { return "1.7"; }
+  static std::string RequiredFastbuildVersionForManifestRestat() { return "1.8"; }
+  static std::string RequiredFastbuildVersionForMultilineDepfile()
   {
     return "1.9";
   }
-  static std::string RequiredNinjaVersionForDyndeps() { return "1.10"; }
-  static std::string RequiredNinjaVersionForRestatTool() { return "1.10"; }
-  static std::string RequiredNinjaVersionForUnconditionalRecompactTool()
+  static std::string RequiredFastbuildVersionForDyndeps() { return "1.10"; }
+  static std::string RequiredFastbuildVersionForRestatTool() { return "1.10"; }
+  static std::string RequiredFastbuildVersionForUnconditionalRecompactTool()
   {
     return "1.10";
   }
-  static std::string RequiredNinjaVersionForMultipleOutputs()
+  static std::string RequiredFastbuildVersionForMultipleOutputs()
   {
     return "1.10";
   }
-  static std::string RequiredNinjaVersionForMetadataOnRegeneration()
+  static std::string RequiredFastbuildVersionForMetadataOnRegeneration()
   {
     return "1.10.2";
   }
@@ -393,9 +393,9 @@ public:
   bool SupportsManifestRestat() const;
   bool SupportsMultilineDepfile() const;
 
-  std::string NinjaOutputPath(std::string const& path) const;
+  std::string FastbuildOutputPath(std::string const& path) const;
   bool HasOutputPathPrefix() const { return !this->OutputPathPrefix.empty(); }
-  void StripNinjaOutputPathPrefixAsSuffix(std::string& path);
+  void StripFastbuildOutputPathPrefixAsSuffix(std::string& path);
 
   bool WriteDyndepFile(
     std::string const& dir_top_src, std::string const& dir_top_bld,
@@ -416,12 +416,12 @@ public:
     return "";
   }
 
-  cmNinjaDeps& GetByproductsForCleanTarget()
+  cmFastbuildDeps& GetByproductsForCleanTarget()
   {
     return this->ByproductsForCleanTarget;
   }
 
-  cmNinjaDeps& GetByproductsForCleanTarget(const std::string& config)
+  cmFastbuildDeps& GetByproductsForCleanTarget(const std::string& config)
   {
     return this->Configs[config].ByproductsForCleanTarget;
   }
@@ -473,7 +473,7 @@ protected:
 private:
   std::string GetEditCacheCommand() const override;
   bool FindMakeProgram(cmMakefile* mf) override;
-  void CheckNinjaFeatures();
+  void CheckFastbuildFeatures();
   bool CheckLanguages(std::vector<std::string> const& languages,
                       cmMakefile* mf) const override;
   bool CheckFortran(cmMakefile* mf) const;
@@ -506,7 +506,7 @@ private:
     std::set<cmGeneratorTarget const*>& depends);
 
   std::string CMakeCmd() const;
-  std::string NinjaCmd() const;
+  std::string FastbuildCmd() const;
 
   /// The file containing the build statement. (the relationship of the
   /// compilation DAG).
@@ -555,19 +555,19 @@ private:
   TargetAliasMap DefaultTargetAliases;
 
   /// the local cache for calls to ConvertToNinjaPath
-  mutable std::unordered_map<std::string, std::string> ConvertToNinjaPathCache;
+  mutable std::unordered_map<std::string, std::string> ConvertToFastbuildPathCache;
 
-  std::string NinjaCommand;
-  std::string NinjaVersion;
-  bool NinjaSupportsConsolePool = false;
-  bool NinjaSupportsImplicitOuts = false;
-  bool NinjaSupportsManifestRestat = false;
-  bool NinjaSupportsMultilineDepfile = false;
-  bool NinjaSupportsDyndeps = false;
-  bool NinjaSupportsRestatTool = false;
-  bool NinjaSupportsUnconditionalRecompactTool = false;
-  bool NinjaSupportsMultipleOutputs = false;
-  bool NinjaSupportsMetadataOnRegeneration = false;
+  std::string FastbuildCommand;
+  std::string FastbuildVersion;
+  bool FastbuildSupportsConsolePool = false;
+  bool FastbuildSupportsImplicitOuts = false;
+  bool FastbuildSupportsManifestRestat = false;
+  bool FastbuildSupportsMultilineDepfile = false;
+  bool FastbuildSupportsDyndeps = false;
+  bool FastbuildSupportsRestatTool = false;
+  bool FastbuildSupportsUnconditionalRecompactTool = false;
+  bool FastbuildSupportsMultipleOutputs = false;
+  bool FastbuildSupportsMetadataOnRegeneration = false;
 
   bool DiagnosedCxxModuleSupport = false;
 
@@ -592,15 +592,15 @@ private:
       bool GenexOutput;
     };
 
-    std::map<TargetDependsClosureKey, cmNinjaOuts> TargetDependsClosures;
+    std::map<TargetDependsClosureKey, cmFastbuildOuts> TargetDependsClosures;
 
     TargetAliasMap TargetAliases;
 
-    cmNinjaDeps ByproductsForCleanTarget;
+    cmFastbuildDeps ByproductsForCleanTarget;
   };
   std::map<std::string, ByConfig> Configs;
 
-  cmNinjaDeps ByproductsForCleanTarget;
+  cmFastbuildDeps ByproductsForCleanTarget;
 
   friend bool operator==(const ByConfig::TargetDependsClosureKey& lhs,
                          const ByConfig::TargetDependsClosureKey& rhs);
@@ -616,30 +616,30 @@ private:
                          const ByConfig::TargetDependsClosureKey& rhs);
 };
 
-class cmGlobalNinjaMultiGenerator : public cmGlobalNinjaGenerator
+class cmGlobalFastbuildMultiGenerator : public cmGlobalFastbuildGenerator
 {
 public:
   /// The default name of Ninja's common file. Typically: common.ninja.
-  static const char* NINJA_COMMON_FILE;
+  static const char* FASTBUILD_COMMON_FILE;
   /// The default file extension to use for per-config Ninja files.
-  static const char* NINJA_FILE_EXTENSION;
+  static const char* FASTBUILD_FILE_EXTENSION;
 
-  cmGlobalNinjaMultiGenerator(cmake* cm);
+  cmGlobalFastbuildMultiGenerator(cmake* cm);
   bool IsMultiConfig() const override { return true; }
   static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory()
   {
     return std::unique_ptr<cmGlobalGeneratorFactory>(
-      new cmGlobalGeneratorSimpleFactory<cmGlobalNinjaMultiGenerator>());
+      new cmGlobalGeneratorSimpleFactory<cmGlobalFastbuildMultiGenerator>());
   }
 
   static void GetDocumentation(cmDocumentationEntry& entry);
 
   std::string GetName() const override
   {
-    return cmGlobalNinjaMultiGenerator::GetActualName();
+    return cmGlobalFastbuildMultiGenerator::GetActualName();
   }
 
-  static std::string GetActualName() { return "Ninja Multi-Config"; }
+  static std::string GetActualName() { return "Fastbuild Multi-Config"; }
 
   std::string BuildAlias(const std::string& alias,
                          const std::string& config) const override
@@ -685,13 +685,13 @@ public:
     return this->CommonFileStream.get();
   }
 
-  void AppendNinjaFileArgument(GeneratedMakeCommand& command,
+  void AppendFastbuildFileArgument(GeneratedMakeCommand& command,
                                const std::string& config) const override;
 
-  static std::string GetNinjaImplFilename(const std::string& config);
-  static std::string GetNinjaConfigFilename(const std::string& config);
+  static std::string GetFastbuildImplFilename(const std::string& config);
+  static std::string GetFastbuildConfigFilename(const std::string& config);
 
-  void AddRebuildManifestOutputs(cmNinjaDeps& outputs) const override;
+  void AddRebuildManifestOutputs(cmFastbuildDeps& outputs) const override;
 
   void GetQtAutoGenConfigs(std::vector<std::string>& configs) const override;
 

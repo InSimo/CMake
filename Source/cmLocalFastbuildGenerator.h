@@ -12,7 +12,7 @@
 
 #include "cmListFileCache.h"
 #include "cmLocalCommonGenerator.h"
-#include "cmNinjaTypes.h"
+#include "cmFastbuildTypes.h"
 #include "cmOutputConverter.h"
 
 class cmCustomCommand;
@@ -20,7 +20,7 @@ class cmCustomCommandGenerator;
 class cmGeneratedFileStream;
 class cmGeneratorTarget;
 class cmGlobalGenerator;
-class cmGlobalNinjaGenerator;
+class cmGlobalFastbuildGenerator;
 class cmMakefile;
 class cmRulePlaceholderExpander;
 class cmake;
@@ -32,12 +32,12 @@ class cmake;
  * cmLocalNinjaGenerator produces a local build.ninja file from its
  * member Makefile.
  */
-class cmLocalNinjaGenerator : public cmLocalCommonGenerator
+class cmLocalFastbuildGenerator : public cmLocalCommonGenerator
 {
 public:
-  cmLocalNinjaGenerator(cmGlobalGenerator* gg, cmMakefile* mf);
+  cmLocalFastbuildGenerator(cmGlobalGenerator* gg, cmMakefile* mf);
 
-  ~cmLocalNinjaGenerator() override;
+  ~cmLocalFastbuildGenerator() override;
 
   void Generate() override;
 
@@ -46,8 +46,8 @@ public:
   std::string GetTargetDirectory(
     cmGeneratorTarget const* target) const override;
 
-  const cmGlobalNinjaGenerator* GetGlobalNinjaGenerator() const;
-  cmGlobalNinjaGenerator* GetGlobalNinjaGenerator();
+  const cmGlobalFastbuildGenerator* GetGlobalFastbuildGenerator() const;
+  cmGlobalFastbuildGenerator* GetGlobalFastbuildGenerator();
 
   const cmake* GetCMakeInstance() const;
   cmake* GetCMakeInstance();
@@ -65,12 +65,12 @@ public:
     std::string const& customStep = std::string(),
     cmGeneratorTarget const* target = nullptr) const;
 
-  void AppendTargetOutputs(cmGeneratorTarget* target, cmNinjaDeps& outputs,
+  void AppendTargetOutputs(cmGeneratorTarget* target, cmFastbuildDeps& outputs,
                            const std::string& config);
-  void AppendTargetDepends(cmGeneratorTarget* target, cmNinjaDeps& outputs,
+  void AppendTargetDepends(cmGeneratorTarget* target, cmFastbuildDeps& outputs,
                            const std::string& config,
                            const std::string& fileConfig,
-                           cmNinjaTargetDepends depends);
+                           cmFastbuildTargetDepends depends);
 
   std::string CreateUtilityOutput(std::string const& targetName,
                                   std::vector<std::string> const& byproducts,
@@ -84,7 +84,7 @@ public:
   void AppendCustomCommandLines(cmCustomCommandGenerator const& ccg,
                                 std::vector<std::string>& cmdLines);
   void AppendCustomCommandDeps(cmCustomCommandGenerator const& ccg,
-                               cmNinjaDeps& ninjaDeps,
+                               cmFastbuildDeps& fastbuildDeps,
                                const std::string& config);
 
   bool HasUniqueByproducts(std::vector<std::string> const& byproducts,
@@ -103,11 +103,11 @@ private:
 
   void WriteBuildFileTop();
   void WriteProjectHeader(std::ostream& os);
-  void WriteNinjaRequiredVersion(std::ostream& os);
-  void WriteNinjaConfigurationVariable(std::ostream& os,
+  void WriteFastbuildRequiredVersion(std::ostream& os);
+  void WriteFastbuildConfigurationVariable(std::ostream& os,
                                        const std::string& config);
-  void WriteNinjaFilesInclusionConfig(std::ostream& os);
-  void WriteNinjaFilesInclusionCommon(std::ostream& os);
+  void WriteFastbuildFilesInclusionConfig(std::ostream& os);
+  void WriteFastbuildFilesInclusionCommon(std::ostream& os);
   void WriteProcessedMakefile(std::ostream& os);
   void WritePools(std::ostream& os);
 

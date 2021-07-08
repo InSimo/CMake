@@ -201,6 +201,8 @@ public:
   bool UseMSYSShell() const;
   void SetNinjaMulti(bool ninjaMulti);
   bool UseNinjaMulti() const;
+  void SetFastbuildMulti(bool FastbuildMulti);
+  bool UseFastbuildMulti() const;
 
   unsigned int GetCacheMajorVersion() const;
   unsigned int GetCacheMinorVersion() const;
@@ -258,5 +260,6 @@ private:
   bool NMake = false;
   bool MSYSShell = false;
   bool NinjaMulti = false;
+  bool FastbuildMulti = false;
   Mode CurrentMode = Unknown;
 };

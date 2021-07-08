@@ -1,6 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#include "cmNinjaTargetGenerator.h"
+#include "cmFastbuildTargetGenerator.h"
 
 #include <algorithm>
 #include <cassert>
@@ -24,12 +24,12 @@
 #include "cmGeneratedFileStream.h"
 #include "cmGeneratorExpression.h"
 #include "cmGeneratorTarget.h"
-#include "cmGlobalNinjaGenerator.h"
+#include "cmGlobalFastbuildGenerator.h"
 #include "cmLocalGenerator.h"
-#include "cmLocalNinjaGenerator.h"
+#include "cmLocalFastbuildGenerator.h"
 #include "cmMakefile.h"
-#include "cmNinjaNormalTargetGenerator.h"
-#include "cmNinjaUtilityTargetGenerator.h"
+#include "cmFastbuildNormalTargetGenerator.h"
+#include "cmFastbuildUtilityTargetGenerator.h"
 #include "cmOutputConverter.h"
 #include "cmProperty.h"
 #include "cmRange.h"
@@ -42,7 +42,7 @@
 #include "cmSystemTools.h"
 #include "cmake.h"
 
-std::unique_ptr<cmNinjaTargetGenerator> cmNinjaTargetGenerator::New(
+std::unique_ptr<cmFastbuildTargetGenerator> cmFastbuildTargetGenerator::New(
   cmGeneratorTarget* target)
 {
   switch (target->GetType()) {
@@ -51,23 +51,23 @@ std::unique_ptr<cmNinjaTargetGenerator> cmNinjaTargetGenerator::New(
     case cmStateEnums::STATIC_LIBRARY:
     case cmStateEnums::MODULE_LIBRARY:
     case cmStateEnums::OBJECT_LIBRARY:
-      return cm::make_unique<cmNinjaNormalTargetGenerator>(target);
+      return cm::make_unique<cmFastbuildNormalTargetGenerator>(target);
 
     case cmStateEnums::UTILITY:
     case cmStateEnums::INTERFACE_LIBRARY:
     case cmStateEnums::GLOBAL_TARGET:
-      return cm::make_unique<cmNinjaUtilityTargetGenerator>(target);
+      return cm::make_unique<cmFastbuildUtilityTargetGenerator>(target);
 
     default:
-      return std::unique_ptr<cmNinjaTargetGenerator>();
+      return std::unique_ptr<cmFastbuildTargetGenerator>();
   }
 }
 
-cmNinjaTargetGenerator::cmNinjaTargetGenerator(cmGeneratorTarget* target)
+cmFastbuildTargetGenerator::cmFastbuildTargetGenerator(cmGeneratorTarget* target)
   : cmCommonTargetGenerator(target)
   , OSXBundleGenerator(nullptr)
   , LocalGenerator(
-      static_cast<cmLocalNinjaGenerator*>(target->GetLocalGenerator()))
+      static_cast<cmLocalFastbuildGenerator*>(target->GetLocalGenerator()))
 {
   for (auto const& fileConfig :
        target->Makefile->GetGeneratorConfigs(cmMakefile::IncludeEmptyConfig)) {
@@ -76,78 +76,78 @@ cmNinjaTargetGenerator::cmNinjaTargetGenerator(cmGeneratorTarget* target)
   }
 }
 
-cmNinjaTargetGenerator::~cmNinjaTargetGenerator() = default;
+cmFastbuildTargetGenerator::~cmFastbuildTargetGenerator() = default;
 
-cmGeneratedFileStream& cmNinjaTargetGenerator::GetImplFileStream(
+cmGeneratedFileStream& cmFastbuildTargetGenerator::GetImplFileStream(
   const std::string& config) const
 {
   return *this->GetGlobalGenerator()->GetImplFileStream(config);
 }
 
-cmGeneratedFileStream& cmNinjaTargetGenerator::GetCommonFileStream() const
+cmGeneratedFileStream& cmFastbuildTargetGenerator::GetCommonFileStream() const
 {
   return *this->GetGlobalGenerator()->GetCommonFileStream();
 }
 
-cmGeneratedFileStream& cmNinjaTargetGenerator::GetRulesFileStream() const
+cmGeneratedFileStream& cmFastbuildTargetGenerator::GetRulesFileStream() const
 {
   return *this->GetGlobalGenerator()->GetRulesFileStream();
 }
 
-cmGlobalNinjaGenerator* cmNinjaTargetGenerator::GetGlobalGenerator() const
+cmGlobalFastbuildGenerator* cmFastbuildTargetGenerator::GetGlobalGenerator() const
 {
-  return this->LocalGenerator->GetGlobalNinjaGenerator();
+  return this->LocalGenerator->GetGlobalFastbuildGenerator();
 }
 
-std::string cmNinjaTargetGenerator::LanguageCompilerRule(
+std::string cmFastbuildTargetGenerator::LanguageCompilerRule(
   const std::string& lang, const std::string& config) const
 {
   return cmStrCat(
     lang, "_COMPILER__",
-    cmGlobalNinjaGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
+    cmGlobalFastbuildGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
     '_', config);
 }
 
-std::string cmNinjaTargetGenerator::LanguagePreprocessAndScanRule(
+std::string cmFastbuildTargetGenerator::LanguagePreprocessAndScanRule(
   std::string const& lang, const std::string& config) const
 {
   return cmStrCat(
     lang, "_PREPROCESS_SCAN__",
-    cmGlobalNinjaGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
+    cmGlobalFastbuildGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
     '_', config);
 }
 
-std::string cmNinjaTargetGenerator::LanguageScanRule(
+std::string cmFastbuildTargetGenerator::LanguageScanRule(
   std::string const& lang, const std::string& config) const
 {
   return cmStrCat(
     lang, "_SCAN__",
-    cmGlobalNinjaGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
+    cmGlobalFastbuildGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
     '_', config);
 }
 
-bool cmNinjaTargetGenerator::NeedExplicitPreprocessing(
+bool cmFastbuildTargetGenerator::NeedExplicitPreprocessing(
   std::string const& lang) const
 {
   return lang == "Fortran";
 }
 
-bool cmNinjaTargetGenerator::CompileWithDefines(std::string const& lang) const
+bool cmFastbuildTargetGenerator::CompileWithDefines(std::string const& lang) const
 {
   return this->Makefile->IsOn(
     cmStrCat("CMAKE_", lang, "_COMPILE_WITH_DEFINES"));
 }
 
-std::string cmNinjaTargetGenerator::LanguageDyndepRule(
+std::string cmFastbuildTargetGenerator::LanguageDyndepRule(
   const std::string& lang, const std::string& config) const
 {
   return cmStrCat(
     lang, "_DYNDEP__",
-    cmGlobalNinjaGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
+    cmGlobalFastbuildGenerator::EncodeRuleName(this->GeneratorTarget->GetName()),
     '_', config);
 }
 
-bool cmNinjaTargetGenerator::NeedCxxModuleSupport(
+bool cmFastbuildTargetGenerator::NeedCxxModuleSupport(
   std::string const& lang, std::string const& config) const
 {
   if (lang != "CXX") {
@@ -163,13 +163,13 @@ bool cmNinjaTargetGenerator::NeedCxxModuleSupport(
   return uses_cxx20 && this->GetGlobalGenerator()->CheckCxxModuleSupport();
 }
 
-bool cmNinjaTargetGenerator::NeedDyndep(std::string const& lang,
+bool cmFastbuildTargetGenerator::NeedDyndep(std::string const& lang,
                                         std::string const& config) const
 {
   return lang == "Fortran" || this->NeedCxxModuleSupport(lang, config);
 }
 
-std::string cmNinjaTargetGenerator::OrderDependsTargetForTarget(
+std::string cmFastbuildTargetGenerator::OrderDependsTargetForTarget(
   const std::string& config)
 {
   return this->GetGlobalGenerator()->OrderDependsTargetForTarget(
@@ -180,7 +180,7 @@ std::string cmNinjaTargetGenerator::OrderDependsTargetForTarget(
 // void cmMakefileExecutableTargetGenerator::WriteExecutableRule(bool relink),
 // void cmMakefileTargetGenerator::WriteTargetLanguageFlags()
 // Refactor it.
-std::string cmNinjaTargetGenerator::ComputeFlagsForObject(
+std::string cmFastbuildTargetGenerator::ComputeFlagsForObject(
   cmSourceFile const* source, const std::string& language,
   const std::string& config)
 {
@@ -254,7 +254,7 @@ std::string cmNinjaTargetGenerator::ComputeFlagsForObject(
   return flags;
 }
 
-void cmNinjaTargetGenerator::AddIncludeFlags(std::string& languageFlags,
+void cmFastbuildTargetGenerator::AddIncludeFlags(std::string& languageFlags,
                                              std::string const& language,
                                              const std::string& config)
 {
@@ -275,7 +275,7 @@ void cmNinjaTargetGenerator::AddIncludeFlags(std::string& languageFlags,
 
 // TODO: Refactor with
 // void cmMakefileTargetGenerator::WriteTargetLanguageFlags().
-std::string cmNinjaTargetGenerator::ComputeDefines(cmSourceFile const* source,
+std::string cmFastbuildTargetGenerator::ComputeDefines(cmSourceFile const* source,
                                                    const std::string& language,
                                                    const std::string& config)
 {
@@ -308,7 +308,7 @@ std::string cmNinjaTargetGenerator::ComputeDefines(cmSourceFile const* source,
   return definesString;
 }
 
-std::string cmNinjaTargetGenerator::ComputeIncludes(
+std::string cmFastbuildTargetGenerator::ComputeIncludes(
   cmSourceFile const* source, const std::string& language,
   const std::string& config)
 {
@@ -331,7 +331,7 @@ std::string cmNinjaTargetGenerator::ComputeIncludes(
   return includesString;
 }
 
-cmNinjaDeps cmNinjaTargetGenerator::ComputeLinkDeps(
+cmFastbuildDeps cmFastbuildTargetGenerator::ComputeLinkDeps(
   const std::string& linkLanguage, const std::string& config,
   bool ignoreType) const
 {
@@ -339,25 +339,25 @@ cmNinjaDeps cmNinjaTargetGenerator::ComputeLinkDeps(
   if (!ignoreType &&
       (this->GeneratorTarget->GetType() == cmStateEnums::STATIC_LIBRARY ||
        this->GeneratorTarget->GetType() == cmStateEnums::OBJECT_LIBRARY)) {
-    return cmNinjaDeps();
+    return cmFastbuildDeps();
   }
 
   cmComputeLinkInformation* cli =
     this->GeneratorTarget->GetLinkInformation(config);
   if (!cli) {
-    return cmNinjaDeps();
+    return cmFastbuildDeps();
   }
 
   const std::vector<std::string>& deps = cli->GetDepends();
-  cmNinjaDeps result(deps.size());
+  cmFastbuildDeps result(deps.size());
   std::transform(deps.begin(), deps.end(), result.begin(),
-                 this->MapToNinjaPath());
+                 this->MapToFastbuildPath());
 
   // Add a dependency on the link definitions file, if any.
   if (cmGeneratorTarget::ModuleDefinitionInfo const* mdi =
         this->GeneratorTarget->GetModuleDefinitionInfo(config)) {
     for (cmSourceFile const* src : mdi->Sources) {
-      result.push_back(this->ConvertToNinjaPath(src->GetFullPath()));
+      result.push_back(this->ConvertToFastbuildPath(src->GetFullPath()));
     }
   }
 
@@ -365,25 +365,25 @@ cmNinjaDeps cmNinjaTargetGenerator::ComputeLinkDeps(
   std::vector<cmSourceFile const*> manifest_srcs;
   this->GeneratorTarget->GetManifests(manifest_srcs, config);
   for (cmSourceFile const* manifest_src : manifest_srcs) {
-    result.push_back(this->ConvertToNinjaPath(manifest_src->GetFullPath()));
+    result.push_back(this->ConvertToFastbuildPath(manifest_src->GetFullPath()));
   }
 
   // Add user-specified dependencies.
   std::vector<std::string> linkDeps;
   this->GeneratorTarget->GetLinkDepends(linkDeps, config, linkLanguage);
   std::transform(linkDeps.begin(), linkDeps.end(), std::back_inserter(result),
-                 this->MapToNinjaPath());
+                 this->MapToFastbuildPath());
 
   return result;
 }
 
-std::string cmNinjaTargetGenerator::GetSourceFilePath(
+std::string cmFastbuildTargetGenerator::GetSourceFilePath(
   cmSourceFile const* source) const
 {
-  return this->ConvertToNinjaPath(source->GetFullPath());
+  return this->ConvertToFastbuildPath(source->GetFullPath());
 }
 
-std::string cmNinjaTargetGenerator::GetObjectFilePath(
+std::string cmFastbuildTargetGenerator::GetObjectFilePath(
   cmSourceFile const* source, const std::string& config) const
 {
   std::string path = this->LocalGenerator->GetHomeRelativeOutputPath();
@@ -397,7 +397,7 @@ std::string cmNinjaTargetGenerator::GetObjectFilePath(
   return path;
 }
 
-std::string cmNinjaTargetGenerator::GetPreprocessedFilePath(
+std::string cmFastbuildTargetGenerator::GetPreprocessedFilePath(
   cmSourceFile const* source, const std::string& config) const
 {
   // Choose an extension to compile already-preprocessed source.
@@ -433,7 +433,7 @@ std::string cmNinjaTargetGenerator::GetPreprocessedFilePath(
   return path;
 }
 
-std::string cmNinjaTargetGenerator::GetDyndepFilePath(
+std::string cmFastbuildTargetGenerator::GetDyndepFilePath(
   std::string const& lang, const std::string& config) const
 {
   std::string path = this->LocalGenerator->GetHomeRelativeOutputPath();
@@ -446,7 +446,7 @@ std::string cmNinjaTargetGenerator::GetDyndepFilePath(
   return path;
 }
 
-std::string cmNinjaTargetGenerator::GetTargetDependInfoPath(
+std::string cmFastbuildTargetGenerator::GetTargetDependInfoPath(
   std::string const& lang, const std::string& config) const
 {
   std::string path =
@@ -457,14 +457,14 @@ std::string cmNinjaTargetGenerator::GetTargetDependInfoPath(
   return path;
 }
 
-std::string cmNinjaTargetGenerator::GetTargetOutputDir(
+std::string cmFastbuildTargetGenerator::GetTargetOutputDir(
   const std::string& config) const
 {
   std::string dir = this->GeneratorTarget->GetDirectory(config);
-  return this->ConvertToNinjaPath(dir);
+  return this->ConvertToFastbuildPath(dir);
 }
 
-std::string cmNinjaTargetGenerator::GetTargetFilePath(
+std::string cmFastbuildTargetGenerator::GetTargetFilePath(
   const std::string& name, const std::string& config) const
 {
   std::string path = this->GetTargetOutputDir(config);
@@ -475,13 +475,13 @@ std::string cmNinjaTargetGenerator::GetTargetFilePath(
   return path;
 }
 
-std::string cmNinjaTargetGenerator::GetTargetName() const
+std::string cmFastbuildTargetGenerator::GetTargetName() const
 {
   return this->GeneratorTarget->GetName();
 }
 
-bool cmNinjaTargetGenerator::SetMsvcTargetPdbVariable(
-  cmNinjaVars& vars, const std::string& config) const
+bool cmFastbuildTargetGenerator::SetMsvcTargetPdbVariable(
+  cmFastbuildVars& vars, const std::string& config) const
 {
   cmMakefile* mf = this->GetMakefile();
   if (mf->GetDefinition("MSVC_C_ARCHITECTURE_ID") ||
@@ -498,10 +498,10 @@ bool cmNinjaTargetGenerator::SetMsvcTargetPdbVariable(
     }
 
     vars["TARGET_PDB"] = this->GetLocalGenerator()->ConvertToOutputFormat(
-      this->ConvertToNinjaPath(pdbPath), cmOutputConverter::SHELL);
+      this->ConvertToFastbuildPath(pdbPath), cmOutputConverter::SHELL);
     vars["TARGET_COMPILE_PDB"] =
       this->GetLocalGenerator()->ConvertToOutputFormat(
-        this->ConvertToNinjaPath(compilePdbPath), cmOutputConverter::SHELL);
+        this->ConvertToFastbuildPath(compilePdbPath), cmOutputConverter::SHELL);
 
     this->EnsureParentDirectoryExists(pdbPath);
     this->EnsureParentDirectoryExists(compilePdbPath);
@@ -510,10 +510,10 @@ bool cmNinjaTargetGenerator::SetMsvcTargetPdbVariable(
   return false;
 }
 
-void cmNinjaTargetGenerator::WriteLanguageRules(const std::string& language,
+void cmFastbuildTargetGenerator::WriteLanguageRules(const std::string& language,
                                                 const std::string& config)
 {
-#ifdef NINJA_GEN_VERBOSE_FILES
+#ifdef FASTBUILD_GEN_VERBOSE_FILES
   this->GetRulesFileStream() << "# Rules for language " << language << "\n\n";
 #endif
   this->WriteCompileRule(language, config);
@@ -525,22 +525,22 @@ std::string GetScanCommand(const std::string& cmakeCmd, const std::string& tdi,
                            const std::string& lang, const std::string& ppFile,
                            const std::string& ddiFile)
 {
-  return cmStrCat(cmakeCmd, " -E cmake_ninja_depends --tdi=", tdi,
+  return cmStrCat(cmakeCmd, " -E cmake_fastbuild_depends --tdi=", tdi,
                   " --lang=", lang, " --src=$in", " --pp=", ppFile,
                   " --dep=$DEP_FILE --obj=$OBJ_FILE --ddi=", ddiFile);
 }
 
 // Helper function to create dependency scanning rule that may or may
 // not perform explicit preprocessing too.
-cmNinjaRule GetScanRule(
+cmFastbuildRule GetScanRule(
   const std::string& ruleName,
   cmRulePlaceholderExpander::RuleVariables const& vars,
   const std::string& responseFlag, const std::string& flags,
   cmRulePlaceholderExpander* const rulePlaceholderExpander,
-  cmLocalNinjaGenerator* generator, std::vector<std::string> scanCmds,
+  cmLocalFastbuildGenerator* generator, std::vector<std::string> scanCmds,
   const std::string& outputConfig)
 {
-  cmNinjaRule rule(ruleName);
+  cmFastbuildRule rule(ruleName);
   // Scanning always uses a depfile for preprocessor dependencies.
   rule.DepType = ""; // no deps= for multiple outputs
   rule.DepFile = "$DEP_FILE";
@@ -586,7 +586,7 @@ cmNinjaRule GetScanRule(
 }
 }
 
-void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
+void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
                                               const std::string& config)
 {
   cmRulePlaceholderExpander::RuleVariables vars;
@@ -631,7 +631,7 @@ void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
     this->GetLocalGenerator()->CreateRulePlaceholderExpander());
 
   std::string const tdi = this->GetLocalGenerator()->ConvertToOutputFormat(
-    this->ConvertToNinjaPath(this->GetTargetDependInfoPath(lang, config)),
+    this->ConvertToFastbuildPath(this->GetTargetDependInfoPath(lang, config)),
     cmLocalGenerator::SHELL);
 
   std::string launcher;
@@ -714,7 +714,7 @@ void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
     }
 
     // Write the rule for ninja dyndep file generation.
-    cmNinjaRule rule(this->LanguageDyndepRule(lang, config));
+    cmFastbuildRule rule(this->LanguageDyndepRule(lang, config));
     // Command line length is almost always limited -> use response file for
     // dyndep rules
     rule.RspFile = "$out.rsp";
@@ -730,7 +730,7 @@ void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
       std::vector<std::string> ddCmds;
       {
         std::string ccmd = cmStrCat(
-          cmakeCmd, " -E cmake_ninja_dyndep --tdi=", tdi, " --lang=", lang,
+          cmakeCmd, " -E cmake_fastbuild_dyndep --tdi=", tdi, " --lang=", lang,
           ddModmapArg, " --dd=$out @", rule.RspFile);
         ddCmds.emplace_back(std::move(ccmd));
       }
@@ -738,12 +738,12 @@ void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
         this->GetLocalGenerator()->BuildCommandLine(ddCmds, config, config);
     }
     rule.Comment =
-      cmStrCat("Rule to generate ninja dyndep files for ", lang, '.');
+      cmStrCat("Rule to generate fastbuild dyndep files for ", lang, '.');
     rule.Description = cmStrCat("Generating ", lang, " dyndep file $out");
     this->GetGlobalGenerator()->AddRule(rule);
   }
 
-  cmNinjaRule rule(this->LanguageCompilerRule(lang, config));
+  cmFastbuildRule rule(this->LanguageCompilerRule(lang, config));
   // If using a response file, move defines, includes, and flags into it.
   if (!responseFlag.empty()) {
     rule.RspFile = "$RSP_FILE";
@@ -758,7 +758,7 @@ void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
   std::string cldeps;
   if (!compilationPreprocesses) {
     // The compiler will not do preprocessing, so it has no such dependencies.
-  } else if (mf->IsOn(cmStrCat("CMAKE_NINJA_CMCLDEPS_", lang))) {
+  } else if (mf->IsOn(cmStrCat("CMAKE_FASTBUILD_CMCLDEPS_", lang))) {
     // For the MS resource compiler we need cmcldeps, but skip dependencies
     // for source-file try_compile cases because they are always fresh.
     if (!mf->GetIsSourceFileTryCompile()) {
@@ -940,12 +940,12 @@ void cmNinjaTargetGenerator::WriteCompileRule(const std::string& lang,
   this->GetGlobalGenerator()->AddRule(rule);
 }
 
-void cmNinjaTargetGenerator::WriteObjectBuildStatements(
+void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
   const std::string& config, const std::string& fileConfig,
   bool firstForConfig)
 {
   // Write comments.
-  cmGlobalNinjaGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
+  cmGlobalFastbuildGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
   this->GetImplFileStream(fileConfig)
     << "# Object build statements for "
     << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
@@ -994,12 +994,12 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
   }
 
   {
-    cmNinjaBuild build("phony");
+    cmFastbuildBuild build("phony");
     build.Comment =
       cmStrCat("Order-only phony target for ", this->GetTargetName());
     build.Outputs.push_back(this->OrderDependsTargetForTarget(config));
 
-    cmNinjaDeps& orderOnlyDeps = build.OrderOnlyDeps;
+    cmFastbuildDeps& orderOnlyDeps = build.OrderOnlyDeps;
     this->GetLocalGenerator()->AppendTargetDepends(
       this->GeneratorTarget, orderOnlyDeps, config, fileConfig,
       DependOnTargetOrdering);
@@ -1014,10 +1014,10 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       const std::vector<std::string>& ccbyproducts = ccg.GetByproducts();
       std::transform(ccoutputs.begin(), ccoutputs.end(),
                      std::back_inserter(orderOnlyDeps),
-                     this->MapToNinjaPath());
+                     this->MapToFastbuildPath());
       std::transform(ccbyproducts.begin(), ccbyproducts.end(),
                      std::back_inserter(orderOnlyDeps),
-                     this->MapToNinjaPath());
+                     this->MapToFastbuildPath());
     }
 
     std::sort(orderOnlyDeps.begin(), orderOnlyDeps.end());
@@ -1034,7 +1034,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       std::string tgtDir = cmStrCat(
         this->LocalGenerator->GetCurrentBinaryDirectory(), '/',
         this->LocalGenerator->GetTargetDirectory(this->GeneratorTarget));
-      orderOnlyDeps.push_back(this->ConvertToNinjaPath(tgtDir));
+      orderOnlyDeps.push_back(this->ConvertToFastbuildPath(tgtDir));
     }
 
     this->GetGlobalGenerator()->WriteBuild(this->GetImplFileStream(fileConfig),
@@ -1052,9 +1052,9 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
 
   for (auto const& langDDIFiles : this->Configs[config].DDIFiles) {
     std::string const& language = langDDIFiles.first;
-    cmNinjaDeps const& ddiFiles = langDDIFiles.second;
+    cmFastbuildDeps const& ddiFiles = langDDIFiles.second;
 
-    cmNinjaBuild build(this->LanguageDyndepRule(language, config));
+    cmFastbuildBuild build(this->LanguageDyndepRule(language, config));
     build.Outputs.push_back(this->GetDyndepFilePath(language, config));
     build.ExplicitDeps = ddiFiles;
 
@@ -1087,7 +1087,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
       if (cmProp name = target->GetProperty("Swift_DEPENDENCIES_FILE")) {
         return *name;
       }
-      return this->ConvertToNinjaPath(
+      return this->ConvertToFastbuildPath(
         cmStrCat(target->GetSupportDirectory(), '/', config, '/',
                  target->GetName(), ".swiftdeps"));
     }();
@@ -1104,15 +1104,15 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatements(
 }
 
 namespace {
-cmNinjaBuild GetScanBuildStatement(const std::string& ruleName,
+cmFastbuildBuild GetScanBuildStatement(const std::string& ruleName,
                                    const std::string& ppFileName,
                                    bool compilePP, bool compilePPWithDefines,
-                                   cmNinjaBuild& objBuild, cmNinjaVars& vars,
+                                   cmFastbuildBuild& objBuild, cmFastbuildVars& vars,
                                    std::string const& modmapFormat,
                                    const std::string& objectFileName,
                                    cmLocalGenerator* lg)
 {
-  cmNinjaBuild scanBuild(ruleName);
+  cmFastbuildBuild scanBuild(ruleName);
 
   if (!ppFileName.empty()) {
     scanBuild.RspFile = cmStrCat(ppFileName, ".rsp");
@@ -1192,18 +1192,18 @@ cmNinjaBuild GetScanBuildStatement(const std::string& ruleName,
 }
 }
 
-void cmNinjaTargetGenerator::WriteObjectBuildStatement(
+void cmFastbuildTargetGenerator::WriteObjectBuildStatement(
   cmSourceFile const* source, const std::string& config,
   const std::string& fileConfig, bool firstForConfig)
 {
   std::string const language = source->GetLanguage();
   std::string const sourceFileName =
     language == "RC" ? source->GetFullPath() : this->GetSourceFilePath(source);
-  std::string const objectDir = this->ConvertToNinjaPath(
+  std::string const objectDir = this->ConvertToFastbuildPath(
     cmStrCat(this->GeneratorTarget->GetSupportDirectory(),
              this->GetGlobalGenerator()->ConfigDirectory(config)));
   std::string const objectFileName =
-    this->ConvertToNinjaPath(this->GetObjectFilePath(source, config));
+    this->ConvertToFastbuildPath(this->GetObjectFilePath(source, config));
   std::string const objectFileDir =
     cmSystemTools::GetFilenamePath(objectFileName);
 
@@ -1219,8 +1219,8 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   int const commandLineLengthLimit =
     ((lang_supports_response && this->ForceResponseFile())) ? -1 : 0;
 
-  cmNinjaBuild objBuild(this->LanguageCompilerRule(language, config));
-  cmNinjaVars& vars = objBuild.Variables;
+  cmFastbuildBuild objBuild(this->LanguageCompilerRule(language, config));
+  cmFastbuildVars& vars = objBuild.Variables;
   vars["FLAGS"] = this->ComputeFlagsForObject(source, language, config);
   vars["DEFINES"] = this->ComputeDefines(source, language, config);
   vars["INCLUDES"] = this->ComputeIncludes(source, language, config);
@@ -1309,7 +1309,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     }
     std::transform(depList.begin(), depList.end(),
                    std::back_inserter(objBuild.ImplicitDeps),
-                   this->MapToNinjaPath());
+                   this->MapToFastbuildPath());
   }
 
   objBuild.OrderOnlyDeps.push_back(this->OrderDependsTargetForTarget(config));
@@ -1359,13 +1359,13 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     std::string ppFileName;
     if (compilePP) {
       scanRuleName = this->LanguagePreprocessAndScanRule(language, config);
-      ppFileName = this->ConvertToNinjaPath(
+      ppFileName = this->ConvertToFastbuildPath(
         this->GetPreprocessedFilePath(source, config));
     } else {
       scanRuleName = this->LanguageScanRule(language, config);
     }
 
-    cmNinjaBuild ppBuild = GetScanBuildStatement(
+    cmFastbuildBuild ppBuild = GetScanBuildStatement(
       scanRuleName, ppFileName, compilePP, compilePPWithDefines, objBuild,
       vars, modmapFormat, objectFileName, this->LocalGenerator);
 
@@ -1394,7 +1394,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
       this->Configs[config].DDIFiles[language].push_back(ddiFile);
     }
 
-    this->addPoolNinjaVariable("JOB_POOL_COMPILE", this->GetGeneratorTarget(),
+    this->addPoolFastbuildVariable("JOB_POOL_COMPILE", this->GetGeneratorTarget(),
                                ppBuild.Variables);
 
     this->GetGlobalGenerator()->WriteBuild(this->GetImplFileStream(fileConfig),
@@ -1418,13 +1418,13 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   vars["OBJECT_FILE_DIR"] = this->GetLocalGenerator()->ConvertToOutputFormat(
     objectFileDir, cmOutputConverter::SHELL);
 
-  this->addPoolNinjaVariable("JOB_POOL_COMPILE", this->GetGeneratorTarget(),
+  this->addPoolFastbuildVariable("JOB_POOL_COMPILE", this->GetGeneratorTarget(),
                              vars);
 
   if (!pchSources.empty() && !source->GetProperty("SKIP_PRECOMPILE_HEADERS")) {
     auto pchIt = pchSources.find(source->GetFullPath());
     if (pchIt != pchSources.end()) {
-      this->addPoolNinjaVariable("JOB_POOL_PRECOMPILE_HEADER",
+      this->addPoolFastbuildVariable("JOB_POOL_PRECOMPILE_HEADER",
                                  this->GetGeneratorTarget(), vars);
     }
   }
@@ -1454,7 +1454,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
 
     std::string ispcHeader =
       cmStrCat(ispcHeaderDirectory, '/', ispcSource, *ispcSuffixProp);
-    ispcHeader = this->ConvertToNinjaPath(ispcHeader);
+    ispcHeader = this->ConvertToFastbuildPath(ispcHeader);
 
     // Make sure ninja knows what command generates the header
     objBuild.ImplicitOuts.push_back(ispcHeader);
@@ -1471,7 +1471,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
         objectName, rootObjectDir, ispcSuffixes);
 
       for (auto sideEffect : ispcSideEfffectObjects) {
-        sideEffect = this->ConvertToNinjaPath(sideEffect);
+        sideEffect = this->ConvertToFastbuildPath(sideEffect);
         objBuild.ImplicitOuts.emplace_back(sideEffect);
         this->GetGlobalGenerator()->AddAdditionalCleanFile(sideEffect, config);
       }
@@ -1484,7 +1484,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
     auto headers = this->GeneratorTarget->GetGeneratedISPCHeaders(config);
     if (!headers.empty()) {
       std::transform(headers.begin(), headers.end(), headers.begin(),
-                     this->MapToNinjaPath());
+                     this->MapToFastbuildPath());
       objBuild.OrderOnlyDeps.insert(objBuild.OrderOnlyDeps.end(),
                                     headers.begin(), headers.end());
     }
@@ -1502,11 +1502,11 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
       *objectOutputs, this->LocalGenerator, config);
 
     if (!evaluatedObjectOutputs.empty()) {
-      cmNinjaBuild build("phony");
+      cmFastbuildBuild build("phony");
       build.Comment = "Additional output files.";
       build.Outputs = cmExpandedList(evaluatedObjectOutputs);
       std::transform(build.Outputs.begin(), build.Outputs.end(),
-                     build.Outputs.begin(), this->MapToNinjaPath());
+                     build.Outputs.begin(), this->MapToFastbuildPath());
       build.ExplicitDeps = objBuild.Outputs;
       this->GetGlobalGenerator()->WriteBuild(
         this->GetImplFileStream(fileConfig), build);
@@ -1514,7 +1514,7 @@ void cmNinjaTargetGenerator::WriteObjectBuildStatement(
   }
 }
 
-void cmNinjaTargetGenerator::WriteTargetDependInfo(std::string const& lang,
+void cmFastbuildTargetGenerator::WriteTargetDependInfo(std::string const& lang,
                                                    const std::string& config)
 {
   Json::Value tdi(Json::objectValue);
@@ -1556,7 +1556,7 @@ void cmNinjaTargetGenerator::WriteTargetDependInfo(std::string const& lang,
   for (std::string const& i : includes) {
     // Convert the include directories the same way we do for -I flags.
     // See upstream ninja issue 1251.
-    tdi_include_dirs.append(this->ConvertToNinjaPath(i));
+    tdi_include_dirs.append(this->ConvertToFastbuildPath(i));
   }
 
   Json::Value& tdi_linked_target_dirs = tdi["linked-target-dirs"] =
@@ -1570,13 +1570,13 @@ void cmNinjaTargetGenerator::WriteTargetDependInfo(std::string const& lang,
   tdif << tdi;
 }
 
-void cmNinjaTargetGenerator::EmitSwiftDependencyInfo(
+void cmFastbuildTargetGenerator::EmitSwiftDependencyInfo(
   cmSourceFile const* source, const std::string& config)
 {
   std::string const sourceFilePath =
-    this->ConvertToNinjaPath(this->GetSourceFilePath(source));
+    this->ConvertToFastbuildPath(this->GetSourceFilePath(source));
   std::string const objectFilePath =
-    this->ConvertToNinjaPath(this->GetObjectFilePath(source, config));
+    this->ConvertToFastbuildPath(this->GetObjectFilePath(source, config));
   std::string const swiftDepsPath = [source, objectFilePath]() -> std::string {
     if (cmProp name = source->GetProperty("Swift_DEPENDENCIES_FILE")) {
       return *name;
@@ -1590,9 +1590,9 @@ void cmNinjaTargetGenerator::EmitSwiftDependencyInfo(
     return cmStrCat(objectFilePath, ".dia");
   }();
   std::string const makeDepsPath = [this, source, config]() -> std::string {
-    cmLocalNinjaGenerator const* local = this->GetLocalGenerator();
+    cmLocalFastbuildGenerator const* local = this->GetLocalGenerator();
     std::string const objectFileName =
-      this->ConvertToNinjaPath(this->GetObjectFilePath(source, config));
+      this->ConvertToFastbuildPath(this->GetObjectFilePath(source, config));
     std::string const objectFileDir =
       cmSystemTools::GetFilenamePath(objectFileName);
 
@@ -1617,7 +1617,7 @@ void cmNinjaTargetGenerator::EmitSwiftDependencyInfo(
   this->Configs[config].SwiftOutputMap[sourceFilePath] = entry;
 }
 
-void cmNinjaTargetGenerator::ExportObjectCompileCommand(
+void cmFastbuildTargetGenerator::ExportObjectCompileCommand(
   std::string const& language, std::string const& sourceFileName,
   std::string const& objectDir, std::string const& objectFileName,
   std::string const& objectFileDir, std::string const& flags,
@@ -1690,17 +1690,17 @@ void cmNinjaTargetGenerator::ExportObjectCompileCommand(
   this->GetGlobalGenerator()->AddCXXCompileCommand(cmdLine, sourceFileName);
 }
 
-void cmNinjaTargetGenerator::AdditionalCleanFiles(const std::string& config)
+void cmFastbuildTargetGenerator::AdditionalCleanFiles(const std::string& config)
 {
   if (cmProp prop_value =
         this->GeneratorTarget->GetProperty("ADDITIONAL_CLEAN_FILES")) {
-    cmLocalNinjaGenerator* lg = this->LocalGenerator;
+    cmLocalFastbuildGenerator* lg = this->LocalGenerator;
     std::vector<std::string> cleanFiles;
     cmExpandList(cmGeneratorExpression::Evaluate(*prop_value, lg, config,
                                                  this->GeneratorTarget),
                  cleanFiles);
     std::string const& binaryDir = lg->GetCurrentBinaryDirectory();
-    cmGlobalNinjaGenerator* gg = lg->GetGlobalNinjaGenerator();
+    cmGlobalFastbuildGenerator* gg = lg->GetGlobalFastbuildGenerator();
     for (std::string const& cleanFile : cleanFiles) {
       // Support relative paths
       gg->AddAdditionalCleanFile(
@@ -1709,7 +1709,7 @@ void cmNinjaTargetGenerator::AdditionalCleanFiles(const std::string& config)
   }
 }
 
-cmNinjaDeps cmNinjaTargetGenerator::GetObjects(const std::string& config) const
+cmFastbuildDeps cmFastbuildTargetGenerator::GetObjects(const std::string& config) const
 {
   auto const it = this->Configs.find(config);
   if (it != this->Configs.end()) {
@@ -1718,28 +1718,28 @@ cmNinjaDeps cmNinjaTargetGenerator::GetObjects(const std::string& config) const
   return {};
 }
 
-void cmNinjaTargetGenerator::EnsureDirectoryExists(
+void cmFastbuildTargetGenerator::EnsureDirectoryExists(
   const std::string& path) const
 {
   if (cmSystemTools::FileIsFullPath(path)) {
     cmSystemTools::MakeDirectory(path);
   } else {
-    cmGlobalNinjaGenerator* gg = this->GetGlobalGenerator();
+    cmGlobalFastbuildGenerator* gg = this->GetGlobalGenerator();
     std::string fullPath = gg->GetCMakeInstance()->GetHomeOutputDirectory();
     // Also ensures their is a trailing slash.
-    gg->StripNinjaOutputPathPrefixAsSuffix(fullPath);
+    gg->StripFastbuildOutputPathPrefixAsSuffix(fullPath);
     fullPath += path;
     cmSystemTools::MakeDirectory(fullPath);
   }
 }
 
-void cmNinjaTargetGenerator::EnsureParentDirectoryExists(
+void cmFastbuildTargetGenerator::EnsureParentDirectoryExists(
   const std::string& path) const
 {
   this->EnsureDirectoryExists(cmSystemTools::GetParentDirectory(path));
 }
 
-void cmNinjaTargetGenerator::MacOSXContentGeneratorType::operator()(
+void cmFastbuildTargetGenerator::MacOSXContentGeneratorType::operator()(
   cmSourceFile const& source, const char* pkgloc, const std::string& config)
 {
   // Skip OS X content when not building a Framework or Bundle.
@@ -1763,12 +1763,12 @@ void cmNinjaTargetGenerator::MacOSXContentGeneratorType::operator()(
 
   // Get the input file location.
   std::string input = source.GetFullPath();
-  input = this->Generator->GetGlobalGenerator()->ConvertToNinjaPath(input);
+  input = this->Generator->GetGlobalGenerator()->ConvertToFastbuildPath(input);
 
   // Get the output file location.
   std::string output =
     cmStrCat(macdir, '/', cmSystemTools::GetFilenameName(input));
-  output = this->Generator->GetGlobalGenerator()->ConvertToNinjaPath(output);
+  output = this->Generator->GetGlobalGenerator()->ConvertToFastbuildPath(output);
 
   // Write a build statement to copy the content into the bundle.
   this->Generator->GetGlobalGenerator()->WriteMacOSXContentBuild(
@@ -1778,9 +1778,9 @@ void cmNinjaTargetGenerator::MacOSXContentGeneratorType::operator()(
   this->Generator->Configs[config].ExtraFiles.push_back(std::move(output));
 }
 
-void cmNinjaTargetGenerator::addPoolNinjaVariable(
+void cmFastbuildTargetGenerator::addPoolFastbuildVariable(
   const std::string& pool_property, cmGeneratorTarget* target,
-  cmNinjaVars& vars)
+  cmFastbuildVars& vars)
 {
   cmProp pool = target->GetProperty(pool_property);
   if (pool) {
@@ -1788,9 +1788,9 @@ void cmNinjaTargetGenerator::addPoolNinjaVariable(
   }
 }
 
-bool cmNinjaTargetGenerator::ForceResponseFile()
+bool cmFastbuildTargetGenerator::ForceResponseFile()
 {
-  static std::string const forceRspFile = "CMAKE_NINJA_FORCE_RESPONSE_FILE";
+  static std::string const forceRspFile = "CMAKE_FASTBUILD_FORCE_RESPONSE_FILE";
   return (this->GetMakefile()->IsDefinitionSet(forceRspFile) ||
           cmSystemTools::HasEnv(forceRspFile));
 }

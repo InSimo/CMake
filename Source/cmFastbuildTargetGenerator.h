@@ -14,36 +14,36 @@
 #include <cm3p/json/value.h>
 
 #include "cmCommonTargetGenerator.h"
-#include "cmGlobalNinjaGenerator.h"
-#include "cmNinjaTypes.h"
+#include "cmGlobalFastbuildGenerator.h"
+#include "cmFastbuildTypes.h"
 #include "cmOSXBundleGenerator.h"
 
 class cmCustomCommand;
 class cmGeneratedFileStream;
 class cmGeneratorTarget;
-class cmLocalNinjaGenerator;
+class cmLocalFastbuildGenerator;
 class cmMakefile;
 class cmSourceFile;
 
-class cmNinjaTargetGenerator : public cmCommonTargetGenerator
+class cmFastbuildTargetGenerator : public cmCommonTargetGenerator
 {
 public:
   /// Create a cmNinjaTargetGenerator according to the @a target's type.
-  static std::unique_ptr<cmNinjaTargetGenerator> New(
+  static std::unique_ptr<cmFastbuildTargetGenerator> New(
     cmGeneratorTarget* target);
 
   /// Build a NinjaTargetGenerator.
-  cmNinjaTargetGenerator(cmGeneratorTarget* target);
+  cmFastbuildTargetGenerator(cmGeneratorTarget* target);
 
   /// Destructor.
-  ~cmNinjaTargetGenerator() override;
+  ~cmFastbuildTargetGenerator() override;
 
   virtual void Generate(const std::string& config) = 0;
 
   std::string GetTargetName() const;
 
 protected:
-  bool SetMsvcTargetPdbVariable(cmNinjaVars&, const std::string& config) const;
+  bool SetMsvcTargetPdbVariable(cmFastbuildVars&, const std::string& config) const;
 
   cmGeneratedFileStream& GetImplFileStream(const std::string& config) const;
   cmGeneratedFileStream& GetCommonFileStream() const;
@@ -54,12 +54,12 @@ protected:
     return this->GeneratorTarget;
   }
 
-  cmLocalNinjaGenerator* GetLocalGenerator() const
+  cmLocalFastbuildGenerator* GetLocalGenerator() const
   {
     return this->LocalGenerator;
   }
 
-  cmGlobalNinjaGenerator* GetGlobalGenerator() const;
+  cmGlobalFastbuildGenerator* GetGlobalGenerator() const;
 
   cmMakefile* GetMakefile() const { return this->Makefile; }
 
@@ -101,17 +101,17 @@ protected:
                               const std::string& language,
                               const std::string& config);
 
-  std::string ConvertToNinjaPath(const std::string& path) const
+  std::string ConvertToFastbuildPath(const std::string& path) const
   {
-    return this->GetGlobalGenerator()->ConvertToNinjaPath(path);
+    return this->GetGlobalGenerator()->ConvertToFastbuildPath(path);
   }
-  cmGlobalNinjaGenerator::MapToNinjaPathImpl MapToNinjaPath() const
+  cmGlobalFastbuildGenerator::MapToFastbuildPathImpl MapToFastbuildPath() const
   {
-    return this->GetGlobalGenerator()->MapToNinjaPath();
+    return this->GetGlobalGenerator()->MapToFastbuildPath();
   }
 
   /// @return the list of link dependency for the given target @a target.
-  cmNinjaDeps ComputeLinkDeps(const std::string& linkLanguage,
+  cmFastbuildDeps ComputeLinkDeps(const std::string& linkLanguage,
                               const std::string& config,
                               bool ignoreType = false) const;
 
@@ -167,7 +167,7 @@ protected:
 
   void AdditionalCleanFiles(const std::string& config);
 
-  cmNinjaDeps GetObjects(const std::string& config) const;
+  cmFastbuildDeps GetObjects(const std::string& config) const;
 
   void EnsureDirectoryExists(const std::string& dir) const;
   void EnsureParentDirectoryExists(const std::string& path) const;
@@ -176,7 +176,7 @@ protected:
   struct MacOSXContentGeneratorType
     : cmOSXBundleGenerator::MacOSXContentGeneratorType
   {
-    MacOSXContentGeneratorType(cmNinjaTargetGenerator* g,
+    MacOSXContentGeneratorType(cmFastbuildTargetGenerator* g,
                                std::string fileConfig)
       : Generator(g)
       , FileConfig(std::move(fileConfig))
@@ -187,7 +187,7 @@ protected:
                     const std::string& config) override;
 
   private:
-    cmNinjaTargetGenerator* Generator;
+    cmFastbuildTargetGenerator* Generator;
     std::string FileConfig;
   };
   friend struct MacOSXContentGeneratorType;
@@ -196,24 +196,24 @@ protected:
   std::unique_ptr<cmOSXBundleGenerator> OSXBundleGenerator;
   std::set<std::string> MacContentFolders;
 
-  void addPoolNinjaVariable(const std::string& pool_property,
-                            cmGeneratorTarget* target, cmNinjaVars& vars);
+  void addPoolFastbuildVariable(const std::string& pool_property,
+                            cmGeneratorTarget* target, cmFastbuildVars& vars);
 
   bool ForceResponseFile();
 
 private:
-  cmLocalNinjaGenerator* LocalGenerator;
+  cmLocalFastbuildGenerator* LocalGenerator;
 
   struct ByConfig
   {
     /// List of object files for this target.
-    cmNinjaDeps Objects;
+    cmFastbuildDeps Objects;
     // Fortran Support
-    std::map<std::string, cmNinjaDeps> DDIFiles;
+    std::map<std::string, cmFastbuildDeps> DDIFiles;
     // Swift Support
     Json::Value SwiftOutputMap;
     std::vector<cmCustomCommand const*> CustomCommands;
-    cmNinjaDeps ExtraFiles;
+    cmFastbuildDeps ExtraFiles;
     std::unique_ptr<MacOSXContentGeneratorType> MacOSXContentGenerator;
   };
 

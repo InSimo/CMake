@@ -1,6 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#include "cmNinjaUtilityTargetGenerator.h"
+#include "cmFastbuildUtilityTargetGenerator.h"
 
 #include <algorithm>
 #include <array>
@@ -14,9 +14,9 @@
 #include "cmCustomCommandGenerator.h"
 #include "cmGeneratedFileStream.h"
 #include "cmGeneratorTarget.h"
-#include "cmGlobalNinjaGenerator.h"
-#include "cmLocalNinjaGenerator.h"
-#include "cmNinjaTypes.h"
+#include "cmGlobalFastbuildGenerator.h"
+#include "cmLocalFastbuildGenerator.h"
+#include "cmFastbuildTypes.h"
 #include "cmOutputConverter.h"
 #include "cmProperty.h"
 #include "cmSourceFile.h"
@@ -25,15 +25,15 @@
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 
-cmNinjaUtilityTargetGenerator::cmNinjaUtilityTargetGenerator(
+cmFastbuildUtilityTargetGenerator::cmFastbuildUtilityTargetGenerator(
   cmGeneratorTarget* target)
-  : cmNinjaTargetGenerator(target)
+  : cmFastbuildTargetGenerator(target)
 {
 }
 
-cmNinjaUtilityTargetGenerator::~cmNinjaUtilityTargetGenerator() = default;
+cmFastbuildUtilityTargetGenerator::~cmFastbuildUtilityTargetGenerator() = default;
 
-void cmNinjaUtilityTargetGenerator::Generate(const std::string& config)
+void cmFastbuildUtilityTargetGenerator::Generate(const std::string& config)
 {
   if (!this->GetGeneratorTarget()->Target->IsPerConfig()) {
     this->WriteUtilBuildStatements(config, config);
@@ -54,11 +54,11 @@ void cmNinjaUtilityTargetGenerator::Generate(const std::string& config)
   }
 }
 
-void cmNinjaUtilityTargetGenerator::WriteUtilBuildStatements(
+void cmFastbuildUtilityTargetGenerator::WriteUtilBuildStatements(
   std::string const& config, std::string const& fileConfig)
 {
-  cmGlobalNinjaGenerator* gg = this->GetGlobalGenerator();
-  cmLocalNinjaGenerator* lg = this->GetLocalGenerator();
+  cmGlobalFastbuildGenerator* gg = this->GetGlobalGenerator();
+  cmLocalFastbuildGenerator* lg = this->GetLocalGenerator();
   cmGeneratorTarget* genTarget = this->GetGeneratorTarget();
 
   std::string configDir;
@@ -68,12 +68,12 @@ void cmNinjaUtilityTargetGenerator::WriteUtilBuildStatements(
   std::string utilCommandName =
     cmStrCat(lg->GetCurrentBinaryDirectory(), "/CMakeFiles", configDir, "/",
              this->GetTargetName(), ".util");
-  utilCommandName = this->ConvertToNinjaPath(utilCommandName);
+  utilCommandName = this->ConvertToFastbuildPath(utilCommandName);
 
-  cmNinjaBuild phonyBuild("phony");
+  cmFastbuildBuild phonyBuild("phony");
   std::vector<std::string> commands;
-  cmNinjaDeps deps;
-  cmNinjaDeps util_outputs(1, utilCommandName);
+  cmFastbuildDeps deps;
+  cmFastbuildDeps util_outputs(1, utilCommandName);
 
   bool uses_terminal = false;
   {
@@ -89,7 +89,7 @@ void cmNinjaUtilityTargetGenerator::WriteUtilBuildStatements(
         std::vector<std::string> const& ccByproducts = ccg.GetByproducts();
         std::transform(ccByproducts.begin(), ccByproducts.end(),
                        std::back_inserter(util_outputs),
-                       this->MapToNinjaPath());
+                       this->MapToFastbuildPath());
         if (ci.GetUsesTerminal()) {
           uses_terminal = true;
         }
@@ -109,9 +109,9 @@ void cmNinjaUtilityTargetGenerator::WriteUtilBuildStatements(
         const std::vector<std::string>& ccOutputs = ccg.GetOutputs();
         const std::vector<std::string>& ccByproducts = ccg.GetByproducts();
         std::transform(ccOutputs.begin(), ccOutputs.end(),
-                       std::back_inserter(deps), this->MapToNinjaPath());
+                       std::back_inserter(deps), this->MapToFastbuildPath());
         std::transform(ccByproducts.begin(), ccByproducts.end(),
-                       std::back_inserter(deps), this->MapToNinjaPath());
+                       std::back_inserter(deps), this->MapToFastbuildPath());
       }
     }
   }

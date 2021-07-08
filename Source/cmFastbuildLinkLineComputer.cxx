@@ -1,22 +1,22 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
 
-#include "cmNinjaLinkLineComputer.h"
+#include "cmFastbuildLinkLineComputer.h"
 
-#include "cmGlobalNinjaGenerator.h"
+#include "cmGlobalFastbuildGenerator.h"
 
 class cmOutputConverter;
 
-cmNinjaLinkLineComputer::cmNinjaLinkLineComputer(
+cmFastbuildLinkLineComputer::cmFastbuildLinkLineComputer(
   cmOutputConverter* outputConverter, cmStateDirectory const& stateDir,
-  cmGlobalNinjaGenerator const* gg)
+  cmGlobalFastbuildGenerator const* gg)
   : cmLinkLineComputer(outputConverter, stateDir)
   , GG(gg)
 {
 }
 
-std::string cmNinjaLinkLineComputer::ConvertToLinkReference(
+std::string cmFastbuildLinkLineComputer::ConvertToLinkReference(
   std::string const& lib) const
 {
-  return this->GG->ConvertToNinjaPath(lib);
+  return this->GG->ConvertToFastbuildPath(lib);
 }

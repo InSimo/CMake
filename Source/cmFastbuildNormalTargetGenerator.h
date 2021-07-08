@@ -8,13 +8,13 @@
 #include <vector>
 
 #include "cmGeneratorTarget.h"
-#include "cmNinjaTargetGenerator.h"
+#include "cmFastbuildTargetGenerator.h"
 
-class cmNinjaNormalTargetGenerator : public cmNinjaTargetGenerator
+class cmFastbuildNormalTargetGenerator : public cmFastbuildTargetGenerator
 {
 public:
-  cmNinjaNormalTargetGenerator(cmGeneratorTarget* target);
-  ~cmNinjaNormalTargetGenerator() override;
+  cmFastbuildNormalTargetGenerator(cmGeneratorTarget* target);
+  ~cmFastbuildNormalTargetGenerator() override;
 
   void Generate(const std::string& config) override;
 

@@ -10,20 +10,20 @@
 #include <utility>
 #include <vector>
 
-enum cmNinjaTargetDepends
+enum cmFastbuildTargetDepends
 {
   DependOnTargetArtifact,
   DependOnTargetOrdering
 };
 
-using cmNinjaDeps = std::vector<std::string>;
-using cmNinjaOuts = std::set<std::string>;
-using cmNinjaVars = std::map<std::string, std::string>;
+using cmFastbuildDeps = std::vector<std::string>;
+using cmFastbuildOuts = std::set<std::string>;
+using cmFastbuildVars = std::map<std::string, std::string>;
 
-class cmNinjaRule
+class cmFastbuildRule
 {
 public:
-  cmNinjaRule(std::string name)
+  cmFastbuildRule(std::string name)
     : Name(std::move(name))
   {
   }
@@ -40,22 +40,22 @@ public:
   bool Generator = false;
 };
 
-class cmNinjaBuild
+class cmFastbuildBuild
 {
 public:
-  cmNinjaBuild() = default;
-  cmNinjaBuild(std::string rule)
+  cmFastbuildBuild() = default;
+  cmFastbuildBuild(std::string rule)
     : Rule(std::move(rule))
   {
   }
 
   std::string Comment;
   std::string Rule;
-  cmNinjaDeps Outputs;
-  cmNinjaDeps ImplicitOuts;
-  cmNinjaDeps ExplicitDeps;
-  cmNinjaDeps ImplicitDeps;
-  cmNinjaDeps OrderOnlyDeps;
-  cmNinjaVars Variables;
+  cmFastbuildDeps Outputs;
+  cmFastbuildDeps ImplicitOuts;
+  cmFastbuildDeps ExplicitDeps;
+  cmFastbuildDeps ImplicitDeps;
+  cmFastbuildDeps OrderOnlyDeps;
+  cmFastbuildVars Variables;
   std::string RspFile;
 };

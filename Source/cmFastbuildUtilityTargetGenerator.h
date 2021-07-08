@@ -6,15 +6,15 @@
 
 #include <string>
 
-#include "cmNinjaTargetGenerator.h"
+#include "cmFastbuildTargetGenerator.h"
 
 class cmGeneratorTarget;
 
-class cmNinjaUtilityTargetGenerator : public cmNinjaTargetGenerator
+class cmFastbuildUtilityTargetGenerator : public cmFastbuildTargetGenerator
 {
 public:
-  cmNinjaUtilityTargetGenerator(cmGeneratorTarget* target);
-  ~cmNinjaUtilityTargetGenerator() override;
+  cmFastbuildUtilityTargetGenerator(cmGeneratorTarget* target);
+  ~cmFastbuildUtilityTargetGenerator() override;
 
   void Generate(const std::string& config) override;
 

@@ -112,7 +112,7 @@ std::string cmLinkLineComputer::ConvertToOutputFormat(std::string const& input)
   } else if (this->UseNinjaMulti) {
     shellFormat = cmOutputConverter::NINJAMULTI;
   } else if (this->UseFastbuildMulti) {
-    shellFormat = cmOutputConverter::NINJAMULTI; //TEMPO
+    shellFormat = cmOutputConverter::NINJAMULTI; //TMP
   }
 
   return this->OutputConverter->ConvertToOutputFormat(input, shellFormat);
@@ -129,7 +129,7 @@ std::string cmLinkLineComputer::ConvertToOutputForExisting(
   } else if (this->UseNinjaMulti) {
     shellFormat = cmOutputConverter::NINJAMULTI;
   } else if (this->UseFastbuildMulti) {
-    shellFormat = cmOutputConverter::NINJAMULTI; //TEMPO
+    shellFormat = cmOutputConverter::NINJAMULTI; //TMP
   }
 
   return this->OutputConverter->ConvertToOutputForExisting(input, shellFormat);

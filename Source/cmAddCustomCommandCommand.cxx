@@ -297,7 +297,7 @@ bool cmAddCustomCommandCommand(std::vector<std::string> const& args,
     return false;
   }
   if (!implicit_depends.empty() && !depfile.empty() &&
-      mf.GetGlobalGenerator()->GetName() != "Ninja") {
+      mf.GetGlobalGenerator()->GetName() != "Ninja" && mf.GetGlobalGenerator()->GetName() != "Fastbuild") {
     // Makefiles generators does not support both at the same time
     status.SetError("IMPLICIT_DEPENDS and DEPFILE can not both be specified.");
     return false;

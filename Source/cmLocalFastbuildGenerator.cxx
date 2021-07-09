@@ -269,8 +269,8 @@ void cmLocalFastbuildGenerator::WriteBuildFileTop()
 void cmLocalFastbuildGenerator::WriteProjectHeader(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "# Project: " << this->GetProjectName() << '\n'
-     << "# Configurations: " << cmJoin(this->GetConfigNames(), ", ") << '\n';
+  os << "// Project: " << this->GetProjectName() << '\n'
+     << "// Configurations: " << cmJoin(this->GetConfigNames(), ", ") << '\n';
   cmGlobalFastbuildGenerator::WriteDivider(os);
 }
 
@@ -339,7 +339,7 @@ void cmLocalFastbuildGenerator::WritePools(std::ostream& os)
 void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionConfig(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "# Include auxiliary files.\n\n";
+  os << "// Include auxiliary files.\n\n";
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildCommonFile =
     ng->FastbuildOutputPath(cmGlobalFastbuildMultiGenerator::FASTBUILD_COMMON_FILE);
@@ -352,7 +352,7 @@ void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionConfig(std::ostream&
 void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionCommon(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "# Include auxiliary files.\n\n";
+  os << "// Include auxiliary files.\n\n";
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildRulesFile =
     ng->FastbuildOutputPath(cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE);
@@ -365,11 +365,11 @@ void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionCommon(std::ostream&
 void cmLocalFastbuildGenerator::WriteProcessedMakefile(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "# Write statements declared in CMakeLists.txt:\n"
-     << "# " << this->Makefile->GetSafeDefinition("CMAKE_CURRENT_LIST_FILE")
+  os << "// Write statements declared in CMakeLists.txt:\n"
+     << "// " << this->Makefile->GetSafeDefinition("CMAKE_CURRENT_LIST_FILE")
      << '\n';
   if (this->IsRootMakefile()) {
-    os << "# Which is the root file.\n";
+    os << "// Which is the root file.\n";
   }
   cmGlobalFastbuildGenerator::WriteDivider(os);
   os << '\n';

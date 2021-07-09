@@ -366,27 +366,27 @@ public:
   void ComputeTargetObjectDirectory(cmGeneratorTarget* gt) const override;
 
   // Ninja generator uses 'deps' and 'msvc_deps_prefix' introduced in 1.3
-  static std::string RequiredFastbuildVersion() { return "1.3"; }
-  static std::string RequiredFastbuildVersionForConsolePool() { return "1.5"; }
-  static std::string RequiredFastbuildVersionForImplicitOuts() { return "1.7"; }
-  static std::string RequiredFastbuildVersionForManifestRestat() { return "1.8"; }
+  static std::string RequiredFastbuildVersion() { return "v1.05"; }
+  static std::string RequiredFastbuildVersionForConsolePool() { return "v1.05"; }
+  static std::string RequiredFastbuildVersionForImplicitOuts() { return "v1.05"; }
+  static std::string RequiredFastbuildVersionForManifestRestat() { return "v1.05"; }
   static std::string RequiredFastbuildVersionForMultilineDepfile()
   {
-    return "1.9";
+    return "1.05";
   }
-  static std::string RequiredFastbuildVersionForDyndeps() { return "1.10"; }
-  static std::string RequiredFastbuildVersionForRestatTool() { return "1.10"; }
+  static std::string RequiredFastbuildVersionForDyndeps() { return "v1.05"; }
+  static std::string RequiredFastbuildVersionForRestatTool() { return "v1.05"; }
   static std::string RequiredFastbuildVersionForUnconditionalRecompactTool()
   {
-    return "1.10";
+    return "1.05";
   }
   static std::string RequiredFastbuildVersionForMultipleOutputs()
   {
-    return "1.10";
+    return "1.05";
   }
   static std::string RequiredFastbuildVersionForMetadataOnRegeneration()
   {
-    return "1.10.2";
+    return "1.05";
   }
   bool SupportsConsolePool() const;
   bool SupportsImplicitOuts() const;

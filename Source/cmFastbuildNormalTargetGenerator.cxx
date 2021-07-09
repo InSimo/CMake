@@ -117,7 +117,7 @@ void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
 #ifdef FASTBUILD_GEN_VERBOSE_FILES
   cmGlobalFastbuildGenerator::WriteDivider(this->GetRulesFileStream());
   this->GetRulesFileStream()
-    << "# Rules for each languages for "
+    << "// Rules for each languages for "
     << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
     << " target " << this->GetTargetName() << "\n\n";
 #endif
@@ -691,7 +691,7 @@ void cmFastbuildNormalTargetGenerator::WriteDeviceLinkStatement(
   // Write comments.
   cmGlobalFastbuildGenerator::WriteDivider(this->GetCommonFileStream());
   this->GetCommonFileStream()
-    << "# Device Link build statements for "
+    << "// Device Link build statements for "
     << cmState::GetTargetTypeName(genTarget->GetType()) << " target "
     << this->GetTargetName() << "\n\n";
 
@@ -1008,7 +1008,7 @@ void cmFastbuildNormalTargetGenerator::WriteLinkStatement(
   cmGlobalFastbuildGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
   const cmStateEnums::TargetType targetType = gt->GetType();
   this->GetImplFileStream(fileConfig)
-    << "# Link build statements for " << cmState::GetTargetTypeName(targetType)
+    << "// Link build statements for " << cmState::GetTargetTypeName(targetType)
     << " target " << this->GetTargetName() << "\n\n";
 
   cmFastbuildBuild linkBuild(this->LanguageLinkerRule(config));

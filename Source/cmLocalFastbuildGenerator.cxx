@@ -297,14 +297,14 @@ void cmLocalFastbuildGenerator::WriteFastbuildRequiredVersion(std::ostream& os)
 
   cmGlobalFastbuildGenerator::WriteComment(
     os, "Minimal version of Fastbuild required by this file");
-  os << "fastbuild_required_version = " << requiredVersion << "\n\n";
+  os << "// fastbuild_required_version = " << requiredVersion << "\n\n";
 }
 
 void cmLocalFastbuildGenerator::WriteFastbuildConfigurationVariable(
   std::ostream& os, const std::string& config)
 {
   cmGlobalFastbuildGenerator::WriteVariable(
-    os, "CONFIGURATION", config,
+    os, "// CONFIGURATION", config,
     "Set configuration variable for custom commands.");
 }
 

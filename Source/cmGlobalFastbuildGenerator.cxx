@@ -210,7 +210,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
   cmGlobalFastbuildGenerator::WriteComment(os, build.Comment);
 
   // Write output files.
-  std::string buildStr("build");
+  std::string buildStr("// build");
   {
     // Write explicit outputs
     for (std::string const& output : build.Outputs) {
@@ -417,7 +417,7 @@ void cmGlobalFastbuildGenerator::WriteRule(std::ostream& os,
   auto writeKV = [&os](const char* key, std::string const& value) {
     if (!value.empty()) {
       cmGlobalFastbuildGenerator::Indent(os, 1);
-      os << key << " = " << value << '\n';
+      os << "// " << key << " = " << value << '\n';
     }
   };
 
@@ -446,8 +446,8 @@ void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
 {
   // Make sure we have a name.
   if (name.empty()) {
-    cmSystemTools::Error(cmStrCat("No name given for WriteVariable! called "
-                                  "with comment: ",
+    cmSystemTools::Error(cmStrCat("// No name given for WriteVariable! called "
+                                  "// with comment: ",
                                   comment));
     return;
   }
@@ -460,7 +460,7 @@ void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
 
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
   cmGlobalFastbuildGenerator::Indent(os, indent);
-  os << name << " = " << val << "\n";
+  os << "// " << name << " = " << val << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteInclude(std::ostream& os,
@@ -468,7 +468,7 @@ void cmGlobalFastbuildGenerator::WriteInclude(std::ostream& os,
                                           const std::string& comment)
 {
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
-  os << "//include " << filename << "\n"; // TMP
+  os << "// include " << filename << "\n"; // TMP
 }
 
 void cmGlobalFastbuildGenerator::WriteDefault(std::ostream& os,
@@ -476,7 +476,7 @@ void cmGlobalFastbuildGenerator::WriteDefault(std::ostream& os,
                                           const std::string& comment)
 {
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
-  os << "default";
+  os << "// default";
   for (std::string const& target : targets) {
     os << " " << target;
   }
@@ -516,7 +516,7 @@ codecvt::Encoding cmGlobalFastbuildGenerator::GetMakefileEncoding() const
 void cmGlobalFastbuildGenerator::GetDocumentation(cmDocumentationEntry& entry)
 {
   entry.Name = cmGlobalFastbuildGenerator::GetActualName();
-  entry.Brief = "Generates fbuild.bff files.";
+  entry.Brief = "Generates FBuild.bff files.";
 }
 
 // Implemented in all cmGlobaleGenerator sub-classes.
@@ -1166,7 +1166,7 @@ void cmGlobalFastbuildGenerator::WriteAssumedSourceDependencies()
 std::string cmGlobalFastbuildGenerator::OrderDependsTargetForTarget(
   cmGeneratorTarget const* target, const std::string& /*config*/) const
 {
-  return cmStrCat("cmake_object_order_depends_target_", target->GetName());
+  return cmStrCat(" cmake_object_order_depends_target_", target->GetName());
 }
 
 void cmGlobalFastbuildGenerator::AppendTargetOutputs(
@@ -1504,7 +1504,7 @@ void cmGlobalFastbuildGenerator::WriteFolderTargets(std::ostream& os)
 
     // Setup target
     cmFastbuildDeps configDeps;
-    build.Comment = cmStrCat("Folder: ", currentBinaryDir);
+    build.Comment = cmStrCat("//Folder: ", currentBinaryDir);
     build.Outputs.emplace_back();
     std::string const buildDirAllTarget =
       this->ConvertToFastbuildPath(cmStrCat(currentBinaryDir, "/all"));
@@ -2078,8 +2078,8 @@ void cmGlobalFastbuildGenerator::WriteTargetHelp(std::ostream& os)
   {
     cmFastbuildRule rule("HELP");
     rule.Command = cmStrCat(this->FastbuildCmd(), " -t targets");
-    rule.Description = "All primary targets available:";
-    rule.Comment = "Rule for printing all primary targets available.";
+    rule.Description = "//All primary targets available:";
+    rule.Comment = "//Rule for printing all primary targets available.";
     WriteRule(*this->RulesFileStream, rule);
   }
   {
@@ -2644,7 +2644,7 @@ cmGlobalFastbuildMultiGenerator::cmGlobalFastbuildMultiGenerator(cmake* cm)
 void cmGlobalFastbuildMultiGenerator::GetDocumentation(cmDocumentationEntry& entry)
 {
   entry.Name = cmGlobalFastbuildMultiGenerator::GetActualName();
-  entry.Brief = "Generates fbuild-<Config>.bff files.";
+  entry.Brief = "Generates FBuild-<Config>.bff files.";
 }
 
 std::string cmGlobalFastbuildMultiGenerator::ExpandCFGIntDir(
@@ -2755,7 +2755,7 @@ std::string cmGlobalFastbuildMultiGenerator::GetFastbuildImplFilename(
 std::string cmGlobalFastbuildMultiGenerator::GetFastbuildConfigFilename(
   const std::string& config)
 {
-  return cmStrCat("build-", config,
+  return cmStrCat("FBuild-", config,
                   cmGlobalFastbuildMultiGenerator::FASTBUILD_FILE_EXTENSION);
 }
 

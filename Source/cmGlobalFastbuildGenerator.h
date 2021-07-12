@@ -132,9 +132,9 @@ public:
    * optional @a comment. An @a indent level can be specified.
    * @warning no escaping of any kind is done here.
    */
-  static void WriteVariable(std::ostream& os, const std::string& name,
+  /*static void WriteVariable(std::ostream& os, const std::string& name,
                             const std::string& value,
-                            const std::string& comment = "", int indent = 0);
+                            const std::string& comment = "", int indent = 0);*/
 
   /**
    * Write an include statement including @a filename with an optional
@@ -462,6 +462,18 @@ protected:
 
   void WriteSectionHeader(std::ostream& os, const std::string& comment);
 
+  void WritePushScope(std::ostream& os, char begin, char end);
+
+  void WritePopScopeStruct(std::ostream& os);
+
+  void WritePopScope(std::ostream& os);
+
+  void WriteVariable(std::ostream& os, const std::string& key, const std::string& value, const std::string& operation);
+
+  void WriteCommand(std::ostream& os, const std::string& command, const std::string& value);
+
+  void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, const std::string& operation);
+
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }
 
   virtual bool OpenBuildFileStreams();
@@ -479,6 +491,10 @@ protected:
   std::set<std::string> CrossConfigs;
   std::set<std::string> DefaultConfigs;
   std::string DefaultFileConfig;
+
+  // Variable for formatting file .bff
+  std::string linePrefix;
+  std::string closingScope;
 
 private:
   std::string GetEditCacheCommand() const override;

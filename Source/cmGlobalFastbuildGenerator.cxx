@@ -121,7 +121,7 @@ void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
   if (comment.empty()) {
     return;
   }
-  os << "// " << comment << "\n";
+  os /*<< this->linePrefix*/ << "// " << comment << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std::string& comment)
@@ -133,6 +133,66 @@ void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std:
   cmGlobalFastbuildGenerator::WriteDivider(os);
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
 	cmGlobalFastbuildGenerator::WriteDivider(os);
+}
+
+void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin = '{', char end = '}')
+{
+  os << this->linePrefix << begin << "\n";
+  this->linePrefix += "\t";
+  this->closingScope += end;
+}
+
+void cmGlobalFastbuildGenerator::WritePopScopeStruct(std::ostream& os)
+{
+  cmGlobalFastbuildGenerator::WritePushScope(os, '[', ']');
+}
+
+void cmGlobalFastbuildGenerator::WritePopScope(std::ostream& os)
+{
+  assert(!this->linePrefix.empty());
+  this->linePrefix.resize(this->linePrefix.size() - 1);
+
+  os << this->linePrefix << this->closingScope[this->closingScope.size() - 1] << "\n";
+
+  this->closingScope.resize(this->closingScope.size() - 1);
+}
+
+void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os, const std::string& key, const std::string& value,
+  const std::string& operation = "=")
+{
+  os << this->linePrefix << "." << key << " " << operation << " " << value << "\n";
+}
+
+void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os, const std::string& command, const std::string& value = std::string())
+{
+  os << this->linePrefix << command;
+  if (!value.empty())
+  {
+    os << "(" << value << ")";
+  }
+  os << "\n";
+}
+
+void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string& key,
+  const std::vector<std::string>& values,
+  const std::string& operation = "=")
+{
+  cmGlobalFastbuildGenerator::WriteVariable(os, key, "", operation);
+  cmGlobalFastbuildGenerator::WritePushScope(os);
+  size_t size = values.size();
+  for (size_t index = 0; index < size; ++index)
+  {
+    const std::string & value = values[index];
+    bool isLast = index == size - 1;
+
+    os << this->linePrefix << value;
+    if (!isLast)
+    {
+      os << '//';
+    }
+    os << "\n";
+  }
+  cmGlobalFastbuildGenerator::WritePopScope(os);
 }
 
 std::unique_ptr<cmLinkLineComputer>
@@ -195,7 +255,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
                                         cmFastbuildBuild const& build,
                                         int cmdLineLimit,
                                         bool* usedResponseFile)
-{
+{/* TMP
   // Make sure there is a rule.
   if (build.Rule.empty()) {
     cmSystemTools::Error(cmStrCat(
@@ -296,7 +356,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
     this->DisableCleandead = true;
   }
 
-  os << buildStr << arguments << assignments << "\n";
+  os << buildStr << arguments << assignments << "\n";*/
 }
 
 void cmGlobalFastbuildGenerator::AddCustomCommandRule()
@@ -441,7 +501,7 @@ void cmGlobalFastbuildGenerator::WriteRule(std::ostream& os,
   os << '\n';
 }
 
-void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
+/*void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
                                            const std::string& name,
                                            const std::string& value,
                                            const std::string& comment,
@@ -464,7 +524,7 @@ void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
   cmGlobalFastbuildGenerator::Indent(os, indent);
   os << "// " << name << " = " << val << "\n";
-}
+}*/
 
 void cmGlobalFastbuildGenerator::WriteInclude(std::ostream& os,
                                           const std::string& filename,
@@ -576,7 +636,7 @@ void cmGlobalFastbuildGenerator::Generate()
   //this->WriteUnknownExplicitDependencies(*this->GetCommonFileStream());
   //this->WriteBuiltinTargets(*this->GetCommonFileStream());
 
-  if (cmSystemTools::GetErrorOccuredFlag()) {
+  /*if (cmSystemTools::GetErrorOccuredFlag()) {
     this->RulesFileStream->setstate(std::ios::failbit);
     for (auto const& config : this->Makefiles[0]->GetGeneratorConfigs(
            cmMakefile::IncludeEmptyConfig)) {
@@ -585,7 +645,7 @@ void cmGlobalFastbuildGenerator::Generate()
     }
     this->GetCommonFileStream()->setstate(std::ios::failbit);
   }
-
+*/
   this->CloseCompileCommandsStream();
   this->CloseRulesFileStream();
   this->CloseBuildFileStreams();
@@ -617,8 +677,8 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
 	{
     cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Settings");
     os << "Settings\n";
-    os << "{\n";
-    os << "}\n";
+    cmGlobalFastbuildGenerator::WritePushScope(os);
+    cmGlobalFastbuildGenerator::WritePopScope(os);
 	}
 
 void cmGlobalFastbuildGenerator::WriteCompilers(std::ostream& os)

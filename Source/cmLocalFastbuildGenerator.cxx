@@ -303,9 +303,9 @@ void cmLocalFastbuildGenerator::WriteFastbuildRequiredVersion(std::ostream& os)
 void cmLocalFastbuildGenerator::WriteFastbuildConfigurationVariable(
   std::ostream& os, const std::string& config)
 {
-  cmGlobalFastbuildGenerator::WriteVariable(
+  /*cmGlobalFastbuildGenerator::WriteVariable( TMP
     os, "// CONFIGURATION", config,
-    "Set configuration variable for custom commands.");
+    "Set configuration variable for custom commands.");*/
 }
 
 void cmLocalFastbuildGenerator::WritePools(std::ostream& os)

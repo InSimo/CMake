@@ -46,7 +46,7 @@
 #include "cmVersion.h"
 #include "cmake.h"
 
-const char* cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE = "FBuild.bff";
+const char* cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE = "fbuild.bff";
 const char* cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE =
   "CMakeFiles/rules.ninja";
 const char* cmGlobalFastbuildGenerator::INDENT = "  ";
@@ -519,7 +519,7 @@ codecvt::Encoding cmGlobalFastbuildGenerator::GetMakefileEncoding() const
 void cmGlobalFastbuildGenerator::GetDocumentation(cmDocumentationEntry& entry)
 {
   entry.Name = cmGlobalFastbuildGenerator::GetActualName();
-  entry.Brief = "Generates FBuild.bff files.";
+  entry.Brief = "Generates fbuild.bff files.";
 }
 
 // Implemented in all cmGlobaleGenerator sub-classes.
@@ -658,7 +658,7 @@ void cmGlobalFastbuildGenerator::CleanMetaData()
   // Skip some ninja tools if they need 'build.ninja' but it is missing.
   bool const missingBuildManifest = expectBuildManifest &&
     this->FastbuildSupportsUnconditionalRecompactTool &&
-    !cmSystemTools::FileExists("FBuild.bff");
+    !cmSystemTools::FileExists("fbuild.bff");
 
   // The `recompact` tool loads the manifest. As above, we don't have a single
   // `build.ninja` to load for this in Ninja-Multi. This may be relaxed in the
@@ -1826,7 +1826,7 @@ void cmGlobalFastbuildGenerator::WriteTargetRebuildManifest(std::ostream& os)
     msg << "The detected version of Fastbuild:\n"
         << "  " << this->FastbuildVersion << "\n"
         << "is less than the version of Fastbuild required by CMake for adding "
-           "restat dependencies to the FBuild.bff manifest regeneration "
+           "restat dependencies to the fbuild.bff manifest regeneration "
            "target:\n"
         << "  "
         << cmGlobalFastbuildGenerator::RequiredFastbuildVersionForManifestRestat()
@@ -2672,7 +2672,7 @@ cmGlobalFastbuildMultiGenerator::cmGlobalFastbuildMultiGenerator(cmake* cm)
 void cmGlobalFastbuildMultiGenerator::GetDocumentation(cmDocumentationEntry& entry)
 {
   entry.Name = cmGlobalFastbuildMultiGenerator::GetActualName();
-  entry.Brief = "Generates FBuild-<Config>.bff files.";
+  entry.Brief = "Generates fbuild-<Config>.bff files.";
 }
 
 std::string cmGlobalFastbuildMultiGenerator::ExpandCFGIntDir(
@@ -2695,7 +2695,7 @@ bool cmGlobalFastbuildMultiGenerator::OpenBuildFileStreams()
   }
   *this->DefaultFileStream << "// Build using rules for '"
                            << this->DefaultFileConfig << "'.\n\n"
-                           << " include "
+                           << "// include "
                            << GetFastbuildImplFilename(this->DefaultFileConfig)
                            << "\n\n";
 
@@ -2783,7 +2783,7 @@ std::string cmGlobalFastbuildMultiGenerator::GetFastbuildImplFilename(
 std::string cmGlobalFastbuildMultiGenerator::GetFastbuildConfigFilename(
   const std::string& config)
 {
-  return cmStrCat("FBuild-", config,
+  return cmStrCat("fbuild-", config,
                   cmGlobalFastbuildMultiGenerator::FASTBUILD_FILE_EXTENSION);
 }
 

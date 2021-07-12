@@ -291,7 +291,7 @@ void cmExtraSublimeTextGenerator::AppendTarget(
   if (this->GlobalGenerator->GetName() == "Ninja") {
     makefileName = "build.ninja";
   } else if(this->GlobalGenerator->GetName() == "Fastbuild") {
-    makefileName = "FBuild.bff";
+    makefileName = "fbuild.bff";
   } else {
     makefileName = "Makefile";
   }

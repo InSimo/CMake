@@ -57,7 +57,7 @@ cmLocalFastbuildGenerator::CreateRulePlaceholderExpander() const
 cmLocalFastbuildGenerator::~cmLocalFastbuildGenerator() = default;
 
 void cmLocalFastbuildGenerator::Generate()
-{
+{/* TMP
   // Compute the path to use when referencing the current output
   // directory from the top output directory.
   this->HomeRelativeOutputPath = this->MaybeConvertToRelativePath(
@@ -169,7 +169,7 @@ void cmLocalFastbuildGenerator::Generate()
   for (auto const& config : this->GetConfigNames()) {
     this->WriteCustomCommandBuildStatements(config);
     this->AdditionalCleanFiles(config);
-  }
+  }*/
 }
 
 // TODO: Picked up from cmLocalUnixMakefileGenerator3.  Refactor it.
@@ -253,14 +253,14 @@ void cmLocalFastbuildGenerator::WriteBuildFileTop()
       this->WriteProjectHeader(stream);
       this->WriteFastbuildRequiredVersion(stream);
       this->WriteFastbuildConfigurationVariable(stream, config);
-      this->WriteFastbuildFilesInclusionConfig(stream);
+      //this->WriteFastbuildFilesInclusionConfig(stream); TMP
     }
   } else {
     this->WriteFastbuildRequiredVersion(this->GetCommonFileStream());
-    this->WriteFastbuildConfigurationVariable(this->GetCommonFileStream(),
-                                          this->GetConfigNames().front());
+    //this->WriteFastbuildConfigurationVariable(this->GetCommonFileStream(), TMP
+    //                                      this->GetConfigNames().front());
   }
-  this->WriteFastbuildFilesInclusionCommon(this->GetCommonFileStream());
+  //this->WriteFastbuildFilesInclusionCommon(this->GetCommonFileStream()); TMP
 
   // For the rule file.
   this->WriteProjectHeader(this->GetRulesFileStream());

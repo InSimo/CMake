@@ -452,6 +452,16 @@ public:
 protected:
   void Generate() override;
 
+  void GenerateRootBFF(std::ostream& os);
+
+  void WriteRootBFF(std::ostream& os);
+
+  void WriteSettings(std::ostream& os);
+
+  void WriteCompilers(std::ostream& os);
+
+  void WriteSectionHeader(std::ostream& os, const std::string& comment);
+
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }
 
   virtual bool OpenBuildFileStreams();

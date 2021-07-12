@@ -121,15 +121,18 @@ void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
   if (comment.empty()) {
     return;
   }
+  os << "// " << comment << "\n";
+}
 
-  std::string::size_type lpos = 0;
-  std::string::size_type rpos;
-  os << "\n// ------------------------------------------\n";
-  while ((rpos = comment.find('\n', lpos)) != std::string::npos) {
-    os << "// " << comment.substr(lpos, rpos - lpos) << "\n";
-    lpos = rpos + 1;
+void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std::string& comment)
+{
+  if (comment.empty()) {
+    return;
   }
-  os << "// " << comment.substr(lpos) << "\n\n";
+  os << "\n";
+  cmGlobalFastbuildGenerator::WriteDivider(os);
+  cmGlobalFastbuildGenerator::WriteComment(os, comment);
+	cmGlobalFastbuildGenerator::WriteDivider(os);
 }
 
 std::unique_ptr<cmLinkLineComputer>
@@ -525,7 +528,7 @@ void cmGlobalFastbuildGenerator::GetDocumentation(cmDocumentationEntry& entry)
 //   Source/cmake.cxx
 void cmGlobalFastbuildGenerator::Generate()
 {
-  // Check minimum Ninja version.
+  // Check minimum Fastbuild version.
   if (cmSystemTools::VersionCompare(cmSystemTools::OP_LESS,
                                     this->FastbuildVersion.c_str(),
                                     RequiredFastbuildVersion().c_str())) {
@@ -566,11 +569,12 @@ void cmGlobalFastbuildGenerator::Generate()
 
   this->cmGlobalGenerator::Generate();
 
-  this->WriteAssumedSourceDependencies();
-  this->WriteTargetAliases(*this->GetCommonFileStream());
-  this->WriteFolderTargets(*this->GetCommonFileStream());
-  this->WriteUnknownExplicitDependencies(*this->GetCommonFileStream());
-  this->WriteBuiltinTargets(*this->GetCommonFileStream());
+  this->GenerateRootBFF(*this->GetCommonFileStream()); // TMP
+  //this->WriteAssumedSourceDependencies(); TMP
+  //this->WriteTargetAliases(*this->GetCommonFileStream());
+  //this->WriteFolderTargets(*this->GetCommonFileStream());
+  //this->WriteUnknownExplicitDependencies(*this->GetCommonFileStream());
+  //this->WriteBuiltinTargets(*this->GetCommonFileStream());
 
   if (cmSystemTools::GetErrorOccuredFlag()) {
     this->RulesFileStream->setstate(std::ios::failbit);
@@ -597,6 +601,30 @@ void cmGlobalFastbuildGenerator::Generate()
     //this->CleanMetaData(); TMP
   }
 }
+
+void cmGlobalFastbuildGenerator::GenerateRootBFF(std::ostream& os)
+{
+  cmGlobalFastbuildGenerator::WriteRootBFF(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteRootBFF(std::ostream& os)
+{
+  cmGlobalFastbuildGenerator::WriteSettings(os);
+  cmGlobalFastbuildGenerator::WriteCompilers(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
+	{
+    cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Settings");
+    os << "Settings\n";
+    os << "{\n";
+    os << "}\n";
+	}
+
+void cmGlobalFastbuildGenerator::WriteCompilers(std::ostream& os)
+  {
+    cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Compilers");
+  }
 
 void cmGlobalFastbuildGenerator::CleanMetaData()
 {

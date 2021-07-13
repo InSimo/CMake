@@ -71,10 +71,11 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   }
 
   // Write the rules for each language.
-  this->WriteLanguagesRules(config);
+  //this->WriteLanguagesRules(config);
+  this->WriteLanguagesRulesFB(config);
 
   // Write the build statements
-  bool firstForConfig = true;
+  /*bool firstForConfig = true;
   for (auto const& fileConfig : this->GetConfigNames()) {
     if (!this->GetGlobalGenerator()
            ->GetCrossConfigs(fileConfig)
@@ -108,7 +109,7 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   }
 
   // Find ADDITIONAL_CLEAN_FILES
-  this->AdditionalCleanFiles(config);
+  this->AdditionalCleanFiles(config);*/
 }
 
 void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
@@ -134,6 +135,32 @@ void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
   }
   for (std::string const& language : languages) {
     this->WriteLanguageRules(language, config);
+  }
+}
+
+void cmFastbuildNormalTargetGenerator::WriteLanguagesRulesFB(
+  const std::string& config)
+{
+#ifdef FASTBUILD_GEN_VERBOSE_FILES
+  cmGlobalFastbuildGenerator::WriteDivider(this->GetCommonFileStream());
+  this->GetCommonFileStream()
+    << "// Rules for each languages for "
+    << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
+    << " target " << this->GetTargetName() << "\n\n";
+#endif
+  
+  // Write rules for languages compiled in this target.
+  std::set<std::string> languages;
+  std::vector<cmSourceFile const*> sourceFiles;
+  this->GetGeneratorTarget()->GetObjectSources(sourceFiles, config);
+  for (cmSourceFile const* sf : sourceFiles) {
+    std::string const lang = sf->GetLanguage();
+    if (!lang.empty()) {
+      languages.insert(lang);
+    }
+  }
+  for (std::string const& language : languages) {
+    //this->WriteLanguageRules(language, config);
   }
 }
 

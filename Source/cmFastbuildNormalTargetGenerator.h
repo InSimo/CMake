@@ -29,6 +29,8 @@ private:
   const char* GetVisibleTypeName() const;
   void WriteLanguagesRules(const std::string& config);
 
+  void WriteLanguagesRulesFB(const std::string& config);
+
   void WriteLinkRule(bool useResponseFile, const std::string& config);
   void WriteDeviceLinkRules(const std::string& config);
   void WriteNvidiaDeviceLinkRule(bool useResponseFile,

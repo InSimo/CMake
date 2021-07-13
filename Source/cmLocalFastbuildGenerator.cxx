@@ -57,7 +57,7 @@ cmLocalFastbuildGenerator::CreateRulePlaceholderExpander() const
 cmLocalFastbuildGenerator::~cmLocalFastbuildGenerator() = default;
 
 void cmLocalFastbuildGenerator::Generate()
-{/* TMP
+{
   // Compute the path to use when referencing the current output
   // directory from the top output directory.
   this->HomeRelativeOutputPath = this->MaybeConvertToRelativePath(
@@ -66,12 +66,12 @@ void cmLocalFastbuildGenerator::Generate()
     this->HomeRelativeOutputPath.clear();
   }
 
-  if (this->GetGlobalGenerator()->IsMultiConfig()) {
+   if (this->GetGlobalGenerator()->IsMultiConfig()) {
     for (auto const& config : this->GetConfigNames()) {
-      this->WriteProcessedMakefile(this->GetImplFileStream(config));
+      //this->WriteProcessedMakefile(this->GetImplFileStream(config));
     }
   }
-  this->WriteProcessedMakefile(this->GetCommonFileStream());
+  //this->WriteProcessedMakefile(this->GetCommonFileStream());
 #ifdef FASTBUILD_GEN_VERBOSE_FILES
   this->WriteProcessedMakefile(this->GetRulesFileStream());
 #endif
@@ -169,7 +169,7 @@ void cmLocalFastbuildGenerator::Generate()
   for (auto const& config : this->GetConfigNames()) {
     this->WriteCustomCommandBuildStatements(config);
     this->AdditionalCleanFiles(config);
-  }*/
+  }
 }
 
 // TODO: Picked up from cmLocalUnixMakefileGenerator3.  Refactor it.

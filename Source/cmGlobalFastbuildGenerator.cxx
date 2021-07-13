@@ -121,7 +121,15 @@ void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
   if (comment.empty()) {
     return;
   }
-  os /*<< this->linePrefix*/ << "// " << comment << "\n";
+  os << "// " << comment << "\n";
+}
+
+void cmGlobalFastbuildGenerator::WriteCommentFB(std::ostream& os, const std::string& comment)
+{
+  if (comment.empty()) {
+    return;
+  }
+  os << this->linePrefix << "// " << comment << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std::string& comment)
@@ -130,9 +138,9 @@ void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std:
     return;
   }
   os << "\n";
-  cmGlobalFastbuildGenerator::WriteDivider(os);
-  cmGlobalFastbuildGenerator::WriteComment(os, comment);
-	cmGlobalFastbuildGenerator::WriteDivider(os);
+  WriteDivider(os);
+  WriteCommentFB(os, comment);
+	WriteDivider(os);
 }
 
 void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin = '{', char end = '}')
@@ -144,7 +152,7 @@ void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin = '
 
 void cmGlobalFastbuildGenerator::WritePopScopeStruct(std::ostream& os)
 {
-  cmGlobalFastbuildGenerator::WritePushScope(os, '[', ']');
+  WritePushScope(os, '[', ']');
 }
 
 void cmGlobalFastbuildGenerator::WritePopScope(std::ostream& os)
@@ -177,8 +185,8 @@ void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string&
   const std::vector<std::string>& values,
   const std::string& operation = "=")
 {
-  cmGlobalFastbuildGenerator::WriteVariable(os, key, "", operation);
-  cmGlobalFastbuildGenerator::WritePushScope(os);
+  WriteVariable(os, key, "", operation);
+  WritePushScope(os);
   size_t size = values.size();
   for (size_t index = 0; index < size; ++index)
   {
@@ -192,7 +200,7 @@ void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string&
     }
     os << "\n";
   }
-  cmGlobalFastbuildGenerator::WritePopScope(os);
+  WritePopScope(os);
 }
 
 std::unique_ptr<cmLinkLineComputer>
@@ -664,6 +672,8 @@ void cmGlobalFastbuildGenerator::Generate()
 
 void cmGlobalFastbuildGenerator::GenerateRootBFF(std::ostream& os)
 {
+  this->linePrefix = "";
+  this->closingScope = "";
   cmGlobalFastbuildGenerator::WriteRootBFF(os);
 }
 
@@ -678,12 +688,20 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
     cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Settings");
     os << "Settings\n";
     cmGlobalFastbuildGenerator::WritePushScope(os);
+    cmGlobalFastbuildGenerator::WriteVariable(os, "test1", "REUSSITE1");
+    cmGlobalFastbuildGenerator::WritePushScope(os);
+    cmGlobalFastbuildGenerator::WriteVariable(os, "test2", "REUSSITE2");
+    cmGlobalFastbuildGenerator::WritePopScope(os);
+    cmGlobalFastbuildGenerator::WriteVariable(os, "test3", "REUSSITE3");
     cmGlobalFastbuildGenerator::WritePopScope(os);
 	}
 
 void cmGlobalFastbuildGenerator::WriteCompilers(std::ostream& os)
   {
     cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Compilers");
+    cmGlobalFastbuildGenerator::WriteCommand(os, "Compiler", "\'TEST_COMPILER\'");
+    cmGlobalFastbuildGenerator::WritePushScope(os);
+    cmGlobalFastbuildGenerator::WritePopScope(os);
   }
 
 void cmGlobalFastbuildGenerator::CleanMetaData()

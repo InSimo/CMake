@@ -452,13 +452,7 @@ public:
 protected:
   void Generate() override;
 
-  void GenerateRootBFF(std::ostream& os);
-
-  void WriteRootBFF(std::ostream& os);
-
-  void WriteSettings(std::ostream& os);
-
-  void WriteCompilers(std::ostream& os);
+  void WriteCommentFB(std::ostream& os, const std::string& comment);
 
   void WriteSectionHeader(std::ostream& os, const std::string& comment);
 
@@ -473,6 +467,14 @@ protected:
   void WriteCommand(std::ostream& os, const std::string& command, const std::string& value);
 
   void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, const std::string& operation);
+
+  void GenerateRootBFF(std::ostream& os);
+
+  void WriteRootBFF(std::ostream& os);
+
+  void WriteSettings(std::ostream& os);
+
+  void WriteCompilers(std::ostream& os);
 
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }
 

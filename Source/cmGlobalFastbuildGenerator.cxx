@@ -150,7 +150,7 @@ void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin = '
   this->closingScope += end;
 }
 
-void cmGlobalFastbuildGenerator::WritePopScopeStruct(std::ostream& os)
+void cmGlobalFastbuildGenerator::WritePushScopeStruct(std::ostream& os)
 {
   WritePushScope(os, '[', ']');
 }
@@ -182,17 +182,16 @@ void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os, const std::strin
 }
 
 void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string& key,
-  const std::vector<std::string>& values,
+  const std::vector<std::string>& values, char begin = '{', char end = '}',
   const std::string& operation = "=")
 {
   WriteVariable(os, key, "", operation);
-  WritePushScope(os);
+  WritePushScope(os, begin, end);
   size_t size = values.size();
   for (size_t index = 0; index < size; ++index)
   {
     const std::string & value = values[index];
     bool isLast = index == size - 1;
-
     os << this->linePrefix << value;
     if (!isLast)
     {
@@ -679,30 +678,55 @@ void cmGlobalFastbuildGenerator::GenerateRootBFF(std::ostream& os)
 
 void cmGlobalFastbuildGenerator::WriteRootBFF(std::ostream& os)
 {
-  cmGlobalFastbuildGenerator::WriteSettings(os);
-  cmGlobalFastbuildGenerator::WriteCompilers(os);
+  WriteSettings(os);
+  WriteCompilers(os);
+  WriteConfigurations(os);
+  WriteVSConfigurations(os);
+  WriteTargetDefinitions(os);
+  WriteAliases(os);
+  WriteVSSolution(os);
 }
 
 void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
 	{
-    cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Settings");
+    WriteSectionHeader(os, "Settings");
     os << "Settings\n";
-    cmGlobalFastbuildGenerator::WritePushScope(os);
-    cmGlobalFastbuildGenerator::WriteVariable(os, "test1", "REUSSITE1");
-    cmGlobalFastbuildGenerator::WritePushScope(os);
-    cmGlobalFastbuildGenerator::WriteVariable(os, "test2", "REUSSITE2");
-    cmGlobalFastbuildGenerator::WritePopScope(os);
-    cmGlobalFastbuildGenerator::WriteVariable(os, "test3", "REUSSITE3");
-    cmGlobalFastbuildGenerator::WritePopScope(os);
+    WritePushScope(os);
+    WritePopScope(os);
 	}
 
 void cmGlobalFastbuildGenerator::WriteCompilers(std::ostream& os)
-  {
-    cmGlobalFastbuildGenerator::WriteSectionHeader(os, "Compilers");
-    cmGlobalFastbuildGenerator::WriteCommand(os, "Compiler", "\'TEST_COMPILER\'");
-    cmGlobalFastbuildGenerator::WritePushScope(os);
-    cmGlobalFastbuildGenerator::WritePopScope(os);
-  }
+{
+  WriteSectionHeader(os, "Compilers");
+  WriteCommand(os, "Compiler", "\'TEST_COMPILER\'");
+  WritePushScope(os);
+  WritePopScope(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteConfigurations(std::ostream& os)
+{
+  WriteSectionHeader(os, "Configurations");
+}
+
+void cmGlobalFastbuildGenerator::WriteVSConfigurations(std::ostream& os)
+{
+  WriteSectionHeader(os, "VisualStudio Project Generation");
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetDefinitions(std::ostream& os)
+{
+  WriteSectionHeader(os, "Target Definitions");
+}
+
+void cmGlobalFastbuildGenerator::WriteAliases(std::ostream& os)
+{
+  WriteSectionHeader(os, "Target Aliases");
+}
+
+void cmGlobalFastbuildGenerator::WriteVSSolution(std::ostream& os)
+{
+  WriteSectionHeader(os, "VisualStudio Solution Generation");
+}
 
 void cmGlobalFastbuildGenerator::CleanMetaData()
 {

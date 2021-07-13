@@ -458,7 +458,7 @@ protected:
 
   void WritePushScope(std::ostream& os, char begin, char end);
 
-  void WritePopScopeStruct(std::ostream& os);
+  void WritePushScopeStruct(std::ostream& os);
 
   void WritePopScope(std::ostream& os);
 
@@ -466,7 +466,7 @@ protected:
 
   void WriteCommand(std::ostream& os, const std::string& command, const std::string& value);
 
-  void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, const std::string& operation);
+  void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, char begin, char end, const std::string& operation);
 
   void GenerateRootBFF(std::ostream& os);
 
@@ -475,6 +475,16 @@ protected:
   void WriteSettings(std::ostream& os);
 
   void WriteCompilers(std::ostream& os);
+
+  void WriteConfigurations(std::ostream& os);
+
+  void WriteVSConfigurations(std::ostream& os);
+
+  void WriteTargetDefinitions(std::ostream& os);
+
+  void WriteAliases(std::ostream& os);
+
+  void WriteVSSolution(std::ostream& os);
 
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }
 

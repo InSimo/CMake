@@ -73,21 +73,21 @@ void cmLocalFastbuildGenerator::Generate()
   }
   //this->WriteProcessedMakefile(this->GetCommonFileStream());
 #ifdef FASTBUILD_GEN_VERBOSE_FILES
-  this->WriteProcessedMakefile(this->GetRulesFileStream());
+  this->WriteProcessedMakefile(this->GetCommonFileStream());
 #endif
 
   // We do that only once for the top CMakeLists.txt file.
   if (this->IsRootMakefile()) {
     this->WriteBuildFileTop();
 
-    this->WritePools(this->GetRulesFileStream());
+    this->WritePools(this->GetCommonFileStream());
 
     const std::string& showIncludesPrefix =
       this->GetMakefile()->GetSafeDefinition("CMAKE_CL_SHOWINCLUDES_PREFIX");
     if (!showIncludesPrefix.empty()) {
-      cmGlobalFastbuildGenerator::WriteComment(this->GetRulesFileStream(),
+      cmGlobalFastbuildGenerator::WriteComment(this->GetCommonFileStream(),
                                            "localized /showIncludes string");
-      this->GetRulesFileStream() << "msvc_deps_prefix = ";
+      this->GetCommonFileStream() << "msvc_deps_prefix = ";
 #ifdef WIN32
       // Ninja uses the ANSI Windows APIs, so strings in the rules file
       // typically need to be ANSI encoded. However, in this case the compiler
@@ -98,15 +98,15 @@ void cmLocalFastbuildGenerator::Generate()
       // As a workaround, leave the msvc_deps_prefix UTF-8 encoded even though
       // the rest of the file is ANSI encoded.
       if (GetConsoleOutputCP() == CP_UTF8 && GetACP() != CP_UTF8) {
-        this->GetRulesFileStream().WriteRaw(showIncludesPrefix);
+        this->GetCommonFileStream().WriteRaw(showIncludesPrefix);
       } else {
-        this->GetRulesFileStream() << showIncludesPrefix;
+        this->GetCommonFileStream() << showIncludesPrefix;
       }
 #else
       // It's safe to use the standard encoding on other platforms.
-      this->GetRulesFileStream() << showIncludesPrefix;
+      this->GetCommonFileStream() << showIncludesPrefix;
 #endif
-      this->GetRulesFileStream() << "\n\n";
+      this->GetCommonFileStream() << "\n\n";
     }
   }
 
@@ -263,7 +263,7 @@ void cmLocalFastbuildGenerator::WriteBuildFileTop()
   //this->WriteFastbuildFilesInclusionCommon(this->GetCommonFileStream()); TMP
 
   // For the rule file.
-  this->WriteProjectHeader(this->GetRulesFileStream());
+  this->WriteProjectHeader(this->GetCommonFileStream());
 }
 
 void cmLocalFastbuildGenerator::WriteProjectHeader(std::ostream& os)
@@ -355,7 +355,7 @@ void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionCommon(std::ostream&
   os << "// Include auxiliary files.\n\n";
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildRulesFile =
-    ng->FastbuildOutputPath(cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE);
+    ng->FastbuildOutputPath(cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE);
   std::string const rulesFilePath = ng->EncodePath(fastbuildRulesFile);
   cmGlobalFastbuildGenerator::WriteInclude(os, rulesFilePath,
                                        "Include rules file.");

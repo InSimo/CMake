@@ -1053,7 +1053,7 @@ void cmGlobalFastbuildGenerator::AddRule(cmFastbuildRule const& rule)
   // Store command length
   this->RuleCmdLength[rule.Name] = static_cast<int>(rule.Command.size());
   // Write rule
-  cmGlobalFastbuildGenerator::WriteRule(*this->RulesFileStream, rule);
+  cmGlobalFastbuildGenerator::WriteRule(*this->BuildFileStream, rule);
 }
 
 bool cmGlobalFastbuildGenerator::HasRule(const std::string& name)
@@ -1155,7 +1155,7 @@ void cmGlobalFastbuildGenerator::CloseBuildFileStreams()
 bool cmGlobalFastbuildGenerator::OpenRulesFileStream()
 {
   if (!this->OpenFileStream(this->RulesFileStream,
-                            cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE)) {
+                            cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE)) {
     return false;
   }
 
@@ -1866,7 +1866,7 @@ void cmGlobalFastbuildGenerator::WriteTargetRebuildManifest(std::ostream& os)
     rule.Description = "Re-running CMake...";
     rule.Comment = "Rule for re-running cmake.";
     rule.Generator = true;
-    WriteRule(*this->RulesFileStream, rule);
+    WriteRule(*this->BuildFileStream, rule);
   }
 
   cmFastbuildBuild reBuild("RERUN_CMAKE");
@@ -1897,7 +1897,7 @@ void cmGlobalFastbuildGenerator::WriteTargetRebuildManifest(std::ostream& os)
       rule.Description = "Re-checking globbed directories...";
       rule.Comment = "Rule for re-checking globbed directories.";
       rule.Generator = true;
-      this->WriteRule(*this->RulesFileStream, rule);
+      this->WriteRule(*this->BuildFileStream, rule);
     }
 
     cmFastbuildBuild phonyBuild("phony");
@@ -2058,7 +2058,7 @@ bool cmGlobalFastbuildGenerator::WriteTargetCleanAdditional(std::ostream& os)
                                  cmOutputConverter::SHELL));
     rule.Description = "Cleaning additional files...";
     rule.Comment = "Rule for cleaning additional files.";
-    WriteRule(*this->RulesFileStream, rule);
+    WriteRule(*this->BuildFileStream, rule);
   }
 
   // Write build
@@ -2095,7 +2095,7 @@ void cmGlobalFastbuildGenerator::WriteTargetClean(std::ostream& os)
     rule.Command = cmStrCat(this->FastbuildCmd(), " $FILE_ARG -t clean $TARGETS");
     rule.Description = "Cleaning all built files...";
     rule.Comment = "Rule for cleaning all built files.";
-    WriteRule(*this->RulesFileStream, rule);
+    WriteRule(*this->BuildFileStream, rule);
   }
 
   auto const configs = this->Makefiles.front()->GetGeneratorConfigs(
@@ -2211,7 +2211,7 @@ void cmGlobalFastbuildGenerator::WriteTargetHelp(std::ostream& os)
     rule.Command = cmStrCat(this->FastbuildCmd(), " -t targets");
     rule.Description = "//All primary targets available:";
     rule.Comment = "//Rule for printing all primary targets available.";
-    WriteRule(*this->RulesFileStream, rule);
+    WriteRule(*this->BuildFileStream, rule);
   }
   {
     cmFastbuildBuild build("HELP");

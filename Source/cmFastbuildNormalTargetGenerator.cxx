@@ -116,8 +116,8 @@ void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
   const std::string& config)
 {
 #ifdef FASTBUILD_GEN_VERBOSE_FILES
-  cmGlobalFastbuildGenerator::WriteDivider(this->GetRulesFileStream());
-  this->GetRulesFileStream()
+  cmGlobalFastbuildGenerator::WriteDivider(this->GetCommonFileStream());
+  this->GetCommonFileStream()
     << "// Rules for each languages for "
     << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
     << " target " << this->GetTargetName() << "\n\n";

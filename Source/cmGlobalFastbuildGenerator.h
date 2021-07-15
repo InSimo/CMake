@@ -449,28 +449,31 @@ public:
 
   bool CheckCxxModuleSupport();
 
-protected:
-  void Generate() override;
-
-  void WriteCommentFB(std::ostream& os, const std::string& comment);
-
   void WriteSectionHeader(std::ostream& os, const std::string& comment);
 
-  void WritePushScope(std::ostream& os, char begin, char end);
+  void WritePushScope(std::ostream& os, char begin = '{', char end = '}');
 
   void WritePushScopeStruct(std::ostream& os);
 
   void WritePopScope(std::ostream& os);
 
-  void WriteVariable(std::ostream& os, const std::string& key, const std::string& value, const std::string& operation);
+  void WriteVariable(std::ostream& os, const std::string& key, const std::string& value, const std::string& operation = "=");
 
-  void WriteCommand(std::ostream& os, const std::string& command, const std::string& value);
+  void WriteCommand(std::ostream& os, const std::string& command, const std::string& value = std::string());
 
-  void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, char begin, char end, const std::string& operation);
+  void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, char begin = '{', char end = '}',
+  const std::string& operation = "=");
+
+protected:
+  void Generate() override;
+
+  void WriteCommentFB(std::ostream& os, const std::string& comment);
 
   void GenerateRootBFF(std::ostream& os);
 
   void WriteRootBFF(std::ostream& os);
+
+  void WritePlaceholders(std::ostream& os);
 
   void WriteSettings(std::ostream& os);
 

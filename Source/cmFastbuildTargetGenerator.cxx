@@ -937,7 +937,17 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
   // Write the rule for compiling file of the given language.
   rule.Comment = cmStrCat("Rule for compiling ", lang, " files.");
   rule.Description = cmStrCat("Building ", lang, " object $out");
-  this->GetGlobalGenerator()->AddRule(rule);
+  //this->GetGlobalGenerator()->AddRule(rule);
+
+
+  // For Fastbuild
+  std::string executable = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
+  std::ostream & os = this->GetCommonFileStream();
+  this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
+  this->GetGlobalGenerator()->WriteCommand(os, "Compiler", cmStrCat("\'Compiler-", lang,"\'"));
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariable(os, "Executable", cmStrCat("\'", executable, "\'"));
+  this->GetGlobalGenerator()->WritePopScope(os);
 }
 
 void cmFastbuildTargetGenerator::WriteObjectBuildStatements(

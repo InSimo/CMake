@@ -75,19 +75,19 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   this->WriteLanguagesRulesFB(config);
 
   // Write the build statements
-  /*bool firstForConfig = true;
+  bool firstForConfig = true;
   for (auto const& fileConfig : this->GetConfigNames()) {
     if (!this->GetGlobalGenerator()
            ->GetCrossConfigs(fileConfig)
            .count(config)) {
       continue;
     }
-    this->WriteObjectBuildStatements(config, fileConfig, firstForConfig);
+    //this->WriteObjectBuildStatements(config, fileConfig, firstForConfig); TMP
     firstForConfig = false;
   }
 
   if (this->GetGeneratorTarget()->GetType() == cmStateEnums::OBJECT_LIBRARY) {
-    this->WriteObjectLibStatement(config);
+    // this->WriteObjectLibStatement(config); TMP
   } else {
     firstForConfig = true;
     for (auto const& fileConfig : this->GetConfigNames()) {
@@ -98,8 +98,8 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
       }
       // If this target has cuda language link inputs, and we need to do
       // device linking
-      this->WriteDeviceLinkStatement(config, fileConfig, firstForConfig);
-      this->WriteLinkStatement(config, fileConfig, firstForConfig);
+      //this->WriteDeviceLinkStatement(config, fileConfig, firstForConfig); TMP
+      //this->WriteLinkStatement(config, fileConfig, firstForConfig); TMP
       firstForConfig = false;
     }
   }
@@ -109,7 +109,7 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   }
 
   // Find ADDITIONAL_CLEAN_FILES
-  this->AdditionalCleanFiles(config);*/
+  this->AdditionalCleanFiles(config);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
@@ -160,7 +160,7 @@ void cmFastbuildNormalTargetGenerator::WriteLanguagesRulesFB(
     }
   }
   for (std::string const& language : languages) {
-    //this->WriteLanguageRules(language, config);
+    this->WriteLanguageRules(language, config);
   }
 }
 

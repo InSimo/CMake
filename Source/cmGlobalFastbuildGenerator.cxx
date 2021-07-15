@@ -140,10 +140,10 @@ void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std:
   os << "\n";
   WriteDivider(os);
   WriteCommentFB(os, comment);
-	WriteDivider(os);
+  WriteDivider(os);
 }
 
-void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin = '{', char end = '}')
+void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin, char end)
 {
   os << this->linePrefix << begin << "\n";
   this->linePrefix += "\t";
@@ -166,12 +166,12 @@ void cmGlobalFastbuildGenerator::WritePopScope(std::ostream& os)
 }
 
 void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os, const std::string& key, const std::string& value,
-  const std::string& operation = "=")
+  const std::string& operation)
 {
   os << this->linePrefix << "." << key << " " << operation << " " << value << "\n";
 }
 
-void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os, const std::string& command, const std::string& value = std::string())
+void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os, const std::string& command, const std::string& value)
 {
   os << this->linePrefix << command;
   if (!value.empty())
@@ -182,8 +182,8 @@ void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os, const std::strin
 }
 
 void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string& key,
-  const std::vector<std::string>& values, char begin = '{', char end = '}',
-  const std::string& operation = "=")
+  const std::vector<std::string>& values, char begin, char end,
+  const std::string& operation)
 {
   WriteVariable(os, key, "", operation);
   WritePushScope(os, begin, end);
@@ -382,7 +382,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuild(
   const cmFastbuildDeps& outputs, const std::string& config,
   const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps)
 {
-  this->AddCustomCommandRule();
+  //this->AddCustomCommandRule(); TMP
 
   {
     cmFastbuildBuild build("CUSTOM_COMMAND");
@@ -613,9 +613,9 @@ void cmGlobalFastbuildGenerator::Generate()
   if (!this->OpenBuildFileStreams()) {
     return;
   }
-  if (!this->OpenRulesFileStream()) {
+  /*if (!this->OpenRulesFileStream()) {
     return;
-  }
+  }*/
 
   for (auto& it : this->Configs) {
     it.second.TargetDependsClosures.clear();
@@ -634,9 +634,8 @@ void cmGlobalFastbuildGenerator::Generate()
     (this->PolicyCMP0058 == cmPolicies::OLD ||
      this->PolicyCMP0058 == cmPolicies::WARN);
 
-  this->cmGlobalGenerator::Generate();
+  this->GenerateRootBFF(*this->GetCommonFileStream());
 
-  this->GenerateRootBFF(*this->GetCommonFileStream()); // TMP
   //this->WriteAssumedSourceDependencies(); TMP
   //this->WriteTargetAliases(*this->GetCommonFileStream());
   //this->WriteFolderTargets(*this->GetCommonFileStream());
@@ -654,7 +653,7 @@ void cmGlobalFastbuildGenerator::Generate()
   }
 */
   this->CloseCompileCommandsStream();
-  this->CloseRulesFileStream();
+  //this->CloseRulesFileStream();
   this->CloseBuildFileStreams();
 
 #ifdef _WIN32
@@ -678,6 +677,7 @@ void cmGlobalFastbuildGenerator::GenerateRootBFF(std::ostream& os)
 
 void cmGlobalFastbuildGenerator::WriteRootBFF(std::ostream& os)
 {
+  WritePlaceholders(os);
   WriteSettings(os);
   WriteCompilers(os);
   WriteConfigurations(os);
@@ -685,6 +685,13 @@ void cmGlobalFastbuildGenerator::WriteRootBFF(std::ostream& os)
   WriteTargetDefinitions(os);
   WriteAliases(os);
   WriteVSSolution(os);
+}
+
+void cmGlobalFastbuildGenerator::WritePlaceholders(std::ostream& os)
+{
+  WriteSectionHeader(os, "Helper variables");
+  WriteVariable(os, "FB_INPUT_1_PLACEHOLDER", "\'\"%1\"\'");
+  WriteVariable(os, "FB_INPUT_2_PLACEHOLDER", "\'\"%2\"\'");
 }
 
 void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
@@ -697,11 +704,7 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
 
 void cmGlobalFastbuildGenerator::WriteCompilers(std::ostream& os)
 {
-  WriteSectionHeader(os, "Compilers");
-  WriteCommand(os, "Compiler", "\'TEST_COMPILER\'");
-  WritePushScope(os);
-
-  WritePopScope(os);
+  this->cmGlobalGenerator::Generate();
 }
 
 void cmGlobalFastbuildGenerator::WriteConfigurations(std::ostream& os)

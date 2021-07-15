@@ -78,9 +78,9 @@ void cmLocalFastbuildGenerator::Generate()
 
   // We do that only once for the top CMakeLists.txt file.
   if (this->IsRootMakefile()) {
-    this->WriteBuildFileTop();
+    //this->WriteBuildFileTop();
 
-    this->WritePools(this->GetCommonFileStream());
+    //this->WritePools(this->GetCommonFileStream());
 
     const std::string& showIncludesPrefix =
       this->GetMakefile()->GetSafeDefinition("CMAKE_CL_SHOWINCLUDES_PREFIX");
@@ -263,7 +263,7 @@ void cmLocalFastbuildGenerator::WriteBuildFileTop()
   //this->WriteFastbuildFilesInclusionCommon(this->GetCommonFileStream()); TMP
 
   // For the rule file.
-  this->WriteProjectHeader(this->GetCommonFileStream());
+  //this->WriteProjectHeader(this->GetRuleFileStream());
 }
 
 void cmLocalFastbuildGenerator::WriteProjectHeader(std::ostream& os)

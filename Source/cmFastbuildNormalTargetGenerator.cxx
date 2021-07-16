@@ -1035,7 +1035,7 @@ void cmFastbuildNormalTargetGenerator::WriteLinkStatement(
   cmGlobalFastbuildGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
   const cmStateEnums::TargetType targetType = gt->GetType();
   this->GetImplFileStream(fileConfig)
-    << "// Link build statements for " << cmState::GetTargetTypeName(targetType)
+    << "// NINJA Link build statements for " << cmState::GetTargetTypeName(targetType)
     << " target " << this->GetTargetName() << "\n\n";
 
   cmFastbuildBuild linkBuild(this->LanguageLinkerRule(config));

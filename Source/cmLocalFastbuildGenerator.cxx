@@ -295,7 +295,7 @@ void cmLocalFastbuildGenerator::WriteFastbuildRequiredVersion(std::ostream& os)
       cmGlobalFastbuildGenerator::RequiredFastbuildVersionForManifestRestat();
   }
 
-  cmGlobalFastbuildGenerator::WriteComment(
+  this->GetGlobalFastbuildGenerator()->WriteCommentFB(
     os, "Minimal version of Fastbuild required by this file");
   os << "// fastbuild_required_version = " << requiredVersion << "\n\n";
 }
@@ -303,8 +303,8 @@ void cmLocalFastbuildGenerator::WriteFastbuildRequiredVersion(std::ostream& os)
 void cmLocalFastbuildGenerator::WriteFastbuildConfigurationVariable(
   std::ostream& os, const std::string& config)
 {
-  cmGlobalFastbuildGenerator::WriteVariable(
-    os, "// CONFIGURATION", config,
+  this->GetGlobalFastbuildGenerator()->WriteVariable(
+    os, "CONFIGURATION", config,
     "Set configuration variable for custom commands.");
 }
 
@@ -339,7 +339,7 @@ void cmLocalFastbuildGenerator::WritePools(std::ostream& os)
 void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionConfig(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "// Include auxiliary files.\n\n";
+  os << "// NINJA Include auxiliary files.\n\n";
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildCommonFile =
     ng->FastbuildOutputPath(cmGlobalFastbuildMultiGenerator::FASTBUILD_COMMON_FILE);
@@ -355,9 +355,9 @@ void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionCommon(std::ostream&
   os << "// Include auxiliary files.\n\n";
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildRulesFile =
-    ng->FastbuildOutputPath(cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE);
+    ng->FastbuildOutputPath(cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE);
   std::string const rulesFilePath = ng->EncodePath(fastbuildRulesFile);
-  cmGlobalFastbuildGenerator::WriteInclude(os, rulesFilePath,
+ this->GetGlobalFastbuildGenerator()->WriteIncludeFB(os, rulesFilePath,
                                        "Include rules file.");
   os << "\n";
 }

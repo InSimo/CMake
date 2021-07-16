@@ -957,7 +957,7 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
   // Write comments.
   cmGlobalFastbuildGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
   this->GetImplFileStream(fileConfig)
-    << "// Object build statements for "
+    << "// NINJA Object build statements for "
     << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
     << " target " << this->GetTargetName() << "\n\n";
 

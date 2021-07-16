@@ -453,6 +453,10 @@ public:
 
   void WriteCommentFB(std::ostream& os, const std::string& comment);
 
+  void cmGlobalFastbuildGenerator::WriteIncludeFB(std::ostream& os,
+                                          const std::string& filename,
+                                          const std::string& comment);
+
   void WriteSectionHeader(std::ostream& os, const std::string& comment);
 
   void WritePushScope(std::ostream& os, char begin = '{', char end = '}');

@@ -137,7 +137,7 @@ void cmGlobalFastbuildGenerator::WriteIncludeFB(std::ostream& os,
                                           const std::string& comment)
 {
   WriteCommentFB(os, comment);
-  os << "#include " << filename << "\n";
+  os << "#include \"" << filename << "\"\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std::string& comment)
@@ -646,10 +646,10 @@ void cmGlobalFastbuildGenerator::Generate()
   this->linePrefix = "";
   this->closingScope = "";
 
+  this->cmGlobalGenerator::Generate();
+
   this->WritePlaceholders(*this->GetCommonFileStream());
   this->WriteSettings(*this->GetCommonFileStream());
-
-  this->cmGlobalGenerator::Generate();
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());

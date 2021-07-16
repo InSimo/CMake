@@ -941,12 +941,47 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
 
 
   // For Fastbuild
+  std::ostream& os = this->GetRulesFileStream();
+
   std::string executable = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::ostream & os = this->GetRulesFileStream();
+  std::string compiler_flags = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
+  std::string linker = this->GetMakefile()->GetSafeDefinition("CMAKE_LINKER");
+  std::string link_flags = "/nologo %1 %2";
+
   this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
-  this->GetGlobalGenerator()->WriteCommand(os, "Compiler", cmStrCat("\'Compiler-", lang,"\'"));
+  //this->GetGlobalGenerator()->WriteCommand(os, "Compiler", cmStrCat("\'Compiler-", lang,"\'"));
+  //this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Compiler", cmStrCat("\'", executable, "\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'/c %1 ", compiler_flags, " /Fo%2\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Linker", cmStrCat("\'", linker, "\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOptions",cmStrCat("\'", link_flags, "\'"));
+  //this->GetGlobalGenerator()->WritePopScope(os);
+
+  std::string project_name = this->GetMakefile()->GetSafeDefinition("CMAKE_PROJECT_NAME");
+  std::string source_path = this->GetMakefile()->GetSafeDefinition("CMAKE_SOURCE_DIR");
+  std::string binary_path = this->GetMakefile()->GetSafeDefinition("CMAKE_BINARY_DIR");
+  this->GetGlobalGenerator()->WriteSectionHeader(os, project_name);
+  this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-Lib\'"));
   this->GetGlobalGenerator()->WritePushScope(os);
-  this->GetGlobalGenerator()->WriteVariableFB(os, "Executable", cmStrCat("\'", executable, "\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerInputPath", cmStrCat("\'", source_path, "\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", binary_path, "\'"));
+  this->GetGlobalGenerator()->WritePopScope(os);
+
+  this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-Lib\" }"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
+  this->GetGlobalGenerator()->WritePopScope(os);
+
+  this->GetGlobalGenerator()->WriteSectionHeader(os, "Alias");
+  this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'all\'");
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "\' }"));
+  this->GetGlobalGenerator()->WritePopScope(os);
+
+  this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'cmTC_\'");
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "\' }"));
   this->GetGlobalGenerator()->WritePopScope(os);
 }
 

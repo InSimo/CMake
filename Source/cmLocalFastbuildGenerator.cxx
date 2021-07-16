@@ -68,26 +68,26 @@ void cmLocalFastbuildGenerator::Generate()
 
    if (this->GetGlobalGenerator()->IsMultiConfig()) {
     for (auto const& config : this->GetConfigNames()) {
-      //this->WriteProcessedMakefile(this->GetImplFileStream(config));
+      this->WriteProcessedMakefile(this->GetImplFileStream(config));
     }
   }
-  //this->WriteProcessedMakefile(this->GetCommonFileStream());
-#ifdef FASTBUILD_GEN_VERBOSE_FILES
   this->WriteProcessedMakefile(this->GetCommonFileStream());
+#ifdef FASTBUILD_GEN_VERBOSE_FILES
+  this->WriteProcessedMakefile(this->GetRulesFileStream());
 #endif
 
   // We do that only once for the top CMakeLists.txt file.
   if (this->IsRootMakefile()) {
-    //this->WriteBuildFileTop();
+    this->WriteBuildFileTop();
 
-    //this->WritePools(this->GetCommonFileStream());
+    this->WritePools(this->GetCommonFileStream());
 
     const std::string& showIncludesPrefix =
       this->GetMakefile()->GetSafeDefinition("CMAKE_CL_SHOWINCLUDES_PREFIX");
     if (!showIncludesPrefix.empty()) {
-      cmGlobalFastbuildGenerator::WriteComment(this->GetCommonFileStream(),
+      cmGlobalFastbuildGenerator::WriteComment(this->GetRulesFileStream(),
                                            "localized /showIncludes string");
-      this->GetCommonFileStream() << "msvc_deps_prefix = ";
+      this->GetRulesFileStream() << "msvc_deps_prefix = ";
 #ifdef WIN32
       // Ninja uses the ANSI Windows APIs, so strings in the rules file
       // typically need to be ANSI encoded. However, in this case the compiler
@@ -98,15 +98,15 @@ void cmLocalFastbuildGenerator::Generate()
       // As a workaround, leave the msvc_deps_prefix UTF-8 encoded even though
       // the rest of the file is ANSI encoded.
       if (GetConsoleOutputCP() == CP_UTF8 && GetACP() != CP_UTF8) {
-        this->GetCommonFileStream().WriteRaw(showIncludesPrefix);
+        this->GetRulesFileStream().WriteRaw(showIncludesPrefix);
       } else {
-        this->GetCommonFileStream() << showIncludesPrefix;
+        this->GetRulesFileStream() << showIncludesPrefix;
       }
 #else
       // It's safe to use the standard encoding on other platforms.
       this->GetCommonFileStream() << showIncludesPrefix;
 #endif
-      this->GetCommonFileStream() << "\n\n";
+      this->GetRulesFileStream() << "\n\n";
     }
   }
 
@@ -253,17 +253,17 @@ void cmLocalFastbuildGenerator::WriteBuildFileTop()
       this->WriteProjectHeader(stream);
       this->WriteFastbuildRequiredVersion(stream);
       this->WriteFastbuildConfigurationVariable(stream, config);
-      //this->WriteFastbuildFilesInclusionConfig(stream); TMP
+      this->WriteFastbuildFilesInclusionConfig(stream);
     }
   } else {
     this->WriteFastbuildRequiredVersion(this->GetCommonFileStream());
-    //this->WriteFastbuildConfigurationVariable(this->GetCommonFileStream(), TMP
-    //                                      this->GetConfigNames().front());
+    this->WriteFastbuildConfigurationVariable(this->GetCommonFileStream(),
+                                          this->GetConfigNames().front());
   }
-  //this->WriteFastbuildFilesInclusionCommon(this->GetCommonFileStream()); TMP
+  this->WriteFastbuildFilesInclusionCommon(this->GetCommonFileStream());
 
   // For the rule file.
-  //this->WriteProjectHeader(this->GetRuleFileStream());
+  this->WriteProjectHeader(this->GetRulesFileStream());
 }
 
 void cmLocalFastbuildGenerator::WriteProjectHeader(std::ostream& os)
@@ -303,9 +303,9 @@ void cmLocalFastbuildGenerator::WriteFastbuildRequiredVersion(std::ostream& os)
 void cmLocalFastbuildGenerator::WriteFastbuildConfigurationVariable(
   std::ostream& os, const std::string& config)
 {
-  /*cmGlobalFastbuildGenerator::WriteVariable( TMP
+  cmGlobalFastbuildGenerator::WriteVariable(
     os, "// CONFIGURATION", config,
-    "Set configuration variable for custom commands.");*/
+    "Set configuration variable for custom commands.");
 }
 
 void cmLocalFastbuildGenerator::WritePools(std::ostream& os)

@@ -942,11 +942,11 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
 
   // For Fastbuild
   std::string executable = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::ostream & os = this->GetCommonFileStream();
+  std::ostream & os = this->GetRulesFileStream();
   this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
   this->GetGlobalGenerator()->WriteCommand(os, "Compiler", cmStrCat("\'Compiler-", lang,"\'"));
   this->GetGlobalGenerator()->WritePushScope(os);
-  this->GetGlobalGenerator()->WriteVariable(os, "Executable", cmStrCat("\'", executable, "\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Executable", cmStrCat("\'", executable, "\'"));
   this->GetGlobalGenerator()->WritePopScope(os);
 }
 

@@ -48,7 +48,7 @@
 
 const char* cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE = "fbuild.bff";
 const char* cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE =
-  "CMakeFiles/rules.ninja";
+  "CMakeFiles/rules.bff";
 const char* cmGlobalFastbuildGenerator::INDENT = "  ";
 #ifdef _WIN32
 std::string const cmGlobalFastbuildGenerator::SHELL_NOOP = "cd .";
@@ -165,7 +165,7 @@ void cmGlobalFastbuildGenerator::WritePopScope(std::ostream& os)
   this->closingScope.resize(this->closingScope.size() - 1);
 }
 
-void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os, const std::string& key, const std::string& value,
+void cmGlobalFastbuildGenerator::WriteVariableFB(std::ostream& os, const std::string& key, const std::string& value,
   const std::string& operation)
 {
   os << this->linePrefix << "." << key << " " << operation << " " << value << "\n";
@@ -185,7 +185,7 @@ void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string&
   const std::vector<std::string>& values, char begin, char end,
   const std::string& operation)
 {
-  WriteVariable(os, key, "", operation);
+  WriteVariableFB(os, key, "", operation);
   WritePushScope(os, begin, end);
   size_t size = values.size();
   for (size_t index = 0; index < size; ++index)
@@ -262,7 +262,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
                                         cmFastbuildBuild const& build,
                                         int cmdLineLimit,
                                         bool* usedResponseFile)
-{/* TMP
+{
   // Make sure there is a rule.
   if (build.Rule.empty()) {
     cmSystemTools::Error(cmStrCat(
@@ -363,7 +363,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
     this->DisableCleandead = true;
   }
 
-  os << buildStr << arguments << assignments << "\n";*/
+  os << buildStr << arguments << assignments << "\n";
 }
 
 void cmGlobalFastbuildGenerator::AddCustomCommandRule()
@@ -382,7 +382,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuild(
   const cmFastbuildDeps& outputs, const std::string& config,
   const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps)
 {
-  //this->AddCustomCommandRule(); TMP
+  this->AddCustomCommandRule();
 
   {
     cmFastbuildBuild build("CUSTOM_COMMAND");
@@ -481,7 +481,7 @@ void cmGlobalFastbuildGenerator::WriteRule(std::ostream& os,
   // -- Write rule
   // Write rule intro
   cmGlobalFastbuildGenerator::WriteComment(os, rule.Comment);
-  os << "rule " << rule.Name << '\n';
+  os << "// " << "rule " << rule.Name << '\n';
 
   // Write rule key/value pairs
   auto writeKV = [&os](const char* key, std::string const& value) {
@@ -508,7 +508,7 @@ void cmGlobalFastbuildGenerator::WriteRule(std::ostream& os,
   os << '\n';
 }
 
-/*void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
+void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
                                            const std::string& name,
                                            const std::string& value,
                                            const std::string& comment,
@@ -531,14 +531,14 @@ void cmGlobalFastbuildGenerator::WriteRule(std::ostream& os,
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
   cmGlobalFastbuildGenerator::Indent(os, indent);
   os << "// " << name << " = " << val << "\n";
-}*/
+}
 
 void cmGlobalFastbuildGenerator::WriteInclude(std::ostream& os,
                                           const std::string& filename,
                                           const std::string& comment)
 {
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
-  os << "// include " << filename << "\n"; // TMP
+  os << "#include " << filename << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteDefault(std::ostream& os,
@@ -613,9 +613,9 @@ void cmGlobalFastbuildGenerator::Generate()
   if (!this->OpenBuildFileStreams()) {
     return;
   }
-  /*if (!this->OpenRulesFileStream()) {
+  if (!this->OpenRulesFileStream()) {
     return;
-  }*/
+  }
 
   for (auto& it : this->Configs) {
     it.second.TargetDependsClosures.clear();
@@ -634,15 +634,22 @@ void cmGlobalFastbuildGenerator::Generate()
     (this->PolicyCMP0058 == cmPolicies::OLD ||
      this->PolicyCMP0058 == cmPolicies::WARN);
 
-  this->GenerateRootBFF(*this->GetCommonFileStream());
+  // For file .bff formatting
+  this->linePrefix = "";
+  this->closingScope = "";
 
-  //this->WriteAssumedSourceDependencies(); TMP
-  //this->WriteTargetAliases(*this->GetCommonFileStream());
-  //this->WriteFolderTargets(*this->GetCommonFileStream());
-  //this->WriteUnknownExplicitDependencies(*this->GetCommonFileStream());
-  //this->WriteBuiltinTargets(*this->GetCommonFileStream());
+  this->WritePlaceholders(*this->GetCommonFileStream());
+  this->WriteSettings(*this->GetCommonFileStream());
 
-  /*if (cmSystemTools::GetErrorOccuredFlag()) {
+  this->cmGlobalGenerator::Generate();
+
+  this->WriteAssumedSourceDependencies();
+  this->WriteTargetAliases(*this->GetCommonFileStream());
+  this->WriteFolderTargets(*this->GetCommonFileStream());
+  this->WriteUnknownExplicitDependencies(*this->GetCommonFileStream());
+  this->WriteBuiltinTargets(*this->GetCommonFileStream());
+
+  if (cmSystemTools::GetErrorOccuredFlag()) {
     this->RulesFileStream->setstate(std::ios::failbit);
     for (auto const& config : this->Makefiles[0]->GetGeneratorConfigs(
            cmMakefile::IncludeEmptyConfig)) {
@@ -651,9 +658,9 @@ void cmGlobalFastbuildGenerator::Generate()
     }
     this->GetCommonFileStream()->setstate(std::ios::failbit);
   }
-*/
+
   this->CloseCompileCommandsStream();
-  //this->CloseRulesFileStream();
+  this->CloseRulesFileStream();
   this->CloseBuildFileStreams();
 
 #ifdef _WIN32
@@ -668,30 +675,11 @@ void cmGlobalFastbuildGenerator::Generate()
   }
 }
 
-void cmGlobalFastbuildGenerator::GenerateRootBFF(std::ostream& os)
-{
-  this->linePrefix = "";
-  this->closingScope = "";
-  cmGlobalFastbuildGenerator::WriteRootBFF(os);
-}
-
-void cmGlobalFastbuildGenerator::WriteRootBFF(std::ostream& os)
-{
-  WritePlaceholders(os);
-  WriteSettings(os);
-  WriteCompilers(os);
-  WriteConfigurations(os);
-  WriteVSConfigurations(os);
-  WriteTargetDefinitions(os);
-  WriteAliases(os);
-  WriteVSSolution(os);
-}
-
 void cmGlobalFastbuildGenerator::WritePlaceholders(std::ostream& os)
 {
   WriteSectionHeader(os, "Helper variables");
-  WriteVariable(os, "FB_INPUT_1_PLACEHOLDER", "\'\"%1\"\'");
-  WriteVariable(os, "FB_INPUT_2_PLACEHOLDER", "\'\"%2\"\'");
+  WriteVariableFB(os, "FB_INPUT_1_PLACEHOLDER", "\'\"%1\"\'");
+  WriteVariableFB(os, "FB_INPUT_2_PLACEHOLDER", "\'\"%2\"\'");
 }
 
 void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
@@ -701,11 +689,6 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
     WritePushScope(os);
     WritePopScope(os);
 	}
-
-void cmGlobalFastbuildGenerator::WriteCompilers(std::ostream& os)
-{
-  this->cmGlobalGenerator::Generate();
-}
 
 void cmGlobalFastbuildGenerator::WriteConfigurations(std::ostream& os)
 {
@@ -1056,7 +1039,7 @@ void cmGlobalFastbuildGenerator::AddRule(cmFastbuildRule const& rule)
   // Store command length
   this->RuleCmdLength[rule.Name] = static_cast<int>(rule.Command.size());
   // Write rule
-  cmGlobalFastbuildGenerator::WriteRule(*this->BuildFileStream, rule);
+  cmGlobalFastbuildGenerator::WriteRule(*this->RulesFileStream, rule);
 }
 
 bool cmGlobalFastbuildGenerator::HasRule(const std::string& name)
@@ -1158,7 +1141,7 @@ void cmGlobalFastbuildGenerator::CloseBuildFileStreams()
 bool cmGlobalFastbuildGenerator::OpenRulesFileStream()
 {
   if (!this->OpenFileStream(this->RulesFileStream,
-                            cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE)) {
+                            cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE)) {
     return false;
   }
 
@@ -1869,7 +1852,7 @@ void cmGlobalFastbuildGenerator::WriteTargetRebuildManifest(std::ostream& os)
     rule.Description = "Re-running CMake...";
     rule.Comment = "Rule for re-running cmake.";
     rule.Generator = true;
-    WriteRule(*this->BuildFileStream, rule);
+    WriteRule(*this->RulesFileStream, rule);
   }
 
   cmFastbuildBuild reBuild("RERUN_CMAKE");
@@ -1900,7 +1883,7 @@ void cmGlobalFastbuildGenerator::WriteTargetRebuildManifest(std::ostream& os)
       rule.Description = "Re-checking globbed directories...";
       rule.Comment = "Rule for re-checking globbed directories.";
       rule.Generator = true;
-      this->WriteRule(*this->BuildFileStream, rule);
+      this->WriteRule(*this->RulesFileStream, rule);
     }
 
     cmFastbuildBuild phonyBuild("phony");
@@ -2061,7 +2044,7 @@ bool cmGlobalFastbuildGenerator::WriteTargetCleanAdditional(std::ostream& os)
                                  cmOutputConverter::SHELL));
     rule.Description = "Cleaning additional files...";
     rule.Comment = "Rule for cleaning additional files.";
-    WriteRule(*this->BuildFileStream, rule);
+    WriteRule(*this->RulesFileStream, rule);
   }
 
   // Write build
@@ -2098,7 +2081,7 @@ void cmGlobalFastbuildGenerator::WriteTargetClean(std::ostream& os)
     rule.Command = cmStrCat(this->FastbuildCmd(), " $FILE_ARG -t clean $TARGETS");
     rule.Description = "Cleaning all built files...";
     rule.Comment = "Rule for cleaning all built files.";
-    WriteRule(*this->BuildFileStream, rule);
+    WriteRule(*this->RulesFileStream, rule);
   }
 
   auto const configs = this->Makefiles.front()->GetGeneratorConfigs(
@@ -2214,7 +2197,7 @@ void cmGlobalFastbuildGenerator::WriteTargetHelp(std::ostream& os)
     rule.Command = cmStrCat(this->FastbuildCmd(), " -t targets");
     rule.Description = "//All primary targets available:";
     rule.Comment = "//Rule for printing all primary targets available.";
-    WriteRule(*this->BuildFileStream, rule);
+    WriteRule(*this->RulesFileStream, rule);
   }
   {
     cmFastbuildBuild build("HELP");

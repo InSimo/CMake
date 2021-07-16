@@ -82,12 +82,12 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
            .count(config)) {
       continue;
     }
-    //this->WriteObjectBuildStatements(config, fileConfig, firstForConfig); TMP
+    this->WriteObjectBuildStatements(config, fileConfig, firstForConfig);
     firstForConfig = false;
   }
 
   if (this->GetGeneratorTarget()->GetType() == cmStateEnums::OBJECT_LIBRARY) {
-    // this->WriteObjectLibStatement(config); TMP
+    this->WriteObjectLibStatement(config);
   } else {
     firstForConfig = true;
     for (auto const& fileConfig : this->GetConfigNames()) {
@@ -98,8 +98,8 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
       }
       // If this target has cuda language link inputs, and we need to do
       // device linking
-      //this->WriteDeviceLinkStatement(config, fileConfig, firstForConfig); TMP
-      //this->WriteLinkStatement(config, fileConfig, firstForConfig); TMP
+      this->WriteDeviceLinkStatement(config, fileConfig, firstForConfig);
+      this->WriteLinkStatement(config, fileConfig, firstForConfig);
       firstForConfig = false;
     }
   }
@@ -116,8 +116,8 @@ void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
   const std::string& config)
 {
 #ifdef FASTBUILD_GEN_VERBOSE_FILES
-  cmGlobalFastbuildGenerator::WriteDivider(this->GetCommonFileStream());
-  this->GetCommonFileStream()
+  cmGlobalFastbuildGenerator::WriteDivider(this->GetRulesFileStream());
+  this->GetRulesFileStream()
     << "// Rules for each languages for "
     << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
     << " target " << this->GetTargetName() << "\n\n";

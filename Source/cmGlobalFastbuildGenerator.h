@@ -132,9 +132,9 @@ public:
    * optional @a comment. An @a indent level can be specified.
    * @warning no escaping of any kind is done here.
    */
-  /*static void WriteVariable(std::ostream& os, const std::string& name,
+  static void WriteVariable(std::ostream& os, const std::string& name,
                             const std::string& value,
-                            const std::string& comment = "", int indent = 0);*/
+                            const std::string& comment = "", int indent = 0);
 
   /**
    * Write an include statement including @a filename with an optional
@@ -449,6 +449,10 @@ public:
 
   bool CheckCxxModuleSupport();
 
+  // For Fastbuild
+
+  void WriteCommentFB(std::ostream& os, const std::string& comment);
+
   void WriteSectionHeader(std::ostream& os, const std::string& comment);
 
   void WritePushScope(std::ostream& os, char begin = '{', char end = '}');
@@ -457,7 +461,7 @@ public:
 
   void WritePopScope(std::ostream& os);
 
-  void WriteVariable(std::ostream& os, const std::string& key, const std::string& value, const std::string& operation = "=");
+  void WriteVariableFB(std::ostream& os, const std::string& key, const std::string& value, const std::string& operation = "=");
 
   void WriteCommand(std::ostream& os, const std::string& command, const std::string& value = std::string());
 
@@ -467,17 +471,11 @@ public:
 protected:
   void Generate() override;
 
-  void WriteCommentFB(std::ostream& os, const std::string& comment);
-
-  void GenerateRootBFF(std::ostream& os);
-
-  void WriteRootBFF(std::ostream& os);
+  // For Fastbuild
 
   void WritePlaceholders(std::ostream& os);
 
   void WriteSettings(std::ostream& os);
-
-  void WriteCompilers(std::ostream& os);
 
   void WriteConfigurations(std::ostream& os);
 

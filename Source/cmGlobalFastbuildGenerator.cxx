@@ -2756,7 +2756,8 @@ bool cmGlobalFastbuildGenerator::IsSingleConfigUtility(
 }
 
 const char* cmGlobalFastbuildMultiGenerator::FASTBUILD_COMMON_FILE =
-  "CMakeFiles/common.ninja";
+  "CMakeFiles/common.bff";
+const char* cmGlobalFastbuildMultiGenerator::FASTBUILD_COMMON_FILE_NAME = "common.bff";
 const char* cmGlobalFastbuildMultiGenerator::FASTBUILD_FILE_EXTENSION = ".bff";
 
 cmGlobalFastbuildMultiGenerator::cmGlobalFastbuildMultiGenerator(cmake* cm)
@@ -2790,10 +2791,12 @@ bool cmGlobalFastbuildMultiGenerator::OpenBuildFileStreams()
   if (!this->OpenFileStream(this->DefaultFileStream, FASTBUILD_BUILD_FILE)) {
     return false;
   }
-  *this->DefaultFileStream << "// NINJA Build using rules for '"
+  *this->DefaultFileStream << "// Build using rules for '"
                            << this->DefaultFileConfig << "'.\n\n"
-                           << "// NINJA include "
+                           << "#include "
+                           << "\""
                            << GetFastbuildImplFilename(this->DefaultFileConfig)
+                           << "\""
                            << "\n\n";
 
   // Write a comment about this file.
@@ -2824,9 +2827,12 @@ bool cmGlobalFastbuildMultiGenerator::OpenBuildFileStreams()
 
       // Write a comment about this file.
       *this->ConfigFileStreams[config]
-        << "// NINJA This file contains aliases specific to the \"" << config
+        << "// This file contains aliases specific to the \"" << config
         << "\"\n// configuration.\n\n"
-        << "include " << GetFastbuildImplFilename(config) << "\n\n";
+        << "#include "
+        << "\"" << GetFastbuildImplFilename(config)
+        << "\""
+        << "\n\n";
 
       return true;
     });

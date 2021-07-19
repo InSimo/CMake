@@ -339,12 +339,12 @@ void cmLocalFastbuildGenerator::WritePools(std::ostream& os)
 void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionConfig(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "// NINJA Include auxiliary files.\n\n";
+  os << "// Include auxiliary files.\n\n";
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildCommonFile =
-    ng->FastbuildOutputPath(cmGlobalFastbuildMultiGenerator::FASTBUILD_COMMON_FILE);
-  std::string const commonFilePath = ng->EncodePath(fastbuildCommonFile);
-  cmGlobalFastbuildGenerator::WriteInclude(os, commonFilePath,
+    ng->FastbuildOutputPath(cmGlobalFastbuildMultiGenerator::FASTBUILD_COMMON_FILE_NAME);
+  std::string const commonFilePath = fastbuildCommonFile;
+  this->GetGlobalFastbuildGenerator()->WriteIncludeFB(os, commonFilePath,
                                        "Include common file.");
   os << "\n";
 }
@@ -356,8 +356,11 @@ void cmLocalFastbuildGenerator::WriteFastbuildFilesInclusionCommon(std::ostream&
   cmGlobalFastbuildGenerator* ng = this->GetGlobalFastbuildGenerator();
   std::string const fastbuildRulesFile =
     ng->FastbuildOutputPath(cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE);
-  std::string const rulesFilePath = ng->EncodePath(fastbuildRulesFile);
- this->GetGlobalFastbuildGenerator()->WriteIncludeFB(os, rulesFilePath,
+  std::string rulesFilePath = fastbuildRulesFile;
+  if (this->GetGlobalFastbuildGenerator()->IsMultiConfig()) { // For going in the good directory
+    rulesFilePath = cmStrCat("../",fastbuildRulesFile);
+  }
+  this->GetGlobalFastbuildGenerator()->WriteIncludeFB(os, rulesFilePath,
                                        "Include rules file.");
   os << "\n";
 }

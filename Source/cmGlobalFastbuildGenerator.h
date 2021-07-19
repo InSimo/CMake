@@ -662,9 +662,11 @@ private:
 class cmGlobalFastbuildMultiGenerator : public cmGlobalFastbuildGenerator
 {
 public:
-  /// The default name of Ninja's common file. Typically: common.ninja.
+  /// The default name of Fastbuild's common file. Typically: common.bff.
   static const char* FASTBUILD_COMMON_FILE;
-  /// The default file extension to use for per-config Ninja files.
+  /// The name of the file in FASTBUILD_COMMON_FILE
+  static const char* FASTBUILD_COMMON_FILE_NAME;
+  /// The default file extension to use for per-config Fastbuild files.
   static const char* FASTBUILD_FILE_EXTENSION;
 
   cmGlobalFastbuildMultiGenerator(cmake* cm);

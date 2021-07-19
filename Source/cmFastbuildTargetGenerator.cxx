@@ -946,7 +946,7 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
   std::string executable = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
   std::string compiler_flags = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
   std::string linker = this->GetMakefile()->GetSafeDefinition("CMAKE_LINKER");
-  std::string link_flags = "%1 %2";
+  std::string link_flags = "%1 /OUT:\"%2\"";
 
   this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
   //this->GetGlobalGenerator()->WriteCommand(os, "Compiler", cmStrCat("\'Compiler-", lang,"\'"));

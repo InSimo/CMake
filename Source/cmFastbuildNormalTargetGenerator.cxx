@@ -71,8 +71,7 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   }
 
   // Write the rules for each language.
-  //this->WriteLanguagesRules(config);
-  this->WriteLanguagesRulesFB(config);
+  this->WriteLanguagesRules(config);
 
   // Write the build statements
   bool firstForConfig = true;
@@ -108,6 +107,27 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
       this->GetTargetName(), this->GetGeneratorTarget(), "all");
   }
 
+  std::ostream& os = this->GetCommonFileStream();
+  std::string project_name = this->GetTargetName();
+  std::string source_path = this->GetLocalGenerator()->GetCurrentSourceDirectory();
+  std::string binary_path = this->GetLocalGenerator()->GetCurrentBinaryDirectory();
+
+  /*this->GetGlobalGenerator()->WriteCommand(os, "Library", cmStrCat("\'", project_name, "-Lib\'"));
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\"", project_name, ".obj\""));
+  this->GetGlobalGenerator()->WritePopScope(os);*/
+  this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList\" }"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
+  this->GetGlobalGenerator()->WritePopScope(os);
+
+  this->GetGlobalGenerator()->WriteSectionHeader(os, "Alias");
+  this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'all\'");
+  this->GetGlobalGenerator()->WritePushScope(os);
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "\' }"));
+  this->GetGlobalGenerator()->WritePopScope(os);
+
   // Find ADDITIONAL_CLEAN_FILES
   this->AdditionalCleanFiles(config);
 }
@@ -123,32 +143,6 @@ void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(
     << " target " << this->GetTargetName() << "\n\n";
 #endif
 
-  // Write rules for languages compiled in this target.
-  std::set<std::string> languages;
-  std::vector<cmSourceFile const*> sourceFiles;
-  this->GetGeneratorTarget()->GetObjectSources(sourceFiles, config);
-  for (cmSourceFile const* sf : sourceFiles) {
-    std::string const lang = sf->GetLanguage();
-    if (!lang.empty()) {
-      languages.insert(lang);
-    }
-  }
-  for (std::string const& language : languages) {
-    this->WriteLanguageRules(language, config);
-  }
-}
-
-void cmFastbuildNormalTargetGenerator::WriteLanguagesRulesFB(
-  const std::string& config)
-{
-#ifdef FASTBUILD_GEN_VERBOSE_FILES
-  cmGlobalFastbuildGenerator::WriteDivider(this->GetCommonFileStream());
-  this->GetCommonFileStream()
-    << "// Rules for each languages for "
-    << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
-    << " target " << this->GetTargetName() << "\n\n";
-#endif
-  
   // Write rules for languages compiled in this target.
   std::set<std::string> languages;
   std::vector<cmSourceFile const*> sourceFiles;

@@ -2000,7 +2000,7 @@ int cmGlobalGenerator::Build(
   if (clean) {
     std::vector<GeneratedMakeCommand> cleanCommand =
       this->GenerateBuildCommand(makeCommandCSTR, projectName, bindir,
-                                 { "clean" }, realConfig, fast, jobs, verbose);
+                                 { "-clean" }, realConfig, fast, jobs, verbose);
     output += "\nRun Clean Command:";
     output += cleanCommand.front().Printable();
     output += "\n";

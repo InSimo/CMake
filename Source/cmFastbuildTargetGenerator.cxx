@@ -1077,13 +1077,25 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
     std::string project_name = this->GetTargetName();
     std::string current_source_dir = this->GetMakefile()->GetCurrentSourceDirectory();
     std::string current_binary_dir = this->GetMakefile()->GetCurrentBinaryDirectory();
-    
-    this->GetGlobalGenerator()->WriteSectionHeader(os, project_name);
-    this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-ObjectList\'"));
-    this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles", objectList);
-    this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", current_binary_dir, "\'"));
-    this->GetGlobalGenerator()->WritePopScope(os);
+
+    if (this->GetGlobalGenerator()->GetDefaultFileConfig() == config || !this->GetGlobalGenerator()->IsMultiConfig())
+    {
+      this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
+      this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-ObjectList\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles", objectList);
+      this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", current_binary_dir, "\'"));
+      this->GetGlobalGenerator()->WritePopScope(os);
+    }
+    else
+    {
+      this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
+      this->GetGlobalGenerator()->WriteCommand(os, "ObjectList",cmStrCat("\'", project_name, "-ObjectList-", config, "\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
+      this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", current_binary_dir, "\'"));
+      this->GetGlobalGenerator()->WritePopScope(os);
+    }
   }
 
   for (auto const& langDDIFiles : this->Configs[config].DDIFiles) {

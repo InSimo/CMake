@@ -648,8 +648,8 @@ void cmGlobalFastbuildGenerator::Generate()
 
   this->cmGlobalGenerator::Generate();
 
-  this->WritePlaceholders(*this->GetCommonFileStream());
-  this->WriteSettings(*this->GetCommonFileStream());
+  //this->WritePlaceholders(*this->GetCommonFileStream());
+  //this->WriteSettings(*this->GetCommonFileStream());
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());

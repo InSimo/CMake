@@ -472,6 +472,11 @@ public:
   void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, char begin = '{', char end = '}',
   const std::string& operation = "=");
 
+  std::string GetDefaultFileConfig()
+  {
+    return DefaultFileConfig;
+  }
+
 protected:
   void Generate() override;
 

@@ -141,11 +141,6 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
 
     if (this->GetGlobalGenerator()->GetDefaultFileConfig() == config)
     {
-      this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'all\'");
-      this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
-      this->GetGlobalGenerator()->WritePopScope(os);
-
       // For success cmake basic test 
       this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
       this->GetGlobalGenerator()->WritePushScope(os);
@@ -153,6 +148,12 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
       this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
       this->GetGlobalGenerator()->WritePopScope(os);
     }
+
+    std::ostream & os_file_config = *this->GetGlobalGenerator()->GetImplFileStream(config);
+    this->GetGlobalGenerator()->WriteCommand(os_file_config, "Alias", "\'all\'");
+    this->GetGlobalGenerator()->WritePushScope(os_file_config);
+    this->GetGlobalGenerator()->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
+    this->GetGlobalGenerator()->WritePopScope(os_file_config);
   }
 
   // Find ADDITIONAL_CLEAN_FILES

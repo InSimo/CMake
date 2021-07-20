@@ -2121,7 +2121,7 @@ void cmGlobalFastbuildGenerator::WriteTargetClean(std::ostream& os)
         }
         if (this->IsMultiConfig()) {
           build.Variables["FILE_ARG"] = cmStrCat(
-            "-f ",
+            /*"-f "*/ "-config",
             cmGlobalFastbuildMultiGenerator::GetFastbuildImplFilename(fileConfig));
         }
         this->WriteBuild(*this->GetImplFileStream(fileConfig), build);
@@ -2151,7 +2151,7 @@ void cmGlobalFastbuildGenerator::WriteTargetClean(std::ostream& os)
 
       for (auto const& fileConfig : configs) {
         build.Variables["FILE_ARG"] = cmStrCat(
-          "-f ",
+          /*"-f "*/ "-config",
           cmGlobalFastbuildMultiGenerator::GetFastbuildImplFilename(fileConfig));
         this->WriteBuild(*this->GetImplFileStream(fileConfig), build);
       }
@@ -2871,7 +2871,8 @@ void cmGlobalFastbuildMultiGenerator::AppendFastbuildFileArgument(
   GeneratedMakeCommand& command, const std::string& config) const
 {
   if (!config.empty()) {
-    command.Add("-f");
+    //command.Add("-f");
+    command.Add("-config");
     command.Add(GetFastbuildConfigFilename(config));
   }
 }

@@ -199,13 +199,8 @@ void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string&
   for (size_t index = 0; index < size; ++index)
   {
     const std::string & value = values[index];
-    bool isLast = index == size - 1;
     os << this->linePrefix << value;
-    if (!isLast)
-    {
-      os << '//';
-    }
-    os << "\n";
+    os << '\n';
   }
   WritePopScope(os);
 }

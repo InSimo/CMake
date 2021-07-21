@@ -950,6 +950,12 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
 
   std::string flags_config = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
 
+  // if multiple CL.EXE write to the same .PDB file, please use /FS
+  if (config == "Debug" || config == "RelWithDebInfo")
+  {
+    flags_config += " /FS";
+  }
+
   this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
   this->GetGlobalGenerator()->WriteVariableFB(os, cmStrCat("Compiler", config), "");
   this->GetGlobalGenerator()->WritePushScopeStruct(os);

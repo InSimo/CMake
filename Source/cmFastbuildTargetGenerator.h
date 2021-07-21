@@ -201,6 +201,10 @@ protected:
 
   bool ForceResponseFile();
 
+  void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const std::string& config);
+
+  void cmFastbuildTargetGenerator::WriteObjectAndLibraryFB(const std::string& config);
+
 private:
   cmLocalFastbuildGenerator* LocalGenerator;
 

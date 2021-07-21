@@ -108,56 +108,68 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   }
 
   // For Fastbuild
-  
-  std::ostream& os = this->GetCommonFileStream();
-  std::string project_name = this->GetTargetName();
-  std::string source_path = this->GetLocalGenerator()->GetCurrentSourceDirectory();
-  std::string binary_path = this->GetLocalGenerator()->GetCurrentBinaryDirectory();
-
-  if (!this->GetGlobalGenerator()->IsMultiConfig())
-  {
-    this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
-    this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList\" }"));
-    this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
-    this->GetGlobalGenerator()->WritePopScope(os);
-    this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'all\'");
-    this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "\' }"));
-    this->GetGlobalGenerator()->WritePopScope(os);
-  }
-  else
-  {
-    this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "-", config, "\'"));
-    this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
-    this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", binary_path, "/", config, "/", project_name, ".exe\'"));
-    this->GetGlobalGenerator()->WritePopScope(os);
-
-    this->GetGlobalGenerator()->WriteCommand(os, "Alias", cmStrCat("\'all-", config, "\'"));
-    this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
-    this->GetGlobalGenerator()->WritePopScope(os);
-
-    if (this->GetGlobalGenerator()->GetDefaultFileConfig() == config)
-    {
-      // For success cmake basic test 
-      this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
-      this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
-      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
-      this->GetGlobalGenerator()->WritePopScope(os);
-    }
-
-    std::ostream & os_file_config = *this->GetGlobalGenerator()->GetImplFileStream(config);
-    this->GetGlobalGenerator()->WriteCommand(os_file_config, "Alias", "\'all\'");
-    this->GetGlobalGenerator()->WritePushScope(os_file_config);
-    this->GetGlobalGenerator()->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
-    this->GetGlobalGenerator()->WritePopScope(os_file_config);
-  }
+  this->WriteExeAliasFB(config);
 
   // Find ADDITIONAL_CLEAN_FILES
   this->AdditionalCleanFiles(config);
+}
+
+void cmFastbuildNormalTargetGenerator::WriteExeAliasFB(const std::string& config)
+{
+  cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
+
+  std::ostream& os = this->GetCommonFileStream();
+  std::string project_name = this->GetTargetName();
+  std::string source_path =this->GetLocalGenerator()->GetCurrentSourceDirectory();
+  std::string binary_path =this->GetLocalGenerator()->GetCurrentBinaryDirectory();
+
+  if (targetType == cmStateEnums::EXECUTABLE) {
+    if (!this->GetGlobalGenerator()->IsMultiConfig())
+    {
+      this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList\" }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
+      this->GetGlobalGenerator()->WritePopScope(os);
+      this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'all\'");
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "\' }"));
+      this->GetGlobalGenerator()->WritePopScope(os);
+    }
+    else
+    {
+      this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "-", config, "\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries",cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", binary_path, "/", config, "/", project_name, ".exe\'"));
+      this->GetGlobalGenerator()->WritePopScope(os);
+
+      this->GetGlobalGenerator()->WriteCommand(os, "Alias", cmStrCat("\'all-", config, "\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
+      this->GetGlobalGenerator()->WritePopScope(os);
+
+      if (this->GetGlobalGenerator()->GetDefaultFileConfig() == config)
+      {
+        // For success cmake basic test
+        this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
+        this->GetGlobalGenerator()->WritePushScope(os);
+        this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
+        this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
+        this->GetGlobalGenerator()->WritePopScope(os);
+      }
+
+      std::ostream& os_file_config = *this->GetGlobalGenerator()->GetImplFileStream(config);
+      this->GetGlobalGenerator()->WriteCommand(os_file_config, "Alias", "\'all\'");
+      this->GetGlobalGenerator()->WritePushScope(os_file_config);
+      this->GetGlobalGenerator()->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
+      this->GetGlobalGenerator()->WritePopScope(os_file_config);
+    }
+  }
+  else
+  {
+    this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat("NOT YET AVAILABLE : ", this->GetVisibleTypeName()));
+  }
 }
 
 void cmFastbuildNormalTargetGenerator::WriteLanguagesRules(

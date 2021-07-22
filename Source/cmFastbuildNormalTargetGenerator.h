@@ -58,5 +58,8 @@ private:
   cmGeneratorTarget::Names TargetNames(const std::string& config) const;
   std::string TargetLinkLanguage(const std::string& config) const;
   std::string DeviceLinkObject;
-  void cmFastbuildNormalTargetGenerator::WriteExeAliasFB(const std::string& config);
+
+  void WriteTargetFB(const std::string& config);
+  void WriteExecutableFB(const std::string& config);
+  void WriteLibraryFB(const std::string& config);
 };

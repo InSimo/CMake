@@ -114,26 +114,68 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   this->AdditionalCleanFiles(config);
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config)
+{
+  std::string nameTarget = "";
+  std::size_t found = namePathFile.rfind('/');
+  if (found == std::string::npos)
+  {
+    found = namePathFile.rfind('\\');
+    if (found == std::string::npos)
+    {
+      found = 0;
+    }
+    else found++;
+  }
+  else found++;
+  nameTarget = namePathFile.substr(found);
+
+  found = nameTarget.find('.');
+  if (found != std::string::npos)
+  {
+    nameTarget = nameTarget.substr(0, found);
+  }
+
+  if (isMultiConfig)
+  {
+    nameTarget = cmStrCat(nameTarget, "-", config);
+  }
+
+  return nameTarget;
+}
+
 void cmFastbuildNormalTargetGenerator::WriteExeAliasFB(const std::string& config)
 {
   cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
 
   std::ostream& os = this->GetCommonFileStream();
-  std::string project_name = this->GetTargetName();
-  std::string source_path =this->GetLocalGenerator()->GetCurrentSourceDirectory();
-  std::string binary_path =this->GetLocalGenerator()->GetCurrentBinaryDirectory();
+  bool isMultiConfig = this->GetGlobalGenerator()->IsMultiConfig();
 
+  std::string project_name = this->GetTargetName();
+  std::string target_output = this->GetTargetOutputDir(config);
+  this->TargetLinkLanguage(config);
+
+  //const cmFastbuildDeps explicitDeps = this->GetObjects(config);
+  const cmFastbuildDeps implicitDeps = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
+
+  std::string listImplicitDeps = "";
+  for (std::string implicitDep : implicitDeps) {
+    listImplicitDeps += cmStrCat("\'", GetNameTargetLibrary(implicitDep, isMultiConfig, config), "\' ");
+  }
+  
   if (targetType == cmStateEnums::EXECUTABLE) {
-    if (!this->GetGlobalGenerator()->IsMultiConfig())
+    if (!isMultiConfig)
     {
       this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
       this->GetGlobalGenerator()->WritePushScope(os);
       this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList\" }"));
-      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
+      if (!listImplicitDeps.empty()) this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listImplicitDeps, " }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", target_output, "/", project_name, ".exe\'"));
       this->GetGlobalGenerator()->WritePopScope(os);
+
       this->GetGlobalGenerator()->WriteCommand(os, "Alias", "\'all\'");
       this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "\' }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", project_name, "\' }"));
       this->GetGlobalGenerator()->WritePopScope(os);
     }
     else
@@ -141,12 +183,13 @@ void cmFastbuildNormalTargetGenerator::WriteExeAliasFB(const std::string& config
       this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "-", config, "\'"));
       this->GetGlobalGenerator()->WritePushScope(os);
       this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries",cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
-      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", binary_path, "/", config, "/", project_name, ".exe\'"));
+      if (!listImplicitDeps.empty()) this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", target_output, "/", project_name, ".exe\'"));
       this->GetGlobalGenerator()->WritePopScope(os);
 
       this->GetGlobalGenerator()->WriteCommand(os, "Alias", cmStrCat("\'all-", config, "\'"));
       this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", project_name, "-", config, "\' }"));
       this->GetGlobalGenerator()->WritePopScope(os);
 
       if (this->GetGlobalGenerator()->GetDefaultFileConfig() == config)
@@ -155,15 +198,40 @@ void cmFastbuildNormalTargetGenerator::WriteExeAliasFB(const std::string& config
         this->GetGlobalGenerator()->WriteCommand(os, "Executable", cmStrCat("\'", project_name, "\'"));
         this->GetGlobalGenerator()->WritePushScope(os);
         this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
-        this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", binary_path, "/", project_name, ".exe\'"));
+        this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'out/", project_name, ".exe\'"));
         this->GetGlobalGenerator()->WritePopScope(os);
       }
 
       std::ostream& os_file_config = *this->GetGlobalGenerator()->GetImplFileStream(config);
       this->GetGlobalGenerator()->WriteCommand(os_file_config, "Alias", "\'all\'");
       this->GetGlobalGenerator()->WritePushScope(os_file_config);
-      this->GetGlobalGenerator()->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ \'", project_name, "-", config, "\' }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", project_name, "-", config, "\' }"));
       this->GetGlobalGenerator()->WritePopScope(os_file_config);
+    }
+  }
+  else if (targetType == cmStateEnums::STATIC_LIBRARY)
+  {
+    this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat("VERY CLOSE AVAILABLE : ", this->GetVisibleTypeName()));
+    if (!isMultiConfig)
+    {
+      this->GetGlobalGenerator()->WriteCommand(os, "Library", cmStrCat("\'", project_name, "\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteCommand(os, "Using", cmStrCat(".Compiler", config));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianAdditionalInputs", cmStrCat("{ \"", project_name, "-ObjectList\" }"));
+      if (!listImplicitDeps.empty()) this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
+      
+      this->GetGlobalGenerator()->WritePopScope(os);
+    }
+    else
+    {
+      this->GetGlobalGenerator()->WriteCommand(os, "Library", cmStrCat("\'", project_name, "-", config, "\'"));
+      this->GetGlobalGenerator()->WritePushScope(os);
+      this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianAdditionalInputs", cmStrCat("{ \"", project_name, "-ObjectList-", config, "\" }"));
+      if (!listImplicitDeps.empty()) this->GetGlobalGenerator()->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
+      this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
+      this->GetGlobalGenerator()->WritePopScope(os);
     }
   }
   else

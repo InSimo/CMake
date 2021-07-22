@@ -18,6 +18,8 @@ public:
 
   void Generate(const std::string& config) override;
 
+  static std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
+
 private:
   std::string LanguageLinkerRule(const std::string& config) const;
   std::string LanguageLinkerDeviceRule(const std::string& config) const;
@@ -56,6 +58,5 @@ private:
   cmGeneratorTarget::Names TargetNames(const std::string& config) const;
   std::string TargetLinkLanguage(const std::string& config) const;
   std::string DeviceLinkObject;
-
   void cmFastbuildNormalTargetGenerator::WriteExeAliasFB(const std::string& config);
 };

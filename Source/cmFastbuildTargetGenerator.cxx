@@ -950,10 +950,11 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const st
 
   std::string executable = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
   std::string compiler_flags = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
-  std::string linker = this->GetMakefile()->GetSafeDefinition("CMAKE_LINKER");
-  std::string link_flags = "%1 /OUT:\"%2\"";
-
   std::string flags_config = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
+  std::string create_static_library = this->GetMakefile()->GetSafeDefinition("CMAKE_AR");
+
+  std::string linker = this->GetMakefile()->GetSafeDefinition("CMAKE_LINKER");
+  std::string link_flags = "\"%1\" /OUT:\"%2\"";
 
   // if multiple CL.EXE write to the same .PDB file, please use /FS
   if (config == "Debug" || config == "RelWithDebInfo")
@@ -967,6 +968,8 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const st
   this->GetGlobalGenerator()->WriteVariableFB(os, "Compiler", cmStrCat("\'", executable, "\'"));
   this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'/c %1 ", compiler_flags, " /Fo%2 \'"));
   this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'", flags_config, "\'"), "+");
+  this->GetGlobalGenerator()->WriteVariableFB(os, "Librarian", cmStrCat("\'", create_static_library, "\'"));
+  this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOptions", cmStrCat("\'/nologo ", link_flags, "\'"));
   this->GetGlobalGenerator()->WritePopScope(os);
   this->GetGlobalGenerator()->WriteVariableFB(os, "Linker", cmStrCat("\'", linker, "\'"));
   this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOptions",cmStrCat("\'", link_flags, "\'"));
@@ -1083,7 +1086,7 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
   }
 
   // For Fastbuild
-  this->WriteObjectAndLibraryFB(config);
+  this->WriteObjectListFB(config);
 
   for (auto const& langDDIFiles : this->Configs[config].DDIFiles) {
     std::string const& language = langDDIFiles.first;
@@ -1138,77 +1141,42 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
   }
 }
 
-void cmFastbuildTargetGenerator::WriteObjectAndLibraryFB(const std::string& config)
+void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config)
 {
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
   std::vector<std::string> objectList;
 
-  for (cmSourceFile const* sf : objectSources) {
+  for (cmSourceFile const* sf : objectSources)
+  {
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
-
-  std::vector<cmSourceFile const*> headerSources;
-  this->GeneratorTarget->GetHeaderSources(headerSources, config);
-  std::vector<std::string> headerList;
-
-  for (cmSourceFile const* sf : headerSources) {
-    headerList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
-  }
-
-  cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
 
   std::ostream& os = this->GetCommonFileStream();
 
   std::string project_name = this->GetTargetName();
   std::string current_source_dir = this->GetMakefile()->GetCurrentSourceDirectory();
-  std::string current_binary_dir = this->GetMakefile()->GetCurrentBinaryDirectory();
+  std::string target_output = this->GetTargetOutputDir(config);
 
-  if (targetType == cmStateEnums::STATIC_LIBRARY)
+  if (!this->GetGlobalGenerator()->IsMultiConfig())
   {
-    if (!this->GetGlobalGenerator()->IsMultiConfig()) {
-      this->GetGlobalGenerator()->WriteSectionHeader(os, project_name);
-      this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-Lib\'"));
-      this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
-      this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", current_binary_dir, "\'"));
-      this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", current_binary_dir, "/", project_name, ".lib\'"));
-      this->GetGlobalGenerator()->WritePopScope(os);
-    }
-    else
-    {
-      this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
-      this->GetGlobalGenerator()->WriteCommand(os, "ObjectList",cmStrCat("\'", project_name, "-Lib-", config, "\'"));
-      this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
-      this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath",cmStrCat("\'", current_binary_dir, "/", config, "\'"));
-      this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", current_binary_dir, "/", project_name, ".lib\'"));
-      this->GetGlobalGenerator()->WritePopScope(os);
-    }
+    this->GetGlobalGenerator()->WriteSectionHeader(os, project_name);
+    this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-ObjectList\'"));
+    this->GetGlobalGenerator()->WritePushScope(os);
+    this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
+    this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
+    this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", target_output, "\'"));
+    this->GetGlobalGenerator()->WritePopScope(os);
   }
   else
   {
-    if (!this->GetGlobalGenerator()->IsMultiConfig()) {
-      this->GetGlobalGenerator()->WriteSectionHeader(os, project_name);
-      this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-ObjectList\'"));
-      this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
-      this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", current_binary_dir, "\'"));
-      this->GetGlobalGenerator()->WritePopScope(os);
-    }
-    else
-    {
-      this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
-      this->GetGlobalGenerator()->WriteCommand(os, "ObjectList",cmStrCat("\'", project_name, "-ObjectList-", config, "\'"));
-      this->GetGlobalGenerator()->WritePushScope(os);
-      this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
-      this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
-      this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath",cmStrCat("\'", current_binary_dir, "/", config, "\'"));
-      this->GetGlobalGenerator()->WritePopScope(os);
-    }
+    this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
+    this->GetGlobalGenerator()->WriteCommand(os, "ObjectList",cmStrCat("\'", project_name, "-ObjectList-", config, "\'"));
+    this->GetGlobalGenerator()->WritePushScope(os);
+    this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
+    this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
+    this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", target_output, "\'"));
+    this->GetGlobalGenerator()->WritePopScope(os);
   }
 }
 

@@ -62,4 +62,5 @@ private:
   void WriteTargetFB(const std::string& config);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
+  void WriteDLLFB(const std::string& config);
 };

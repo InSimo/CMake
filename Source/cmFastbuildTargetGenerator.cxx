@@ -954,7 +954,8 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const st
   std::string create_static_library = this->GetMakefile()->GetSafeDefinition("CMAKE_AR");
 
   std::string linker = this->GetMakefile()->GetSafeDefinition("CMAKE_LINKER");
-  std::string link_flags = "\"%1\" /OUT:\"%2\"";
+  std::string link_flags = "\"%1\" /OUT:\"%2\" ";
+  link_flags += this->GetMakefile()->GetSafeDefinition("LINK_OPTIONS");
 
   // if multiple CL.EXE write to the same .PDB file, please use /FS
   if (config == "Debug" || config == "RelWithDebInfo")
@@ -963,7 +964,7 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const st
   }
 
   this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
-  this->GetGlobalGenerator()->WriteVariableFB(os, cmStrCat("Compiler", config), "");
+  this->GetGlobalGenerator()->WriteVariableFB(os, cmStrCat("Compiler", lang, config), "");
   this->GetGlobalGenerator()->WritePushScopeStruct(os);
   this->GetGlobalGenerator()->WriteVariableFB(os, "Compiler", cmStrCat("\'", executable, "\'"));
   this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'/c %1 ", compiler_flags, " /Fo%2 \'"));
@@ -1154,16 +1155,17 @@ void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config)
 
   std::ostream& os = this->GetCommonFileStream();
 
+  std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
   std::string project_name = this->GetTargetName();
   std::string current_source_dir = this->GetMakefile()->GetCurrentSourceDirectory();
   std::string target_output = this->GetTargetOutputDir(config);
-
+  
   if (!this->GetGlobalGenerator()->IsMultiConfig())
   {
     this->GetGlobalGenerator()->WriteSectionHeader(os, project_name);
     this->GetGlobalGenerator()->WriteCommand(os, "ObjectList", cmStrCat("\'", project_name, "-ObjectList\'"));
     this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
+    this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", language, config));
     this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
     this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", target_output, "\'"));
     this->GetGlobalGenerator()->WritePopScope(os);
@@ -1173,7 +1175,7 @@ void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config)
     this->GetGlobalGenerator()->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
     this->GetGlobalGenerator()->WriteCommand(os, "ObjectList",cmStrCat("\'", project_name, "-ObjectList-", config, "\'"));
     this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", config));
+    this->GetGlobalGenerator()->WriteCommand(os, "Using",cmStrCat(".Compiler", language, config));
     this->GetGlobalGenerator()->WriteArray(os, "CompilerInputFiles",objectList);
     this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOutputPath", cmStrCat("\'", target_output, "\'"));
     this->GetGlobalGenerator()->WritePopScope(os);

@@ -945,17 +945,18 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
 
 void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const std::string& config)
 {
-    
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  cmMakefile* mf = this->GetMakefile();
   std::ostream& os = this->GetRulesFileStream();
 
-  std::string executable = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::string compiler_flags = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
-  std::string flags_config = this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
-  std::string create_static_library = this->GetMakefile()->GetSafeDefinition("CMAKE_AR");
+  std::string executable = mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
+  std::string compiler_flags = mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
+  std::string flags_config = mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
+  std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
 
-  std::string linker = this->GetMakefile()->GetSafeDefinition("CMAKE_LINKER");
+  std::string linker = mf->GetSafeDefinition("CMAKE_LINKER");
   std::string link_flags = "\"%1\" /OUT:\"%2\" ";
-  link_flags += this->GetMakefile()->GetSafeDefinition("LINK_OPTIONS");
+  link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
   // if multiple CL.EXE write to the same .PDB file, please use /FS
   if (config == "Debug" || config == "RelWithDebInfo")
@@ -963,17 +964,17 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const st
     flags_config += " /FS";
   }
 
-  this->GetGlobalGenerator()->WriteSectionHeader(os, "Compilers");
-  this->GetGlobalGenerator()->WriteVariableFB(os, cmStrCat("Compiler", lang, config), "");
-  this->GetGlobalGenerator()->WritePushScopeStruct(os);
-  this->GetGlobalGenerator()->WriteVariableFB(os, "Compiler", cmStrCat("\'", executable, "\'"));
-  this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'/c %1 ", compiler_flags, " /Fo%2 \'"));
-  this->GetGlobalGenerator()->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'", flags_config, "\'"), "+");
-  this->GetGlobalGenerator()->WriteVariableFB(os, "Librarian", cmStrCat("\'", create_static_library, "\'"));
-  this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianOptions", cmStrCat("\'/nologo ", link_flags, "\'"));
-  this->GetGlobalGenerator()->WritePopScope(os);
-  this->GetGlobalGenerator()->WriteVariableFB(os, "Linker", cmStrCat("\'", linker, "\'"));
-  this->GetGlobalGenerator()->WriteVariableFB(os, "LinkerOptions",cmStrCat("\'", link_flags, "\'"));
+  gfb->WriteSectionHeader(os, "Compilers");
+  gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config), "");
+  gfb->WritePushScopeStruct(os);
+  gfb->WriteVariableFB(os, "Compiler", cmStrCat("\'", executable, "\'"));
+  gfb->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'/c %1 ", compiler_flags, " /Fo%2 \'"));
+  gfb->WriteVariableFB(os, "CompilerOptions", cmStrCat("\'", flags_config, "\'"), "+");
+  gfb->WriteVariableFB(os, "Librarian", cmStrCat("\'", create_static_library, "\'"));
+  gfb->WriteVariableFB(os, "LibrarianOptions", cmStrCat("\'/nologo ", link_flags, "\'"));
+  gfb->WritePopScope(os);
+  gfb->WriteVariableFB(os, "Linker", cmStrCat("\'", linker, "\'"));
+  gfb->WriteVariableFB(os, "LinkerOptions", cmStrCat("\'", link_flags, "\'"));
 }
 
 void cmFastbuildTargetGenerator::WriteObjectBuildStatements(

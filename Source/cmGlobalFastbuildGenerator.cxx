@@ -115,6 +115,11 @@ void cmGlobalFastbuildGenerator::WriteDivider(std::ostream& os)
         "-----------------------------------------\n";
 }
 
+std::string cmGlobalFastbuildGenerator::Quote(const std::string& str, const std::string& quotation)
+{
+  return cmStrCat(quotation, str, quotation);
+}
+
 void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
                                           const std::string& comment)
 {
@@ -683,8 +688,8 @@ void cmGlobalFastbuildGenerator::Generate()
 void cmGlobalFastbuildGenerator::WritePlaceholders(std::ostream& os)
 {
   WriteSectionHeader(os, "Helper variables");
-  WriteVariableFB(os, "FB_INPUT_1_PLACEHOLDER", "\'\"%1\"\'");
-  WriteVariableFB(os, "FB_INPUT_2_PLACEHOLDER", "\'\"%2\"\'");
+  WriteVariableFB(os, "FB_INPUT_1_PLACEHOLDER", Quote("\"%1\""));
+  WriteVariableFB(os, "FB_INPUT_2_PLACEHOLDER", Quote("\"%2\""));
 }
 
 void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)

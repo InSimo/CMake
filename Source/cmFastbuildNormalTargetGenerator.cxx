@@ -262,10 +262,10 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(const std::string& config)
       listImplicitDeps += cmStrCat("\'", GetNameTargetLibrary(implicitDep, isMultiConfig, config), "\' ");
     }
 
-    this->GetGlobalGenerator()->WriteCommand(os, "Library", cmStrCat("\'", library_name, "\'"));
-    this->GetGlobalGenerator()->WritePushScope(os);
-    this->GetGlobalGenerator()->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
-    this->GetGlobalGenerator()->WriteVariableFB(os, "LibrarianAdditionalInputs", cmStrCat("{ \"", objectList_name, "\" }"));
+    gfb->WriteCommand(os, "Library", cmStrCat("\'", library_name, "\'"));
+    gfb->WritePushScope(os);
+    gfb->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
+    gfb->WriteVariableFB(os, "LibrarianAdditionalInputs", cmStrCat("{ \"", objectList_name, "\" }"));
     if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
     gfb->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
     gfb->WritePopScope(os);
@@ -291,14 +291,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     if (!isMultiConfig)
     {
       objectList_name = cmStrCat(project_name, "-ObjectList");
-      dll_name = this->GetTargetName();
-      library_name = cmStrCat(project_name, "-lib");
+      library_name = this->GetTargetName();
+      dll_name = cmStrCat(project_name, "-dll");
     }
     else
     {
       objectList_name = cmStrCat(project_name, "-ObjectList-", config);
-      dll_name = cmStrCat(this->GetTargetName(), "-", config);
-      library_name = cmStrCat(project_name, "-lib-", config);
+      library_name = cmStrCat(this->GetTargetName(), "-", config);
+      dll_name = cmStrCat(project_name, "-dll-", config);
     }
 
     const cmFastbuildDeps implicitDeps = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
@@ -323,17 +323,17 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmake_arguments += " --mt=$MT$";
     cmake_arguments += cmStrCat(" --manifests ", mf->GetSafeDefinition("MANIFESTS"));
     cmake_arguments += " -- $CMakeLinker$";
-    cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$");
-    cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");
+    cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
+    cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$"); // %2
     cmake_arguments += cmStrCat(" /implib:", library_name, ".lib");
     cmake_arguments += " /dll";
-
+    
     // Create .dll
     gfb->WriteCommand(os, "DLL", cmStrCat("\'", dll_name, "\'"));
     gfb->WritePushScope(os);
-    gfb->WriteVariableFB(os, "RC", cmStrCat("\'", mf->GetSafeDefinition("CMAKE_RC_COMPILER"), "\'"));
-    gfb->WriteVariableFB(os, "MT", cmStrCat("\'", mf->GetSafeDefinition("CMAKE_MT"), "\'"));
-    gfb->WriteVariableFB(os, "CMakeLinker", cmStrCat("\'", mf->GetSafeDefinition("CMAKE_LINKER"), "\'"));
+    gfb->WriteVariableFB(os, "RC", cmStrCat("\'", cmOutputConverter::EscapeForCMake(mf->GetSafeDefinition("CMAKE_RC_COMPILER")), "\'"));
+    gfb->WriteVariableFB(os, "MT", cmStrCat("\'", cmOutputConverter::EscapeForCMake(mf->GetSafeDefinition("CMAKE_MT")), "\'"));
+    gfb->WriteVariableFB(os, "CMakeLinker", cmStrCat("\'", cmOutputConverter::EscapeForCMake(mf->GetSafeDefinition("CMAKE_LINKER")), "\'"));
     gfb->WriteVariableFB(os, "Linker", cmStrCat("\"", cmake_command, "\""));
     gfb->WriteVariableFB(os, "LinkerOptions", cmStrCat("\"", cmake_arguments, "\""));
     gfb->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", library_name, "\" }"));

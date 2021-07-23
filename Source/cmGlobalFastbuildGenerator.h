@@ -75,6 +75,8 @@ public:
   /// Write a divider in the given output stream @a os.
   static void WriteDivider(std::ostream& os);
 
+  static std::string Quote(const std::string& str, const std::string& quotation = "'");
+
   static std::string EncodeRuleName(std::string const& name);
   std::string EncodeLiteral(const std::string& lit);
   std::string EncodePath(const std::string& path);

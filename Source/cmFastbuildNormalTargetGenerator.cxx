@@ -206,11 +206,16 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(const std::string& conf
     gfb->WriteVariableFB(os, "LinkerOutput",cmStrCat("\'", target_output, "/", project_name, ".exe\'"));
     gfb->WritePopScope(os);
 
+
+    std::string listImplicitDepsAlias = "";
+    for (std::string implicitDep : implicitDeps) {
+      listImplicitDepsAlias += cmStrCat("\'", GetNameTargetLibrary(implicitDep, isMultiConfig, config), "-Deps\' ");
+    }
+
     gfb->WriteCommand(os, "Alias", cmStrCat("\'", alias_name, "\'"));
     gfb->WritePushScope(os);
-    gfb->WriteVariableFB(os, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", executable_name, "\' }"));
+    gfb->WriteVariableFB(os, "Targets", cmStrCat("{ " , listImplicitDepsAlias, "\'", executable_name, "\' }"));
     gfb->WritePopScope(os);
-
 
     if (isMultiConfig)
     {
@@ -227,7 +232,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(const std::string& conf
       std::ostream& os_file_config = *gfb->GetImplFileStream(config);
       gfb->WriteCommand(os_file_config, "Alias", "\'all\'");
       gfb->WritePushScope(os_file_config);
-      gfb->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", executable_name, "\' }"));
+      gfb->WriteVariableFB(os_file_config, "Targets", cmStrCat("{ " , listImplicitDepsAlias, "\'", executable_name, "\' }"));
       gfb->WritePopScope(os_file_config);
     }
 }
@@ -269,6 +274,11 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(const std::string& config)
     if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
     gfb->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
     gfb->WritePopScope(os);
+
+    gfb->WriteCommand(os, "Alias", cmStrCat("\'", project_name, "-Deps\'"));
+    gfb->WritePushScope(os);
+    gfb->WriteVariableFB(os, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", library_name, "\' }"));
+    gfb->WritePopScope(os);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
@@ -291,13 +301,13 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     if (!isMultiConfig)
     {
       objectList_name = cmStrCat(project_name, "-ObjectList");
-      library_name = this->GetTargetName();
+      library_name = project_name;
       dll_name = cmStrCat(project_name, "-dll");
     }
     else
     {
       objectList_name = cmStrCat(project_name, "-ObjectList-", config);
-      library_name = cmStrCat(this->GetTargetName(), "-", config);
+      library_name = cmStrCat(project_name, "-", config);
       dll_name = cmStrCat(project_name, "-dll-", config);
     }
 
@@ -315,6 +325,8 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
     gfb->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
     gfb->WritePopScope(os);
+
+
     cmMakefile* mf = this->GetMakefile();
     std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
     std::string cmake_arguments = "-E vs_link_dll ";
@@ -325,7 +337,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmake_arguments += " -- $CMakeLinker$";
     cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
     cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$"); // %2
-    cmake_arguments += cmStrCat(" /implib:", library_name, ".lib");
+    cmake_arguments += cmStrCat(" /implib:", project_name, ".lib");
     cmake_arguments += " /dll";
     
     // Create .dll
@@ -338,6 +350,12 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     gfb->WriteVariableFB(os, "LinkerOptions", cmStrCat("\"", cmake_arguments, "\""));
     gfb->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", library_name, "\" }"));
     gfb->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", target_output, "/", project_name, ".dll\'"));
+    gfb->WritePopScope(os);
+
+    // Create Alias
+    gfb->WriteCommand(os, "Alias", cmStrCat("\'", project_name, "-Deps\'"));
+    gfb->WritePushScope(os);
+    gfb->WriteVariableFB(os, "Targets", cmStrCat("{ " , listImplicitDeps, "\'", dll_name, "\' }"));
     gfb->WritePopScope(os);
 }
 

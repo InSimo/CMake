@@ -315,33 +315,27 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ \"", listImplicitDeps, "\" }"));
     gfb->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
     gfb->WritePopScope(os);
-
     cmMakefile* mf = this->GetMakefile();
     std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
-
     std::string cmake_arguments = "-E vs_link_dll ";
-    //cmake_arguments += cmStrCat(" --intdir=", mf->GetSafeDefinition("OBJECT_DIR"));
-    cmake_arguments += cmStrCat(" --rc=", mf->GetSafeDefinition("CMAKE_RC_COMPILER"));
-    cmake_arguments += cmStrCat(" --mt=", mf->GetSafeDefinition("CMAKE_MT"));
+    cmake_arguments += cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
+    cmake_arguments += " --rc=$RC$";
+    cmake_arguments += " --mt=$MT$";
     cmake_arguments += cmStrCat(" --manifests ", mf->GetSafeDefinition("MANIFESTS"));
-    cmake_arguments += cmStrCat(" -- ", mf->GetSafeDefinition("CMAKE_LINKER"));
-    cmake_arguments += cmStrCat(" /nologo ", mf->GetSafeDefinition("OBJECTS"));
-    cmake_arguments += cmStrCat(" /out:", dll_name, ".dll");
+    cmake_arguments += " -- $CMakeLinker$";
+    cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$");
+    cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");
     cmake_arguments += cmStrCat(" /implib:", library_name, ".lib");
     cmake_arguments += " /dll";
 
-    // Create .dll with cmake command
-    gfb->WriteCommand(os, "Exec", cmStrCat("\'", dll_name, "-cmake\'"));
-    gfb->WritePushScope(os);
-    gfb->WriteVariableFB(os, "ExecExecutable", cmStrCat("\"", cmake_command, "\""));
-    gfb->WriteVariableFB(os, "ExecArguments", cmStrCat("\" ", cmake_arguments, "\""));
-    gfb->WriteVariableFB(os, "ExecOutput", cmStrCat("\"", target_output, "\""));
-    gfb->WritePopScope(os);
-
-    // Link dll
+    // Create .dll
     gfb->WriteCommand(os, "DLL", cmStrCat("\'", dll_name, "\'"));
     gfb->WritePushScope(os);
-    gfb->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
+    gfb->WriteVariableFB(os, "RC", cmStrCat("\'", mf->GetSafeDefinition("CMAKE_RC_COMPILER"), "\'"));
+    gfb->WriteVariableFB(os, "MT", cmStrCat("\'", mf->GetSafeDefinition("CMAKE_MT"), "\'"));
+    gfb->WriteVariableFB(os, "CMakeLinker", cmStrCat("\'", mf->GetSafeDefinition("CMAKE_LINKER"), "\'"));
+    gfb->WriteVariableFB(os, "Linker", cmStrCat("\"", cmake_command, "\""));
+    gfb->WriteVariableFB(os, "LinkerOptions", cmStrCat("\"", cmake_arguments, "\""));
     gfb->WriteVariableFB(os, "Libraries", cmStrCat("{ \"", library_name, "\" }"));
     gfb->WriteVariableFB(os, "LinkerOutput", cmStrCat("\'", target_output, "/", project_name, ".dll\'"));
     gfb->WritePopScope(os);

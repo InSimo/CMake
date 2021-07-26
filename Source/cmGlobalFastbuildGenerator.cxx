@@ -115,13 +115,14 @@ void cmGlobalFastbuildGenerator::WriteDivider(std::ostream& os)
         "-----------------------------------------\n";
 }
 
-std::string cmGlobalFastbuildGenerator::Quote(const std::string& str, const std::string& quotation)
+std::string cmGlobalFastbuildGenerator::Quote(const std::string& str,
+                                              const std::string& quotation)
 {
   return cmStrCat(quotation, str, quotation);
 }
 
 void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
-                                          const std::string& comment)
+                                              const std::string& comment)
 {
   if (comment.empty()) {
     return;
@@ -129,7 +130,8 @@ void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
   os << "// NINJA" << comment << "\n";
 }
 
-void cmGlobalFastbuildGenerator::WriteCommentFB(std::ostream& os, const std::string& comment)
+void cmGlobalFastbuildGenerator::WriteCommentFB(std::ostream& os,
+                                                const std::string& comment)
 {
   if (comment.empty()) {
     return;
@@ -138,14 +140,15 @@ void cmGlobalFastbuildGenerator::WriteCommentFB(std::ostream& os, const std::str
 }
 
 void cmGlobalFastbuildGenerator::WriteIncludeFB(std::ostream& os,
-                                          const std::string& filename,
-                                          const std::string& comment)
+                                                const std::string& filename,
+                                                const std::string& comment)
 {
   WriteCommentFB(os, comment);
   os << "#include \"" << filename << "\"\n";
 }
 
-void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std::string& comment)
+void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os,
+                                                    const std::string& comment)
 {
   if (comment.empty()) {
     return;
@@ -156,7 +159,8 @@ void cmGlobalFastbuildGenerator::WriteSectionHeader(std::ostream& os, const std:
   WriteDivider(os);
 }
 
-void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin, char end)
+void cmGlobalFastbuildGenerator::WritePushScope(std::ostream& os, char begin,
+                                                char end)
 {
   os << this->linePrefix << begin << "\n";
   this->linePrefix += "\t";
@@ -173,44 +177,51 @@ void cmGlobalFastbuildGenerator::WritePopScope(std::ostream& os)
   assert(!this->linePrefix.empty());
   this->linePrefix.resize(this->linePrefix.size() - 1);
 
-  os << this->linePrefix << this->closingScope[this->closingScope.size() - 1] << "\n";
+  os << this->linePrefix << this->closingScope[this->closingScope.size() - 1]
+     << "\n";
 
   this->closingScope.resize(this->closingScope.size() - 1);
 }
 
-void cmGlobalFastbuildGenerator::WriteVariableFB(std::ostream& os, const std::string& key, const std::string& value,
-  const std::string& operation)
+void cmGlobalFastbuildGenerator::WriteVariableFB(std::ostream& os,
+                                                 const std::string& key,
+                                                 const std::string& value,
+                                                 const std::string& operation)
 {
-  os << this->linePrefix << "." << key << " " << operation << " " << value << "\n";
+  os << this->linePrefix << "." << key << " " << operation << " " << value
+     << "\n";
 }
 
-void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os, const std::string& command, const std::string& value)
+void cmGlobalFastbuildGenerator::WriteCommand(std::ostream& os,
+                                              const std::string& command,
+                                              const std::string& value)
 {
   os << this->linePrefix << command;
-  if (!value.empty())
-  {
+  if (!value.empty()) {
     os << "(" << value << ")";
   }
   os << "\n";
 }
 
-void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string& key,
+void cmGlobalFastbuildGenerator::WriteArray(
+  std::ostream& os, const std::string& key,
   const std::vector<std::string>& values, char begin, char end,
   const std::string& operation)
 {
   WriteVariableFB(os, key, "", operation);
   WritePushScope(os, begin, end);
   size_t size = values.size();
-  for (size_t index = 0; index < size; ++index)
-  {
-    const std::string & value = values[index];
+  for (size_t index = 0; index < size; ++index) {
+    const std::string& value = values[index];
     os << this->linePrefix << value;
     os << '\n';
   }
   WritePopScope(os);
 }
 
-void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os, const std::string& name_alias, const std::string& targets)
+void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os,
+                                            const std::string& name_alias,
+                                            const std::string& targets)
 {
   this->WriteCommand(os, "Alias", name_alias);
   this->WritePushScope(os);
@@ -701,12 +712,12 @@ void cmGlobalFastbuildGenerator::WritePlaceholders(std::ostream& os)
 }
 
 void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
-	{
-    WriteSectionHeader(os, "Settings");
-    os << "Settings\n";
-    WritePushScope(os);
-    WritePopScope(os);
-	}
+{
+  WriteSectionHeader(os, "Settings");
+  os << "Settings\n";
+  WritePushScope(os);
+  WritePopScope(os);
+}
 
 void cmGlobalFastbuildGenerator::CleanMetaData()
 {
@@ -1456,8 +1467,9 @@ void cmGlobalFastbuildGenerator::AppendTargetDependsClosure(
 }
 
 void cmGlobalFastbuildGenerator::AddTargetAliasFB(const std::string& alias,
-                                                cmGeneratorTarget* target, std::string listDeps,
-                                                const std::string& config)
+                                                  cmGeneratorTarget* target,
+                                                  std::string listDeps,
+                                                  const std::string& config)
 {
   TargetAliasFB ta;
   ta.Config = config;
@@ -1482,15 +1494,15 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
       listDepsAll += ta.first;
     }
     WriteAlias(os, Quote("all"), listDepsAll);
-  }
-  else {
+  } else {
     std::map<std::string, std::string> configs;
     configs["Debug"] = "";
     configs["RelWithDebInfo"] = "";
     configs["Release"] = "";
 
     for (auto config : configs) {
-      this->WriteSectionHeader(os, cmStrCat("Target aliases : ", config.first));
+      this->WriteSectionHeader(os,
+                               cmStrCat("Target aliases : ", config.first));
       for (auto const ta : this->TargetAliasesFB) {
         if (!ta.second.GeneratorTarget || ta.second.Config != config.first) {
           continue;
@@ -1503,7 +1515,8 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
     for (auto config : configs) {
       WriteAlias(os, Quote(cmStrCat("all-", config.first)), config.second);
     }
-    WriteAlias(os, Quote("all"), Quote(cmStrCat("all-", this->GetDefaultFileConfig())));
+    WriteAlias(os, Quote("all"),
+               Quote(cmStrCat("all-", this->GetDefaultFileConfig())));
   }
 }
 

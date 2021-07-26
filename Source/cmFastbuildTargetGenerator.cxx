@@ -943,15 +943,20 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
   this->WriteCompileFB(lang, config);
 }
 
-void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const std::string& config)
+void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
+                                                const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   cmMakefile* mf = this->GetMakefile();
   std::ostream& os = this->GetRulesFileStream();
+  std::string project_name = this->GetTargetName();
 
-  std::string executable = mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::string compiler_flags = mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
-  std::string flags_config = mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
+  std::string executable =
+    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
+  std::string compiler_flags =
+    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
+  std::string flags_config = mf->GetSafeDefinition(
+    cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
   std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
 
   std::string linker = mf->GetSafeDefinition("CMAKE_LINKER");
@@ -959,22 +964,25 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const st
   link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
   // if multiple CL.EXE write to the same .PDB file, please use /FS
-  if (config == "Debug" || config == "RelWithDebInfo")
-  {
+  if (config == "Debug" || config == "RelWithDebInfo") {
     flags_config += " /FS";
   }
 
   gfb->WriteSectionHeader(os, "Compilers");
-  gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config), "");
+  gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),
+                       "");
   gfb->WritePushScopeStruct(os);
   gfb->WriteVariableFB(os, "Compiler", gfb->Quote(executable));
-  gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(cmStrCat("/c %1 ", compiler_flags, " /Fo%2 ")));
+  gfb->WriteVariableFB(
+    os, "CompilerOptions",
+    gfb->Quote(cmStrCat("/c %1 ", compiler_flags, " /Fo%2 ")));
   gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags_config), "+");
   gfb->WriteVariableFB(os, "Librarian", gfb->Quote(create_static_library));
-  gfb->WriteVariableFB(os, "LibrarianOptions", gfb->Quote(cmStrCat("/nologo ", link_flags)));
-  gfb->WritePopScope(os);
+  gfb->WriteVariableFB(os, "LibrarianOptions",
+                       gfb->Quote(cmStrCat("/nologo ", link_flags)));
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(link_flags));
+  gfb->WritePopScope(os);
 }
 
 void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
@@ -1151,8 +1159,7 @@ void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config)
   this->GeneratorTarget->GetObjectSources(objectSources, config);
   std::vector<std::string> objectList;
 
-  for (cmSourceFile const* sf : objectSources)
-  {
+  for (cmSourceFile const* sf : objectSources) {
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
 
@@ -1160,25 +1167,30 @@ void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config)
 
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
   std::string project_name = this->GetTargetName();
-  std::string current_source_dir = this->GetMakefile()->GetCurrentSourceDirectory();
+  std::string current_source_dir =
+    this->GetMakefile()->GetCurrentSourceDirectory();
   std::string target_output = this->GetTargetOutputDir(config);
-  
-  if (!gfb->IsMultiConfig())
-  {
+
+  if (!gfb->IsMultiConfig()) {
     gfb->WriteSectionHeader(os, project_name);
-    gfb->WriteCommand(os, "ObjectList", gfb->Quote(cmStrCat(project_name, "-ObjectList")));
+    gfb->WriteCommand(os, "ObjectList",
+                      gfb->Quote(cmStrCat(project_name, "-ObjectList")));
     gfb->WritePushScope(os);
-    gfb->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
+    gfb->WriteCommand(
+      os, "Using",
+      cmStrCat(".Compiler", language, config, this->GetTargetName()));
     gfb->WriteArray(os, "CompilerInputFiles", objectList);
     gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
     gfb->WritePopScope(os);
-  }
-  else
-  {
+  } else {
     gfb->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
-    gfb->WriteCommand(os, "ObjectList", gfb->Quote(cmStrCat(project_name, "-ObjectList-", config, "")));
+    gfb->WriteCommand(
+      os, "ObjectList",
+      gfb->Quote(cmStrCat(project_name, "-ObjectList-", config, "")));
     gfb->WritePushScope(os);
-    gfb->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
+    gfb->WriteCommand(
+      os, "Using",
+      cmStrCat(".Compiler", language, config, this->GetTargetName()));
     gfb->WriteArray(os, "CompilerInputFiles", objectList);
     gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
     gfb->WritePopScope(os);

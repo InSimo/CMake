@@ -210,6 +210,14 @@ void cmGlobalFastbuildGenerator::WriteArray(std::ostream& os, const std::string&
   WritePopScope(os);
 }
 
+void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os, const std::string& name_alias, const std::string& targets)
+{
+  this->WriteCommand(os, "Alias", name_alias);
+  this->WritePushScope(os);
+  this->WriteVariableFB(os, "Targets", cmStrCat("{ ", targets, " }"));
+  this->WritePopScope(os);
+}
+
 std::unique_ptr<cmLinkLineComputer>
 cmGlobalFastbuildGenerator::CreateLinkLineComputer(
   cmOutputConverter* outputConverter,
@@ -1454,30 +1462,48 @@ void cmGlobalFastbuildGenerator::AddTargetAliasFB(const std::string& alias,
   TargetAliasFB ta;
   ta.Config = config;
   ta.GeneratorTarget = target;
-  ta.listDeps = listDeps;
+  ta.ListDeps = listDeps;
   this->TargetAliasesFB.insert(std::make_pair(alias, ta));
 }
 
 void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
 {
-  this->WriteSectionHeader(os, "Target aliases");
+  if (!IsMultiConfig()) {
+    std::string listDepsAll = "";
+    this->WriteSectionHeader(os, "Target aliases");
+    for (auto const& ta : this->TargetAliasesFB) {
+      // Don't write ambiguous aliases.
+      if (!ta.second.GeneratorTarget) {
+        continue;
+      }
 
-  for (auto const& ta : this->TargetAliasesFB) {
-    // Don't write ambiguous aliases.
-    if (!ta.second.GeneratorTarget) {
-      continue;
+      WriteAlias(os, ta.first, ta.second.ListDeps);
+
+      listDepsAll += ta.first;
     }
+    WriteAlias(os, Quote("all"), listDepsAll);
+  }
+  else {
+    std::map<std::string, std::string> configs;
+    configs["Debug"] = "";
+    configs["RelWithDebInfo"] = "";
+    configs["Release"] = "";
 
-    // Don't write alias if there is a already a custom command with
-    // matching output
-    /* if (this->HasCustomCommandOutput(ta.first)) {
-      continue;
-    }*/
-
-    this->WriteCommand(os, "Alias", ta.first);
-    this->WritePushScope(os);
-    this->WriteVariableFB(os, "Targets", cmStrCat("{ " , ta.second.listDeps, " }"));
-    this->WritePopScope(os);
+    for (auto config : configs) {
+      this->WriteSectionHeader(os, cmStrCat("Target aliases : ", config.first));
+      for (auto const ta : this->TargetAliasesFB) {
+        if (!ta.second.GeneratorTarget || ta.second.Config != config.first) {
+          continue;
+        }
+        WriteAlias(os, ta.first, ta.second.ListDeps);
+        configs[ta.second.Config] += ta.first;
+      }
+    }
+    this->WriteSectionHeader(os, "Target aliases All");
+    for (auto config : configs) {
+      WriteAlias(os, Quote(cmStrCat("all-", config.first)), config.second);
+    }
+    WriteAlias(os, Quote("all"), Quote(cmStrCat("all-", this->GetDefaultFileConfig())));
   }
 }
 

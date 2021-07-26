@@ -178,12 +178,12 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(const std::string& conf
     if (!isMultiConfig) {
       executable_name = project_name;
       objectList_name = cmStrCat(project_name, "-ObjectList");
-      alias_name = "all";
+      alias_name = cmStrCat(project_name, "-exe-deps");
     }
     else {
       executable_name = cmStrCat(project_name, "-", config);
       objectList_name = cmStrCat(project_name, "-ObjectList-", config);
-      alias_name = cmStrCat("all-", config);
+      alias_name = cmStrCat(project_name, "-exe-", config, "-deps");
     }
 
     const cmFastbuildDeps implicitDeps = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
@@ -202,7 +202,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(const std::string& conf
 
     std::string listImplicitDepsAlias = "";
     for (std::string implicitDep : implicitDeps) {
-      listImplicitDepsAlias += gfb->Quote(cmStrCat(GetNameTargetLibrary(implicitDep, isMultiConfig, config), "-Deps"));
+      listImplicitDepsAlias += gfb->Quote(cmStrCat(GetNameTargetLibrary(implicitDep, isMultiConfig, config), "-deps"));
     }
 
     // Alias
@@ -220,12 +220,6 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(const std::string& conf
         gfb->WriteVariableFB(os, "LinkerOutput", gfb->Quote(cmStrCat("out/", project_name, ".exe")));
         gfb->WritePopScope(os);
       }
-
-      // Alias
-      std::string listDeps = listImplicitDepsAlias;
-      listDeps += gfb->Quote(executable_name);
-      gfb->AddTargetAliasFB(gfb->Quote("all"), this->GetGeneratorTarget(),
-                            listDeps, config);
     }
 }
 
@@ -246,12 +240,12 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(const std::string& config)
     if (!isMultiConfig) {
       library_name = cmStrCat(project_name, "-lib");
       objectList_name = cmStrCat(project_name, "-ObjectList");
-      alias_name = cmStrCat(project_name, "-lib-Deps");
+      alias_name = cmStrCat(project_name, "-lib-deps");
     }
     else {
       library_name = cmStrCat(project_name, "-lib-", config);
       objectList_name = cmStrCat(project_name, "-ObjectList-", config);
-      alias_name = cmStrCat(project_name, "-lib-", config,"-Deps");
+      alias_name = cmStrCat(project_name, "-lib-", config,"-deps");
     }
 
     const cmFastbuildDeps implicitDeps = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
@@ -293,13 +287,13 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
       objectList_name = cmStrCat(project_name, "-ObjectList");
       library_name = cmStrCat(project_name, "-lib");
       dll_name = cmStrCat(project_name, "-dll");
-      alias_name = cmStrCat(project_name, "-lib-Deps");
+      alias_name = cmStrCat(project_name, "-lib-deps");
     }
     else {
       objectList_name = cmStrCat(project_name, "-ObjectList-", config);
       library_name = cmStrCat(project_name, "-lib-", config);
       dll_name = cmStrCat(project_name, "-dll-", config);
-      alias_name = cmStrCat(project_name, "-lib-", config, "-Deps");
+      alias_name = cmStrCat(project_name, "-lib-", config, "-deps");
     }
 
     const cmFastbuildDeps implicitDeps = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);

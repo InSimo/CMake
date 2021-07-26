@@ -478,6 +478,10 @@ public:
   void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, char begin = '{', char end = '}',
   const std::string& operation = "=");
 
+  void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os,
+                                              const std::string& name_alias,
+                                              const std::string& targets);
+
   std::string GetDefaultFileConfig()
   {
     return DefaultFileConfig;
@@ -604,7 +608,7 @@ private:
   {
     cmGeneratorTarget* GeneratorTarget;
     std::string Config;
-    std::string listDeps;
+    std::string ListDeps;
   };
   using TargetAliasMapFB = std::map<std::string, TargetAliasFB>;
   TargetAliasMapFB TargetAliasesFB;

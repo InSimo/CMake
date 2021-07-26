@@ -276,7 +276,7 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(const std::string& config)
     gfb->WritePushScope(os);
     gfb->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
     gfb->WriteVariableFB(os, "LibrarianAdditionalInputs", cmStrCat("{ \"", objectList_name, "\" }"));
-    if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", gfb->Quote(listImplicitDeps), " }"));
+    if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listImplicitDeps, " }"));
     gfb->WriteVariableFB(os, "LibrarianOutput", cmStrCat("\'", target_output, "/", project_name, ".lib\'"));
     gfb->WritePopScope(os);
 
@@ -327,7 +327,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     gfb->WritePushScope(os);
     gfb->WriteCommand(os, "Using", cmStrCat(".Compiler", language, config));
     gfb->WriteVariableFB(os, "LibrarianAdditionalInputs", cmStrCat("{ \"", objectList_name, "\" }"));
-    if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", gfb->Quote(listImplicitDeps), " }"));
+    if (!listImplicitDeps.empty()) gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listImplicitDeps, " }"));
     gfb->WriteVariableFB(os, "LibrarianOutput", gfb->Quote(cmStrCat( target_output, "/", project_name, ".lib")));
     gfb->WritePopScope(os);
 

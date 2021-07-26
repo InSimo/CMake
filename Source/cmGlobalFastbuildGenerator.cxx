@@ -650,7 +650,7 @@ void cmGlobalFastbuildGenerator::Generate()
 
   this->cmGlobalGenerator::Generate();
 
-  
+  this->WriteTargetAliasesFB(*this->GetCommonFileStream());
   //this->WriteSettings(*this->GetCommonFileStream());
 
   this->WriteAssumedSourceDependencies();
@@ -699,31 +699,6 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
     WritePushScope(os);
     WritePopScope(os);
 	}
-
-void cmGlobalFastbuildGenerator::WriteConfigurations(std::ostream& os)
-{
-  WriteSectionHeader(os, "Configurations");
-}
-
-void cmGlobalFastbuildGenerator::WriteVSConfigurations(std::ostream& os)
-{
-  WriteSectionHeader(os, "VisualStudio Project Generation");
-}
-
-void cmGlobalFastbuildGenerator::WriteTargetDefinitions(std::ostream& os)
-{
-  WriteSectionHeader(os, "Target Definitions");
-}
-
-void cmGlobalFastbuildGenerator::WriteAliases(std::ostream& os)
-{
-  WriteSectionHeader(os, "Target Aliases");
-}
-
-void cmGlobalFastbuildGenerator::WriteVSSolution(std::ostream& os)
-{
-  WriteSectionHeader(os, "VisualStudio Solution Generation");
-}
 
 void cmGlobalFastbuildGenerator::CleanMetaData()
 {
@@ -1472,6 +1447,40 @@ void cmGlobalFastbuildGenerator::AppendTargetDependsClosure(
   outputs.insert(outs.begin(), outs.end());
 }
 
+void cmGlobalFastbuildGenerator::AddTargetAliasFB(const std::string& alias,
+                                                cmGeneratorTarget* target, std::string listDeps,
+                                                const std::string& config)
+{
+  TargetAliasFB ta;
+  ta.Config = config;
+  ta.GeneratorTarget = target;
+  ta.listDeps = listDeps;
+  this->TargetAliasesFB.insert(std::make_pair(alias, ta));
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
+{
+  this->WriteSectionHeader(os, "Target aliases");
+
+  for (auto const& ta : this->TargetAliasesFB) {
+    // Don't write ambiguous aliases.
+    if (!ta.second.GeneratorTarget) {
+      continue;
+    }
+
+    // Don't write alias if there is a already a custom command with
+    // matching output
+    /* if (this->HasCustomCommandOutput(ta.first)) {
+      continue;
+    }*/
+
+    this->WriteCommand(os, "Alias", ta.first);
+    this->WritePushScope(os);
+    this->WriteVariableFB(os, "Targets", cmStrCat("{ " , ta.second.listDeps, " }"));
+    this->WritePopScope(os);
+  }
+}
+
 void cmGlobalFastbuildGenerator::AddTargetAlias(const std::string& alias,
                                             cmGeneratorTarget* target,
                                             const std::string& config)
@@ -1527,7 +1536,6 @@ void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
   os << "// NINJA Target aliases.\n\n";
-
   cmFastbuildBuild build("phony");
   build.Outputs.emplace_back();
   for (auto const& ta : this->TargetAliases) {
@@ -1541,7 +1549,6 @@ void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
     if (this->HasCustomCommandOutput(ta.first)) {
       continue;
     }
-
     build.Outputs.front() = ta.first;
     build.ExplicitDeps.clear();
     if (ta.second.Config == "all") {

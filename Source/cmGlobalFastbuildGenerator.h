@@ -362,6 +362,10 @@ public:
     return this->RuleCmdLength[name];
   }
 
+  void AddTargetAliasFB(
+    const std::string& alias, cmGeneratorTarget* target,
+                        std::string listDeps, const std::string& config);
+
   void AddTargetAlias(const std::string& alias, cmGeneratorTarget* target,
                       const std::string& config);
 
@@ -488,16 +492,6 @@ protected:
 
   void WriteSettings(std::ostream& os);
 
-  void WriteConfigurations(std::ostream& os);
-
-  void WriteVSConfigurations(std::ostream& os);
-
-  void WriteTargetDefinitions(std::ostream& os);
-
-  void WriteAliases(std::ostream& os);
-
-  void WriteVSSolution(std::ostream& os);
-
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }
 
   virtual bool OpenBuildFileStreams();
@@ -539,6 +533,8 @@ private:
   void WriteDisclaimer(std::ostream& os) const;
 
   void WriteAssumedSourceDependencies();
+
+  void WriteTargetAliasesFB(std::ostream& os);
 
   void WriteTargetAliases(std::ostream& os);
   void WriteFolderTargets(std::ostream& os);
@@ -603,6 +599,15 @@ private:
   using TargetAliasMap = std::map<std::string, TargetAlias>;
   TargetAliasMap TargetAliases;
   TargetAliasMap DefaultTargetAliases;
+
+  struct TargetAliasFB
+  {
+    cmGeneratorTarget* GeneratorTarget;
+    std::string Config;
+    std::string listDeps;
+  };
+  using TargetAliasMapFB = std::map<std::string, TargetAliasFB>;
+  TargetAliasMapFB TargetAliasesFB;
 
   /// the local cache for calls to ConvertToNinjaPath
   mutable std::unordered_map<std::string, std::string> ConvertToFastbuildPathCache;

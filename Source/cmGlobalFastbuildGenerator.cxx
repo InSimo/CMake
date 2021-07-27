@@ -692,6 +692,25 @@ void cmGlobalFastbuildGenerator::Generate()
   this->CloseRulesFileStream();
   this->CloseBuildFileStreams();
 
+  std::srand(std::time(nullptr));
+  std::string name = cmStrCat("C:/Users/lgross/Documents/tmp/", rand());
+  std::ofstream tempFile(name + ".bff");
+
+  std::ifstream rf;
+  rf.open(cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE);
+  std::ifstream bf;
+  bf.open(cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE);
+  std::string line;
+  while (std::getline(rf, line)) {
+    tempFile << line << std::endl;
+  }
+  while (std::getline(bf, line)) {
+    tempFile << line << std::endl;
+  }
+  rf.close();
+  bf.close();
+  tempFile.close();
+
 #ifdef _WIN32
   // Older ninja tools will not be able to update metadata on Windows
   // when we are re-generating inside an existing 'ninja' invocation

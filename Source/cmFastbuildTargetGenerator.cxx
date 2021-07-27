@@ -951,32 +951,34 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
   std::ostream& os = this->GetRulesFileStream();
   std::string project_name = this->GetTargetName();
 
+  std::string const& compilerId = mf->GetSafeDefinition(
+    cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
+  
+  
+
   std::string executable =
     mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::string compiler_flags =
-    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_FLAGS"));
-  std::string flags_config = mf->GetSafeDefinition(
-    cmStrCat("CMAKE_", lang, "_FLAGS_", cmSystemTools::UpperCase(config)));
+  std::string flags = this->GetFlags(lang, config);
   std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
 
   std::string linker = mf->GetSafeDefinition("CMAKE_LINKER");
   std::string link_flags = "\"%1\" /OUT:\"%2\" ";
   link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
-  // if multiple CL.EXE write to the same .PDB file, please use /FS
-  if (config == "Debug" || config == "RelWithDebInfo") {
-    flags_config += " /FS";
+  if (compilerId == "MSVC") {
+    flags += " /c %1 /Fo%2 ";
+    // if multiple CL.EXE write to the same .PDB file, please use /FS
+    if (config == "Debug" || config == "RelWithDebInfo") flags += " /FS";
   }
 
+  
+  
   gfb->WriteSectionHeader(os, "Compilers");
   gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),
                        "");
   gfb->WritePushScopeStruct(os);
   gfb->WriteVariableFB(os, "Compiler", gfb->Quote(executable));
-  gfb->WriteVariableFB(
-    os, "CompilerOptions",
-    gfb->Quote(cmStrCat("/c %1 ", compiler_flags, " /Fo%2 ")));
-  gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags_config), "+");
+  gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags));
   gfb->WriteVariableFB(os, "Librarian", gfb->Quote(create_static_library));
   gfb->WriteVariableFB(os, "LibrarianOptions",
                        gfb->Quote(cmStrCat("/nologo ", link_flags)));

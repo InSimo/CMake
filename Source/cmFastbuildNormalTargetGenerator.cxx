@@ -136,10 +136,10 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
 
   nameFile = namePathFile.substr(found);
 
-  found = nameFile.find('.');
-  if (found != std::string::npos) {
-    nameTarget = nameFile.substr(0, found);
-    if (nameFile.substr(found, 4) == ".lib")
+  std::size_t found_point = nameFile.find('.');
+  if (found_point != std::string::npos) {
+    nameTarget = nameFile.substr(0, found_point);
+    if (nameFile.substr(found_point, 4) == ".lib")
       nameTarget = cmStrCat(nameTarget, "-lib");
   }
 

@@ -1097,9 +1097,6 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
     }
   }
 
-  // For Fastbuild
-  this->WriteObjectListFB(config);
-
   for (auto const& langDDIFiles : this->Configs[config].DDIFiles) {
     std::string const& language = langDDIFiles.first;
     cmFastbuildDeps const& ddiFiles = langDDIFiles.second;
@@ -1150,52 +1147,6 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
 
     cmGeneratedFileStream output(mapFilePath);
     output << this->Configs[config].SwiftOutputMap;
-  }
-}
-
-void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config)
-{
-  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-
-  std::vector<cmSourceFile const*> objectSources;
-  this->GeneratorTarget->GetObjectSources(objectSources, config);
-  std::vector<std::string> objectList;
-
-  for (cmSourceFile const* sf : objectSources) {
-    objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
-  }
-
-  std::ostream& os = this->GetCommonFileStream();
-
-  std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
-  std::string project_name = this->GetTargetName();
-  std::string current_source_dir =
-    this->GetMakefile()->GetCurrentSourceDirectory();
-  std::string target_output = this->GetTargetOutputDir(config);
-
-  if (!gfb->IsMultiConfig()) {
-    gfb->WriteSectionHeader(os, project_name);
-    gfb->WriteCommand(os, "ObjectList",
-                      gfb->Quote(cmStrCat(project_name, "-ObjectList")));
-    gfb->WritePushScope(os);
-    gfb->WriteCommand(
-      os, "Using",
-      cmStrCat(".Compiler", language, config, this->GetTargetName()));
-    gfb->WriteArray(os, "CompilerInputFiles", objectList);
-    gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
-    gfb->WritePopScope(os);
-  } else {
-    gfb->WriteSectionHeader(os, cmStrCat(project_name, " : ", config));
-    gfb->WriteCommand(
-      os, "ObjectList",
-      gfb->Quote(cmStrCat(project_name, "-ObjectList-", config, "")));
-    gfb->WritePushScope(os);
-    gfb->WriteCommand(
-      os, "Using",
-      cmStrCat(".Compiler", language, config, this->GetTargetName()));
-    gfb->WriteArray(os, "CompilerInputFiles", objectList);
-    gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
-    gfb->WritePopScope(os);
   }
 }
 

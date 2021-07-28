@@ -665,12 +665,12 @@ void cmGlobalFastbuildGenerator::Generate()
   this->linePrefix = "";
   this->closingScope = "";
 
+  // this->WriteSettings(*this->GetCommonFileStream());
   this->WritePlaceholders(*this->GetCommonFileStream());
 
   this->cmGlobalGenerator::Generate();
 
   this->WriteTargetAliasesFB(*this->GetCommonFileStream());
-  //this->WriteSettings(*this->GetCommonFileStream());
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());

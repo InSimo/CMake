@@ -203,8 +203,6 @@ protected:
 
   void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,const std::string& config);
 
-  void cmFastbuildTargetGenerator::WriteObjectListFB(const std::string& config);
-
 private:
   cmLocalFastbuildGenerator* LocalGenerator;
 

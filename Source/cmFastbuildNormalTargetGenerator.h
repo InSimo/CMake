@@ -22,7 +22,10 @@ public:
 
   std::string GetNameDepTarget(std::string namePathFile, const std::string& config);
 
-  std::vector<std::string> RemoveDuplicateNameTarget(std::vector<std::string> listName);
+  std::vector<std::string> RemoveDuplicateName(std::vector<std::string> listName);
+
+  std::vector<std::string> GetNameTargetLibraries(bool isMultiConfig,
+                                                  std::string config);
 
   static std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
 

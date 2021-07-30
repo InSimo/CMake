@@ -480,13 +480,13 @@ public:
   void WriteAliasFB(std::ostream& os, const std::string& name_alias,
                     const std::string& targets);
 
-  void AddFastbuildInfoTarget(cmGeneratorTarget* fntg,  std::vector<std::string> name_target_deps, const std::string& config);
+  void AddFastbuildInfoTarget(cmGeneratorTarget* gt,  std::vector<std::string> name_target_deps, const std::string& config);
 
   int GetNumberUntratedDepsTarget(std::vector<std::string> name_target_deps);
 
-  bool CanTreatTargetFB(cmGeneratorTarget* fntg, const std::string& config);
+  bool CanTreatTargetFB(cmGeneratorTarget* gt, const std::string& config);
 
-  void TargetTreatedFinish(cmGeneratorTarget* fntg, const std::string& config);
+  void TargetTreatedFinish(cmGeneratorTarget* gt, const std::string& config);
 
   std::string GetDefaultFileConfig()
   {
@@ -550,7 +550,7 @@ private:
   struct cmFastbuildInfoTarget
   {
     int number_untrated_deps;
-    cmGeneratorTarget* fntg;
+    cmGeneratorTarget* gt;
     std::vector<std::string> name_target_deps;
     bool is_treated;
     std::string config;

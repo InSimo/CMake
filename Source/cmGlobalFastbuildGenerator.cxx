@@ -119,6 +119,7 @@ void cmGlobalFastbuildGenerator::WriteDivider(std::ostream& os)
 std::string cmGlobalFastbuildGenerator::Quote(const std::string& str,
                                               const std::string& quotation)
 {
+  if (str.empty()) return "";
   return cmStrCat(quotation, str, quotation);
 }
 
@@ -230,17 +231,17 @@ void cmGlobalFastbuildGenerator::WriteAliasFB(std::ostream& os,
   this->WritePopScope(os);
 }
 
-void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* fntg, std::vector<std::string> name_target_deps, const std::string& config)
+void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, std::vector<std::string> name_target_deps, const std::string& config)
 {
   // We add the target whether she is not already in the map
-  if(this->MapFastbuildInfoTargets.find(fntg->GetName()) == this->MapFastbuildInfoTargets.end()){
-    std::string target_name = cmStrCat(fntg->GetName(), config);
+  if(this->MapFastbuildInfoTargets.find(gt->GetName()) == this->MapFastbuildInfoTargets.end()){
+    std::string target_name = cmStrCat(gt->GetName(), config);
     cmFastbuildInfoTarget fbt;
     fbt.is_treated = false;
     fbt.config = config;
     fbt.name_target_deps = name_target_deps;
     fbt.number_untrated_deps = GetNumberUntratedDepsTarget(name_target_deps);
-    fbt.fntg = fntg;
+    fbt.gt = gt;
     this->MapFastbuildInfoTargets.insert(std::make_pair(target_name, fbt));
   }
 }
@@ -261,35 +262,26 @@ int cmGlobalFastbuildGenerator::GetNumberUntratedDepsTarget(std::vector<std::str
 }
 
 bool cmGlobalFastbuildGenerator::CanTreatTargetFB(
-  cmGeneratorTarget* fntg, const std::string& config)
+  cmGeneratorTarget* gt, const std::string& config)
 {
   bool canTreat = true;
-  std::string target_name = cmStrCat(fntg->GetName(), config);
+  std::string target_name = cmStrCat(gt->GetName(), config);
   if(this->MapFastbuildInfoTargets[target_name].number_untrated_deps > 0 || this->MapFastbuildInfoTargets[target_name].is_treated){
     canTreat = false;
   }
-  WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Target name : ", target_name));
-  WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("MAP size : ", std::to_string(this->MapFastbuildInfoTargets.size())));
-  for(auto map : this->MapFastbuildInfoTargets){
-    WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Map target name key : ", map.first));
-    WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Map target name not key : ", map.second.fntg->GetName()));
-  }
-  WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("NB untreated deps : ", std::to_string(this->MapFastbuildInfoTargets[target_name].number_untrated_deps)));
   return canTreat;
 }
 
-void cmGlobalFastbuildGenerator::TargetTreatedFinish(cmGeneratorTarget* fntg, const std::string& config)
+void cmGlobalFastbuildGenerator::TargetTreatedFinish(cmGeneratorTarget* gt, const std::string& config)
 {
-  std::string target_name = cmStrCat(fntg->GetName(), config);
+  std::string target_name = cmStrCat(gt->GetName(), config);
   this->MapFastbuildInfoTargets[target_name].is_treated = true;
   for(auto fit : this->MapFastbuildInfoTargets){
     this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.second.name_target_deps);
 
     // If finally the target can be treat, we treat him immediately
-    WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Target name key : ", fit.first));
-    if(this->CanTreatTargetFB(fit.second.fntg, config)){
-      cmFastbuildNormalTargetGenerator(this->MapFastbuildInfoTargets[fit.first].fntg).Generate(this->MapFastbuildInfoTargets[fit.first].config);
-      //this->MapFastbuildInfoTargets[fit.first].fntg->WriteTargetFB(this->MapFastbuildInfoTargets[fit.first].config);
+    if(this->CanTreatTargetFB(fit.second.gt, config)){
+      cmFastbuildNormalTargetGenerator(this->MapFastbuildInfoTargets[fit.first].gt).Generate(this->MapFastbuildInfoTargets[fit.first].config);
     }
   }
 }

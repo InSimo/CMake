@@ -45,6 +45,7 @@
 #include "cmTargetDepend.h"
 #include "cmVersion.h"
 #include "cmake.h"
+#include "cmFastbuildNormalTargetGenerator.h"
 
 const char* cmGlobalFastbuildGenerator::FASTBUILD_BUILD_FILE = "fbuild.bff";
 const char* cmGlobalFastbuildGenerator::FASTBUILD_RULES_FILE =
@@ -219,7 +220,7 @@ void cmGlobalFastbuildGenerator::WriteArray(
   WritePopScope(os);
 }
 
-void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os,
+void cmGlobalFastbuildGenerator::WriteAliasFB(std::ostream& os,
                                             const std::string& name_alias,
                                             const std::string& targets)
 {
@@ -227,6 +228,70 @@ void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os,
   this->WritePushScope(os);
   this->WriteVariableFB(os, "Targets", cmStrCat("{ ", targets, " }"));
   this->WritePopScope(os);
+}
+
+void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* fntg, std::vector<std::string> name_target_deps, const std::string& config)
+{
+  // We add the target whether she is not already in the map
+  if(this->MapFastbuildInfoTargets.find(fntg->GetName()) == this->MapFastbuildInfoTargets.end()){
+    std::string target_name = cmStrCat(fntg->GetName(), config);
+    cmFastbuildInfoTarget fbt;
+    fbt.is_treated = false;
+    fbt.config = config;
+    fbt.name_target_deps = name_target_deps;
+    fbt.number_untrated_deps = GetNumberUntratedDepsTarget(name_target_deps);
+    fbt.fntg = fntg;
+    this->MapFastbuildInfoTargets.insert(std::make_pair(target_name, fbt));
+  }
+}
+
+int cmGlobalFastbuildGenerator::GetNumberUntratedDepsTarget(std::vector<std::string> name_target_deps)
+{
+  int numberDepsTarget = 0;
+  for(std::string name_target : name_target_deps){
+    auto it = this->MapFastbuildInfoTargets.find(name_target);
+    if(it != this->MapFastbuildInfoTargets.end()){
+      if(!this->MapFastbuildInfoTargets[name_target].is_treated) numberDepsTarget += 1;
+    }
+    else{
+      numberDepsTarget += 1;
+    }
+  }
+  return numberDepsTarget;
+}
+
+bool cmGlobalFastbuildGenerator::CanTreatTargetFB(
+  cmGeneratorTarget* fntg, const std::string& config)
+{
+  bool canTreat = true;
+  std::string target_name = cmStrCat(fntg->GetName(), config);
+  if(this->MapFastbuildInfoTargets[target_name].number_untrated_deps > 0 || this->MapFastbuildInfoTargets[target_name].is_treated){
+    canTreat = false;
+  }
+  WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Target name : ", target_name));
+  WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("MAP size : ", std::to_string(this->MapFastbuildInfoTargets.size())));
+  for(auto map : this->MapFastbuildInfoTargets){
+    WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Map target name key : ", map.first));
+    WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Map target name not key : ", map.second.fntg->GetName()));
+  }
+  WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("NB untreated deps : ", std::to_string(this->MapFastbuildInfoTargets[target_name].number_untrated_deps)));
+  return canTreat;
+}
+
+void cmGlobalFastbuildGenerator::TargetTreatedFinish(cmGeneratorTarget* fntg, const std::string& config)
+{
+  std::string target_name = cmStrCat(fntg->GetName(), config);
+  this->MapFastbuildInfoTargets[target_name].is_treated = true;
+  for(auto fit : this->MapFastbuildInfoTargets){
+    this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.second.name_target_deps);
+
+    // If finally the target can be treat, we treat him immediately
+    WriteSectionHeader(*this->GetCommonFileStream(), cmStrCat("Target name key : ", fit.first));
+    if(this->CanTreatTargetFB(fit.second.fntg, config)){
+      cmFastbuildNormalTargetGenerator(this->MapFastbuildInfoTargets[fit.first].fntg).Generate(this->MapFastbuildInfoTargets[fit.first].config);
+      //this->MapFastbuildInfoTargets[fit.first].fntg->WriteTargetFB(this->MapFastbuildInfoTargets[fit.first].config);
+    }
+  }
 }
 
 std::unique_ptr<cmLinkLineComputer>
@@ -1508,11 +1573,11 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
         continue;
       }
 
-      WriteAlias(os, ta.first, ta.second.ListDeps);
+      WriteAliasFB(os, ta.first, ta.second.ListDeps);
 
       listDepsAll += ta.first;
     }
-    WriteAlias(os, Quote("all"), listDepsAll);
+    WriteAliasFB(os, Quote("all"), listDepsAll);
   } else {
     std::map<std::string, std::string> configs;
     configs["Debug"] = "";
@@ -1526,17 +1591,22 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
         if (!ta.second.GeneratorTarget || ta.second.Config != config.first) {
           continue;
         }
-        WriteAlias(os, ta.first, ta.second.ListDeps);
+        WriteAliasFB(os, ta.first, ta.second.ListDeps);
         configs[ta.second.Config] += ta.first;
       }
     }
     this->WriteSectionHeader(os, "Target aliases All");
     for (auto config : configs) {
-      WriteAlias(os, Quote(cmStrCat("all-", config.first)), config.second);
+      WriteAliasFB(os, Quote(cmStrCat("all-", config.first)), config.second);
     }
-    WriteAlias(os, Quote("all"),
+    WriteAliasFB(os, Quote("all"),
                Quote(cmStrCat("all-", this->GetDefaultFileConfig())));
   }
+}
+
+void cmGlobalFastbuildGenerator::InitFastbuildNormalTargetGenerators()
+{
+  // Voir si on peut initialiser FastbuildNormalTargetGenerators avec le nom de toute les targets du projet et mettre le cmFastbuildTargetStatus NOT_TREAT
 }
 
 void cmGlobalFastbuildGenerator::AddTargetAlias(const std::string& alias,

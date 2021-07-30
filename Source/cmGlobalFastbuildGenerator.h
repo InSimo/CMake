@@ -34,6 +34,7 @@ class cmMakefile;
 class cmOutputConverter;
 class cmStateDirectory;
 class cmake;
+//class cmFastbuildNormalTargetGenerator;
 struct cmDocumentationEntry;
 
 /**
@@ -362,10 +363,6 @@ public:
     return this->RuleCmdLength[name];
   }
 
-  void AddTargetAliasFB(
-    const std::string& alias, cmGeneratorTarget* target,
-                        std::string listDeps, const std::string& config);
-
   void AddTargetAlias(const std::string& alias, cmGeneratorTarget* target,
                       const std::string& config);
 
@@ -457,11 +454,13 @@ public:
 
   // For Fastbuild
 
+  void AddTargetAliasFB(const std::string& alias, cmGeneratorTarget* target,
+                        std::string listDeps, const std::string& config);
+
   void WriteCommentFB(std::ostream& os, const std::string& comment);
 
-  void cmGlobalFastbuildGenerator::WriteIncludeFB(std::ostream& os,
-                                          const std::string& filename,
-                                          const std::string& comment);
+  void WriteIncludeFB(std::ostream& os, const std::string& filename,
+                      const std::string& comment);
 
   void WriteSectionHeader(std::ostream& os, const std::string& comment);
 
@@ -478,9 +477,16 @@ public:
   void WriteArray(std::ostream& os, const std::string& key, const std::vector<std::string>& values, char begin = '{', char end = '}',
   const std::string& operation = "=");
 
-  void cmGlobalFastbuildGenerator::WriteAlias(std::ostream& os,
-                                              const std::string& name_alias,
-                                              const std::string& targets);
+  void WriteAliasFB(std::ostream& os, const std::string& name_alias,
+                    const std::string& targets);
+
+  void AddFastbuildInfoTarget(cmGeneratorTarget* fntg,  std::vector<std::string> name_target_deps, const std::string& config);
+
+  int GetNumberUntratedDepsTarget(std::vector<std::string> name_target_deps);
+
+  bool CanTreatTargetFB(cmGeneratorTarget* fntg, const std::string& config);
+
+  void TargetTreatedFinish(cmGeneratorTarget* fntg, const std::string& config);
 
   std::string GetDefaultFileConfig()
   {
@@ -538,7 +544,20 @@ private:
 
   void WriteAssumedSourceDependencies();
 
+  // For Fastbuild
   void WriteTargetAliasesFB(std::ostream& os);
+
+  struct cmFastbuildInfoTarget
+  {
+    int number_untrated_deps;
+    cmGeneratorTarget* fntg;
+    std::vector<std::string> name_target_deps;
+    bool is_treated;
+    std::string config;
+  };
+  std::map<std::string, cmFastbuildInfoTarget> MapFastbuildInfoTargets;
+
+  void InitFastbuildNormalTargetGenerators();
 
   void WriteTargetAliases(std::ostream& os);
   void WriteFolderTargets(std::ostream& os);

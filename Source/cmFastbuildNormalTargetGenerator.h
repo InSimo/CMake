@@ -18,7 +18,15 @@ public:
 
   void Generate(const std::string& config) override;
 
+  std::vector<std::string> GetNameDepsTargets(const std::string& config);
+
+  std::string GetNameDepTarget(std::string namePathFile, const std::string& config);
+
+  std::vector<std::string> RemoveDuplicateNameTarget(std::vector<std::string> listName);
+
   static std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
+
+  void WriteTargetFB(const std::string& config);
 
 private:
   std::string LanguageLinkerRule(const std::string& config) const;
@@ -59,7 +67,6 @@ private:
   std::string TargetLinkLanguage(const std::string& config) const;
   std::string DeviceLinkObject;
 
-  void WriteTargetFB(const std::string& config);
   void WriteObjectListFB(const std::string& config);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);

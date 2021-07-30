@@ -629,8 +629,8 @@ private:
     std::string Config;
     std::string ListDeps;
   };
-  using TargetAliasMapFB = std::map<std::string, TargetAliasFB>;
-  TargetAliasMapFB TargetAliasesFB;
+  std::map<std::string, TargetAliasFB> TargetAliasesFB;
+  std::vector<std::string> TargetAliasesOrderedFB;
 
   /// the local cache for calls to ConvertToNinjaPath
   mutable std::unordered_map<std::string, std::string> ConvertToFastbuildPathCache;

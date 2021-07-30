@@ -225,27 +225,45 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
 
 void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
 {
-  this->WriteObjectListFB(config);
-
   cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
-
-  const cmFastbuildDeps explicitDeps = this->GetObjects(config);
-  for (std::string explicitDep : explicitDeps) {
-    this->GetGlobalGenerator()->WriteSectionHeader(this->GetCommonFileStream(), explicitDep);
-  }
-
-  std::vector<std::string> linkTargetDirectories = this->GetLinkedTargetDirectories(config);
-  for (std::string linkTargetDirectorie : linkTargetDirectories) {
-    this->GetGlobalGenerator()->WriteSectionHeader(this->GetCommonFileStream(),
-                                                   linkTargetDirectorie);
-  }
   
   if (targetType == cmStateEnums::EXECUTABLE) {
+    this->WriteObjectListFB(config);
     this->WriteExecutableFB(config);
   } else if (targetType == cmStateEnums::STATIC_LIBRARY) {
+    this->WriteObjectListFB(config);
     this->WriteLibraryFB(config);
   } else if (targetType == cmStateEnums::SHARED_LIBRARY) {
+    this->WriteObjectListFB(config);
     this->WriteDLLFB(config);
+  } else if (targetType == cmStateEnums::OBJECT_LIBRARY) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : OBJECT LIBRARY : ", this->GetTargetName()));
+    this->WriteObjectLibraryFB(config);
+  } else if (targetType == cmStateEnums::GLOBAL_TARGET) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : GLOBAL TARGET : ",
+               this->GetTargetName()));
+  } else if (targetType == cmStateEnums::MODULE_LIBRARY) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : MODULE LIBRARY : ", this->GetTargetName()));
+  } else if (targetType == cmStateEnums::INTERFACE_LIBRARY) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : INTERFACE LIBRARY : ",
+               this->GetTargetName()));
+  } else if (targetType == cmStateEnums::UTILITY) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : UTILITY : ",
+               this->GetTargetName()));
+  } else if (targetType == cmStateEnums::UNKNOWN_LIBRARY) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : UNKNOWN LIBRARY : ", this->GetTargetName()));
   } else {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
@@ -526,6 +544,46 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   listDeps += gfb->Quote(dll_name);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
                         listDeps, config);
+}
+
+void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
+  const std::string& config)
+{
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  std::ostream& os = this->GetCommonFileStream();
+  bool isMultiConfig = gfb->IsMultiConfig();
+
+  std::string target_name = this->GetTargetName();
+  std::string language = this->TargetLinkLanguage(config);
+  std::string objlib_name;
+  std::string alias_name;
+
+  if (!isMultiConfig) {
+    objlib_name = cmStrCat(target_name, "-objlib");
+    alias_name = cmStrCat(target_name, "-objlib-deps");
+  } else {
+    objlib_name = cmStrCat(target_name, "-objlib-", config);
+    alias_name = cmStrCat(target_name, "-objlib-", config, "-deps");
+  }
+
+  std::vector<cmSourceFile const*> objectSources;
+  this->GeneratorTarget->GetObjectSources(objectSources, config);
+  std::string objectList = "";
+
+  for (cmSourceFile const* sf : objectSources) {
+    objectList += cmStrCat("\'", sf->GetFullPath(), "\'");
+  }
+
+  /*gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
+  gfb->WritePushScope(os);
+  gfb->WriteCommand(
+    os, "Using",
+    cmStrCat(".Compiler", language, config, target_name));
+  gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$Compiler$"));
+  gfb->WriteVariableFB(os, "ExecArguments",
+    cmStrCat("\"", gfb->Quote("$CompilerOptions$"), objectList, "\""));
+  gfb->WriteVariableFB(os, "ExecOutput", ""); // peut-être .rc en .res
+  gfb->WritePopScope(os);*/
 }
 
 

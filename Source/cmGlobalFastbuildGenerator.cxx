@@ -1547,11 +1547,14 @@ void cmGlobalFastbuildGenerator::AddTargetAliasFB(const std::string& alias,
                                                   std::string listDeps,
                                                   const std::string& config)
 {
-  TargetAliasFB ta;
-  ta.Config = config;
-  ta.GeneratorTarget = target;
-  ta.ListDeps = listDeps;
-  this->TargetAliasesFB.insert(std::make_pair(alias, ta));
+  if (this->TargetAliasesFB.find(alias) == this->TargetAliasesFB.end()) {
+    TargetAliasFB ta;
+    ta.Config = config;
+    ta.GeneratorTarget = target;
+    ta.ListDeps = listDeps;
+    this->TargetAliasesFB.insert(std::make_pair(alias, ta));
+    this->TargetAliasesOrderedFB.push_back(alias);
+  }
 }
 
 void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
@@ -1559,15 +1562,12 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
   if (!IsMultiConfig()) {
     std::string listDepsAll = "";
     this->WriteSectionHeader(os, "Target aliases");
-    for (auto const& ta : this->TargetAliasesFB) {
-      // Don't write ambiguous aliases.
-      if (!ta.second.GeneratorTarget) {
-        continue;
-      }
+    for (std::string name_alias : this->TargetAliasesOrderedFB) {
+      auto ta = this->TargetAliasesFB[name_alias];
 
-      WriteAliasFB(os, ta.first, ta.second.ListDeps);
+      WriteAliasFB(os, name_alias, ta.ListDeps);
 
-      listDepsAll += ta.first;
+      listDepsAll += name_alias;
     }
     WriteAliasFB(os, Quote("all"), listDepsAll);
   } else {
@@ -1579,12 +1579,13 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
     for (auto config : configs) {
       this->WriteSectionHeader(os,
                                cmStrCat("Target aliases : ", config.first));
-      for (auto const ta : this->TargetAliasesFB) {
-        if (!ta.second.GeneratorTarget || ta.second.Config != config.first) {
+      for (std::string name_alias : this->TargetAliasesOrderedFB) {
+        auto ta = this->TargetAliasesFB[name_alias];
+        if (ta.Config != config.first) {
           continue;
         }
-        WriteAliasFB(os, ta.first, ta.second.ListDeps);
-        configs[ta.second.Config] += ta.first;
+        WriteAliasFB(os, name_alias, ta.ListDeps);
+        configs[ta.Config] += name_alias;
       }
     }
     this->WriteSectionHeader(os, "Target aliases All");

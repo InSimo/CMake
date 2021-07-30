@@ -477,7 +477,14 @@ std::string cmFastbuildTargetGenerator::GetTargetFilePath(
 
 std::string cmFastbuildTargetGenerator::GetTargetName() const
 {
-  return this->GeneratorTarget->GetName();
+  std::string name_target = this->GeneratorTarget->GetName();
+  // Files .bff don't accept name with "-" in
+  auto it = name_target.find("-");
+  while (it != std::string::npos) {
+    name_target.replace(it, 1, "_");
+    it = name_target.find("-");
+  }
+  return name_target;
 }
 
 bool cmFastbuildTargetGenerator::SetMsvcTargetPdbVariable(

@@ -249,7 +249,7 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
   } else {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
-      cmStrCat("NOT YET AVAILABLE : ", this->GetVisibleTypeName()));
+      cmStrCat("NOT YET AVAILABLE : ", this->GetTargetName()));
   }
 
   this->GetGlobalGenerator()->TargetTreatedFinish(this->GetGeneratorTarget(), config);

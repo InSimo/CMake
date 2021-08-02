@@ -289,9 +289,9 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
 
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
   std::string target_name = this->GetTargetName();
-  std::string current_source_dir =
-    this->GetMakefile()->GetCurrentSourceDirectory();
-  std::string target_output = this->GetTargetOutputDir(config);
+  
+  std::string target_output =
+    this->GetGeneratorTarget()->GetObjectDirectory(config);
 
   if (!gfb->IsMultiConfig()) {
     gfb->WriteSectionHeader(os, target_name);
@@ -552,6 +552,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = this->GetCommonFileStream();
   bool isMultiConfig = gfb->IsMultiConfig();
+  std::string target_output = this->GetTargetOutputDir(config);
 
   std::string target_name = this->GetTargetName();
   std::string language = this->TargetLinkLanguage(config);
@@ -574,7 +575,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
     objectList += cmStrCat("\'", sf->GetFullPath(), "\'");
   }
 
-  /*gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
+  gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
   gfb->WritePushScope(os);
   gfb->WriteCommand(
     os, "Using",
@@ -582,8 +583,14 @@ void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
   gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$Compiler$"));
   gfb->WriteVariableFB(os, "ExecArguments",
     cmStrCat("\"", gfb->Quote("$CompilerOptions$"), objectList, "\""));
-  gfb->WriteVariableFB(os, "ExecOutput", ""); // peut-être .rc en .res
-  gfb->WritePopScope(os);*/
+  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(cmStrCat(target_output, "/", target_name, ".res"))); // .rc en .res (voir si autre extension)
+  gfb->WritePopScope(os);
+
+  // Alias
+  std::string listDeps = "";
+  listDeps += gfb->Quote(objlib_name);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
+                        listDeps, config);
 }
 
 

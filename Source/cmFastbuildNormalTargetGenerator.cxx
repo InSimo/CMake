@@ -572,7 +572,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
   std::string objectList = "";
 
   for (cmSourceFile const* sf : objectSources) {
-    objectList += cmStrCat("\'", sf->GetFullPath(), "\'");
+    objectList += cmStrCat("\"", sf->GetFullPath(), "\"");
   }
 
   gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
@@ -582,7 +582,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
     cmStrCat(".Compiler", language, config, target_name));
   gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$Compiler$"));
   gfb->WriteVariableFB(os, "ExecArguments",
-    cmStrCat("\"", gfb->Quote("$CompilerOptions$"), objectList, "\""));
+    cmStrCat("\' /nologo ", objectList, "\'"));
   gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(cmStrCat(target_output, "/", target_name, ".res"))); // .rc en .res (voir si autre extension)
   gfb->WritePopScope(os);
 

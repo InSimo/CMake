@@ -224,7 +224,7 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
 }
 
 void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
-{
+{  
   cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
   
   if (targetType == cmStateEnums::EXECUTABLE) {
@@ -276,6 +276,7 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
 void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  std::ostream& os = this->GetCommonFileStream();
 
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
@@ -285,7 +286,11 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
 
-  std::ostream& os = this->GetCommonFileStream();
+  /*std::vector<cmSourceFile const*> vsf;
+  this->GetGeneratorTarget()->GetExtraSources(vsf, config);
+  for (auto sf : vsf) {
+    gfb->WriteSectionHeader(os, sf->GetFullPath());
+  }*/
 
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
   std::string target_name = this->GetTargetName();
@@ -302,6 +307,21 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
       os, "Using",
       cmStrCat(".Compiler", language, config, this->GetTargetName()));
     gfb->WriteArray(os, "CompilerInputFiles", objectList);
+
+
+    if (this->GetMakefile()->GetSafeDefinition(
+    cmStrCat("CMAKE_", language, "_COMPILER_ID")) == "MSVC"){
+      // For have the .h.in files
+      gfb->WriteVariableFB(
+        os, "CompilerOptions",
+        gfb->Quote(cmStrCat(" -I", this->GetTargetOutputDir(config))), "+");
+
+      // TMP
+      gfb->WriteVariableFB(
+        os, "CompilerOptions",
+                           gfb->Quote(cmStrCat(" -I", "Source")), "+");
+    }
+
     gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
     gfb->WritePopScope(os);
   } else {
@@ -341,7 +361,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     objectList_name = cmStrCat(target_name, "-obj-", config);
     alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
   }
-
+  
   std::vector<std::string> implicitDeps = GetNameTargetLibraries(isMultiConfig, config);
   std::string listImplicitDeps = "";
   for (std::string implicitDep : implicitDeps) {

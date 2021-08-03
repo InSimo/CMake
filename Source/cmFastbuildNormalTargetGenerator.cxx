@@ -229,13 +229,13 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
     // Fastbuild can't treat the rc compiler, we treat it differentely
     this->WriteRCFB(config);
   } else if (targetType == cmStateEnums::EXECUTABLE) {
-    this->WriteObjectListFB(config);
+    this->WriteObjectListsFB(config);
     this->WriteExecutableFB(config);
   } else if (targetType == cmStateEnums::STATIC_LIBRARY) {
-    this->WriteObjectListFB(config);
+    this->WriteObjectListsFB(config);
     this->WriteLibraryFB(config);
   } else if (targetType == cmStateEnums::SHARED_LIBRARY) {
-    this->WriteObjectListFB(config);
+    this->WriteObjectListsFB(config);
     this->WriteDLLFB(config);
   } else if (targetType == cmStateEnums::OBJECT_LIBRARY) {
     this->GetGlobalGenerator()->WriteSectionHeader(
@@ -273,7 +273,7 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
   this->GetGlobalGenerator()->TargetTreatedFinish(this->GetGeneratorTarget(), config);
 }
 
-void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& config)
+void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = this->GetCommonFileStream();
@@ -281,26 +281,11 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
 
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
-  std::vector<std::string> objectList;
-  
-  for (cmSourceFile const* sf : objectSources) {
-    objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
-  }
-
-  std::string compilerOptions = "";
-  // In the same target, all Object have the same flags, defines et includes directory
-  if (!objectSources.empty()) {
-    compilerOptions =
-      this->ComputeFlagsForObject(objectSources[0], language, config);
-    compilerOptions += cmStrCat(
-      " ", this->ComputeDefines(objectSources[0], language, config), " ");
-    compilerOptions +=
-      this->ComputeIncludes(objectSources[0], language, config);
-  }
 
   std::string target_output =
     this->GetGeneratorTarget()->GetObjectDirectory(config);
   std::string target_name = this->GetTargetName();
+
   std::string section_header_name;
   std::string objectList_name;
 
@@ -313,7 +298,85 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
   }
 
   gfb->WriteSectionHeader(os, section_header_name);
-  gfb->WriteCommand(os, "ObjectList", gfb->Quote(objectList_name));
+
+  std::string compilerOptions = "";
+  if (!objectSources.empty()) {
+    compilerOptions =
+      this->ComputeFlagsForObject(objectSources[0], language, config);
+    compilerOptions += cmStrCat(
+      " ", this->ComputeDefines(objectSources[0], language, config), " ");
+    compilerOptions +=
+      this->ComputeIncludes(objectSources[0], language, config);
+  }
+  int nbObjectList = 1;
+  std::string compilerOptionsTemp = "";
+  std::vector<std::string> objectList;
+  for (cmSourceFile const* sf : objectSources) {
+    /*gfb->WriteSectionHeader(
+      os, cmStrCat("COMPUTE FLAGS : ", this->ComputeFlagsForObject(sf, language, config)));
+    gfb->WriteSectionHeader(
+      os, cmStrCat("COMPUTE DEFINES : ", this->ComputeDefines(sf, language, config)));
+    gfb->WriteSectionHeader(
+      os, cmStrCat("COMPUTE INCLUDES : ", this->ComputeIncludes(sf, language, config)));*/
+
+    compilerOptionsTemp =
+      this->ComputeFlagsForObject(sf, language, config);
+    compilerOptionsTemp += cmStrCat(
+      " ", this->ComputeDefines(sf, language, config), " ");
+    compilerOptionsTemp +=
+      this->ComputeIncludes(sf, language, config);
+
+    if (compilerOptions != compilerOptionsTemp) {
+      std::string under_objectList_name =
+        cmStrCat(objectList_name, "-", std::to_string(nbObjectList));
+      this->WriteObjectListFB(config, language, under_objectList_name,
+                              objectList,
+                              compilerOptions);
+
+        compilerOptions = compilerOptionsTemp;
+        objectList.clear();
+        nbObjectList++;
+    }
+    objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
+  }
+
+  if (nbObjectList == 1) {
+    // Don't have under ObjectList
+    this->WriteObjectListFB(config, language, objectList_name,
+                            objectList, compilerOptions);
+  } else {
+    // Have under ObjectList
+    gfb->WriteCommand(os, "ObjectList", gfb->Quote(objectList_name));
+    gfb->WritePushScope(os);
+    gfb->WriteCommand(
+      os, "Using",
+      cmStrCat(".Compiler", language, config, this->GetTargetName()));
+    gfb->WriteArray(os, "CompilerInputFiles", objectList);
+    if (!compilerOptions.empty())
+      gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(compilerOptions),
+                           "+");
+    gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
+    std::string under_objectLists = "";
+    for (int i = 1; i < nbObjectList; i++) {
+      under_objectLists += gfb->Quote(cmStrCat(objectList_name, "-", std::to_string(i)));
+    }
+    gfb->WriteVariableFB(os, "CompilerInputObjectLists",
+                         cmStrCat("{ ", under_objectLists, " }"));
+    gfb->WritePopScope(os);
+  }
+}
+
+void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
+  const std::string& config, const std::string& language,
+                       const std::string& under_objectList_name,
+                       std::vector<std::string> objectList, const std::string& compilerOptions)
+{
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  std::ostream& os = this->GetCommonFileStream();
+  std::string target_output =
+    this->GetGeneratorTarget()->GetObjectDirectory(config);
+
+  gfb->WriteCommand(os, "ObjectList", gfb->Quote(under_objectList_name));
   gfb->WritePushScope(os);
   gfb->WriteCommand(
     os, "Using",

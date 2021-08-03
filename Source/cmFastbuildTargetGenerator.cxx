@@ -977,9 +977,9 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
   link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
   if (compilerId == "MSVC") {
-    flags += " /c \"%1\" /Fo\"%2\" ";
+    flags += "/c \"%1\" /Fo\"%2\" ";
     // if multiple CL.EXE write to the same .PDB file, please use /FS
-    if (config == "Debug" || config == "RelWithDebInfo") flags += " /FS ";
+    if (config == "Debug" || config == "RelWithDebInfo") flags += "/FS ";
   }
   
   gfb->WriteSectionHeader(os, "Compilers");

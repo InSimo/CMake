@@ -70,7 +70,12 @@ private:
   std::string TargetLinkLanguage(const std::string& config) const;
   std::string DeviceLinkObject;
 
-  void WriteObjectListFB(const std::string& config);
+  void WriteObjectListsFB(const std::string& config);
+  void WriteObjectListFB(const std::string& config,
+                         const std::string& language,
+                         const std::string& under_objectList_name,
+                         std::vector<std::string> objectList,
+                         const std::string& compilerOptions);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
   void WriteDLLFB(const std::string& config);

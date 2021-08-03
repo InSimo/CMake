@@ -20,7 +20,7 @@ public:
 
   std::vector<std::string> GetNameDepsTargets(const std::string& config);
 
-  std::string GetNameDepTarget(std::string namePathFile, const std::string& config);
+  std::string GetNameFile(std::string namePathFile);
 
   std::vector<std::string> RemoveDuplicateName(std::vector<std::string> listName);
 
@@ -74,6 +74,6 @@ private:
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
   void WriteDLLFB(const std::string& config);
-  void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
+  void cmFastbuildNormalTargetGenerator::WriteRCFB(
     const std::string& config);
 };

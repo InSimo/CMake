@@ -123,7 +123,7 @@ std::vector<std::string> cmFastbuildNormalTargetGenerator::GetNameDepsTargets(co
   std::vector<std::string> listDeps;
   const cmFastbuildDeps depsPath = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
   for (std::string depPath : depsPath) {
-    listDeps.push_back(GetNameDepTarget(depPath, config));
+    listDeps.push_back(cmStrCat(GetNameFile(depPath), config));
   }
   
   return RemoveDuplicateName(listDeps);
@@ -142,7 +142,7 @@ std::vector<std::string> cmFastbuildNormalTargetGenerator::RemoveDuplicateName(s
   return listUniqueName;
 }
 
-std::string cmFastbuildNormalTargetGenerator::GetNameDepTarget(std::string namePathFile, const std::string& config)
+std::string cmFastbuildNormalTargetGenerator::GetNameFile(std::string namePathFile)
 {
   std::string nameFile = "";
   std::string nameTarget = "";
@@ -167,8 +167,6 @@ std::string cmFastbuildNormalTargetGenerator::GetNameDepTarget(std::string nameP
   if (found_point != std::string::npos) {
     nameTarget = nameFile.substr(0, found_point);
   }
-
-  nameTarget = cmStrCat(nameTarget, config);
   
   return nameTarget;
 }
@@ -226,8 +224,10 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
 void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
 {  
   cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
-  
-  if (targetType == cmStateEnums::EXECUTABLE) {
+
+  if (this->TargetLinkLanguage(config) == "RC") {
+    this->WriteRCFB(config);
+  } else if (targetType == cmStateEnums::EXECUTABLE) {
     this->WriteObjectListFB(config);
     this->WriteExecutableFB(config);
   } else if (targetType == cmStateEnums::STATIC_LIBRARY) {
@@ -240,7 +240,6 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
       cmStrCat("NOT YET AVAILABLE : OBJECT LIBRARY : ", this->GetTargetName()));
-    this->WriteObjectLibraryFB(config);
   } else if (targetType == cmStateEnums::GLOBAL_TARGET) {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
@@ -566,7 +565,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
                         listDeps, config);
 }
 
-void cmFastbuildNormalTargetGenerator::WriteObjectLibraryFB(
+void cmFastbuildNormalTargetGenerator::WriteRCFB(
   const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();

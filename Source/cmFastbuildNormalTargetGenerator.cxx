@@ -339,31 +339,18 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     }
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
-
-  if (nbObjectList == 1) {
-    // Don't have under ObjectList
-    this->WriteObjectListFB(config, language, objectList_name,
+  std::string under_objectList_name =
+    cmStrCat(objectList_name, "-", std::to_string(nbObjectList));
+  this->WriteObjectListFB(config, language, under_objectList_name,
                             objectList, compilerOptions);
-  } else {
-    // Have under ObjectList
-    gfb->WriteCommand(os, "ObjectList", gfb->Quote(objectList_name));
-    gfb->WritePushScope(os);
-    gfb->WriteCommand(
-      os, "Using",
-      cmStrCat(".Compiler", language, config, this->GetTargetName()));
-    gfb->WriteArray(os, "CompilerInputFiles", objectList);
-    if (!compilerOptions.empty())
-      gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(compilerOptions),
-                           "+");
-    gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
-    std::string under_objectLists = "";
-    for (int i = 1; i < nbObjectList; i++) {
-      under_objectLists += gfb->Quote(cmStrCat(objectList_name, "-", std::to_string(i)));
-    }
-    gfb->WriteVariableFB(os, "CompilerInputObjectLists",
-                         cmStrCat("{ ", under_objectLists, " }"));
-    gfb->WritePopScope(os);
+  std::string under_objectLists = gfb->Quote(under_objectList_name);
+  for (int i = 1; i < nbObjectList; i++) {
+    under_objectLists +=
+      gfb->Quote(cmStrCat(objectList_name, "-", std::to_string(i)));
   }
+
+
+  gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
@@ -569,7 +556,10 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   cmMakefile* mf = this->GetMakefile();
   std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
   std::string cmake_arguments = "-E vs_link_dll ";
-  std::string pdb = mf->GetSafeDefinition("TARGET_PDB");
+  std::string pdb =
+    cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
+             this->GetGeneratorTarget()->GetPDBName(config));
+  
   cmake_arguments +=
     cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
   cmake_arguments += " --rc=$RC$";
@@ -579,7 +569,8 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   cmake_arguments += " -- $CMakeLinker$";
   cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
   cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");    // %2
-  cmake_arguments += cmStrCat(" /implib:", target_name, ".lib");
+  cmake_arguments +=
+    cmStrCat(" /implib:", target_output, "/", target_name, ".lib");
   if (!pdb.empty())
     cmake_arguments += cmStrCat(" /pdb:", pdb);
   cmake_arguments += mf->GetSafeDefinition("LINK_FLAGS");
@@ -630,11 +621,11 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
   std::string alias_name;
 
   if (!isMultiConfig) {
-    objlib_name = cmStrCat(target_name, "-objlib");
-    alias_name = cmStrCat(target_name, "-objlib-deps");
+    objlib_name = cmStrCat(target_name, "-rc");
+    alias_name = cmStrCat(target_name, "-rc-deps");
   } else {
-    objlib_name = cmStrCat(target_name, "-objlib-", config);
-    alias_name = cmStrCat(target_name, "-objlib-", config, "-deps");
+    objlib_name = cmStrCat(target_name, "-rc-", config);
+    alias_name = cmStrCat(target_name, "-rc-", config, "-deps");
   }
 
   std::vector<cmSourceFile const*> objectSources;

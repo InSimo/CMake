@@ -973,7 +973,7 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
   //gfb->WriteSectionHeader(os, this->GetGeneratorTarget()->GetCompilePDBPath(config));
   
 
-  std::string link_flags = "\"%1\" /OUT:\"%2\" ";
+  std::string link_flags = "\"%1\" /OUT:\"%2\" /nologo ";
   link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
   if (compilerId == "MSVC") {
@@ -989,8 +989,7 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
   gfb->WriteVariableFB(os, "Compiler", gfb->Quote(executable));
   gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags));
   gfb->WriteVariableFB(os, "Librarian", gfb->Quote(create_static_library));
-  gfb->WriteVariableFB(os, "LibrarianOptions",
-                       gfb->Quote(cmStrCat("/nologo ", link_flags)));
+  gfb->WriteVariableFB(os, "LibrarianOptions", gfb->Quote(link_flags));
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(link_flags));
   gfb->WritePopScope(os);

@@ -226,6 +226,7 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
   cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
 
   if (this->TargetLinkLanguage(config) == "RC") {
+    // Fastbuild can't treat the rc compiler, we treat it differentely
     this->WriteRCFB(config);
   } else if (targetType == cmStateEnums::EXECUTABLE) {
     this->WriteObjectListFB(config);
@@ -285,6 +286,10 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
 
+  std::vector<BT<std::string>> includes =
+    this->GetGeneratorTarget()->GetIncludeDirectories(config, this->TargetLinkLanguage(config));
+  
+
   /*std::vector<cmSourceFile const*> vsf;
   this->GetGeneratorTarget()->GetExtraSources(vsf, config);
   for (auto sf : vsf) {
@@ -310,15 +315,11 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
 
     if (this->GetMakefile()->GetSafeDefinition(
     cmStrCat("CMAKE_", language, "_COMPILER_ID")) == "MSVC"){
-      // For have the .h.in files
-      gfb->WriteVariableFB(
-        os, "CompilerOptions",
-        gfb->Quote(cmStrCat(" -I", this->GetTargetOutputDir(config))), "+");
-
-      // TMP
-      gfb->WriteVariableFB(
-        os, "CompilerOptions",
-                           gfb->Quote(cmStrCat(" -I", "Source")), "+");
+      
+      for (auto include : includes) {
+        gfb->WriteVariableFB(os, "CompilerOptions",
+                             gfb->Quote(cmStrCat(" -I", include.Value)), "+");
+      }
     }
 
     gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));

@@ -277,66 +277,53 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(const std::string& conf
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = this->GetCommonFileStream();
+  std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
 
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
   std::vector<std::string> objectList;
-
+  
   for (cmSourceFile const* sf : objectSources) {
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
 
-  std::vector<BT<std::string>> includes =
-    this->GetGeneratorTarget()->GetIncludeDirectories(config, this->TargetLinkLanguage(config));
-  
+  std::string compilerOptions = "";
+  // In the same target, all Object have the same flags, defines et includes directory
+  if (!objectSources.empty()) {
+    compilerOptions =
+      this->ComputeFlagsForObject(objectSources[0], language, config);
+    compilerOptions += cmStrCat(
+      " ", this->ComputeDefines(objectSources[0], language, config), " ");
+    compilerOptions +=
+      this->ComputeIncludes(objectSources[0], language, config);
+  }
 
-  /*std::vector<cmSourceFile const*> vsf;
-  this->GetGeneratorTarget()->GetExtraSources(vsf, config);
-  for (auto sf : vsf) {
-    gfb->WriteSectionHeader(os, sf->GetFullPath());
-  }*/
-
-  std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
-  std::string target_name = this->GetTargetName();
-  
   std::string target_output =
     this->GetGeneratorTarget()->GetObjectDirectory(config);
+  std::string target_name = this->GetTargetName();
+  std::string section_header_name;
+  std::string objectList_name;
 
   if (!gfb->IsMultiConfig()) {
-    gfb->WriteSectionHeader(os, target_name);
-    gfb->WriteCommand(os, "ObjectList",
-                      gfb->Quote(cmStrCat(target_name, "-obj")));
-    gfb->WritePushScope(os);
-    gfb->WriteCommand(
-      os, "Using",
-      cmStrCat(".Compiler", language, config, this->GetTargetName()));
-    gfb->WriteArray(os, "CompilerInputFiles", objectList);
-
-
-    if (this->GetMakefile()->GetSafeDefinition(
-    cmStrCat("CMAKE_", language, "_COMPILER_ID")) == "MSVC"){
-      
-      for (auto include : includes) {
-        gfb->WriteVariableFB(os, "CompilerOptions",
-                             gfb->Quote(cmStrCat(" -I", include.Value)), "+");
-      }
-    }
-
-    gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
-    gfb->WritePopScope(os);
+    section_header_name = target_name;
+    objectList_name = cmStrCat(target_name, "-obj");
   } else {
-    gfb->WriteSectionHeader(os, cmStrCat(target_name, " : ", config));
-    gfb->WriteCommand(
-      os, "ObjectList",
-      gfb->Quote(cmStrCat(target_name, "-obj-", config, "")));
-    gfb->WritePushScope(os);
-    gfb->WriteCommand(
-      os, "Using",
-      cmStrCat(".Compiler", language, config, this->GetTargetName()));
-    gfb->WriteArray(os, "CompilerInputFiles", objectList);
-    gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
-    gfb->WritePopScope(os);
+    section_header_name = cmStrCat(target_name, " : ", config);
+    objectList_name = cmStrCat(target_name, "-obj-", config);
   }
+
+  gfb->WriteSectionHeader(os, section_header_name);
+  gfb->WriteCommand(os, "ObjectList", gfb->Quote(objectList_name));
+  gfb->WritePushScope(os);
+  gfb->WriteCommand(
+    os, "Using",
+    cmStrCat(".Compiler", language, config, this->GetTargetName()));
+  gfb->WriteArray(os, "CompilerInputFiles", objectList);
+  if (!compilerOptions.empty())
+    gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(compilerOptions),
+                         "+");
+  gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
+  gfb->WritePopScope(os);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteExecutableFB(

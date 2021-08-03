@@ -965,20 +965,22 @@ void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
 
   std::string executable =
     mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::string flags = this->GetFlags(lang, config);
+  std::string flags = " /nologo ";
   std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
 
   std::string linker = mf->GetSafeDefinition("CMAKE_LINKER");
+
+  //gfb->WriteSectionHeader(os, this->GetGeneratorTarget()->GetCompilePDBPath(config));
+  
+
   std::string link_flags = "\"%1\" /OUT:\"%2\" ";
   link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
   if (compilerId == "MSVC") {
-    flags += " /c \"%1\" /Fo\"%2\" /nologo";
+    flags += " /c \"%1\" /Fo\"%2\" ";
     // if multiple CL.EXE write to the same .PDB file, please use /FS
-    if (config == "Debug" || config == "RelWithDebInfo") flags += " /FS";
+    if (config == "Debug" || config == "RelWithDebInfo") flags += " /FS ";
   }
-
-  
   
   gfb->WriteSectionHeader(os, "Compilers");
   gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),

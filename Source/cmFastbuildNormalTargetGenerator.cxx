@@ -250,6 +250,8 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
       cmStrCat("NOT YET AVAILABLE : MODULE LIBRARY : ", this->GetTargetName()));
+    this->WriteObjectListsFB(config);
+    this->WriteDLLFB(config);
   } else if (targetType == cmStateEnums::INTERFACE_LIBRARY) {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
@@ -312,12 +314,6 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   std::string compilerOptionsTemp = "";
   std::vector<std::string> objectList;
   for (cmSourceFile const* sf : objectSources) {
-    /*gfb->WriteSectionHeader(
-      os, cmStrCat("COMPUTE FLAGS : ", this->ComputeFlagsForObject(sf, language, config)));
-    gfb->WriteSectionHeader(
-      os, cmStrCat("COMPUTE DEFINES : ", this->ComputeDefines(sf, language, config)));
-    gfb->WriteSectionHeader(
-      os, cmStrCat("COMPUTE INCLUDES : ", this->ComputeIncludes(sf, language, config)));*/
 
     compilerOptionsTemp =
       this->ComputeFlagsForObject(sf, language, config);
@@ -406,8 +402,68 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
       gfb->Quote(implicitDep);
   }
 
+
+  std::string createRule =
+    this->GetGeneratorTarget()->GetCreateRuleVariable(this->TargetLinkLanguage(config), config);
+  bool useWatcomQuote = this->GetMakefile()->IsOn(createRule + "_USE_WATCOM_QUOTE");
+
+  cmLocalFastbuildGenerator& localGen = *this->GetLocalGenerator();
+
+  std::unique_ptr<cmLinkLineComputer> linkLineComputer =
+    gfb->CreateLinkLineComputer(
+      this->GetLocalGenerator(),
+      this->GetLocalGenerator()->GetStateSnapshot().GetDirectory());
+  linkLineComputer->SetUseWatcomQuote(useWatcomQuote);
+  linkLineComputer->SetUseFastbuildMulti(gfb->IsMultiConfig());
+  std::string linkLibs;
+  std::string flags;
+  std::string linkFlags;
+  std::string frameworkPath;
+  std::string linkPath;
+  localGen.GetTargetFlags(linkLineComputer.get(), config,
+                          linkLibs, flags,
+                          linkFlags, frameworkPath, linkPath,
+                          this->GetGeneratorTarget());
+  gfb->WriteSectionHeader(os,
+                            cmStrCat("GetTargetFlags linkLibs : ", linkLibs));
+  gfb->WriteSectionHeader(os,
+                          cmStrCat("GetTargetFlags flags : ", flags));
+  gfb->WriteSectionHeader(os,
+                          cmStrCat("GetTargetFlags linkFlags : ", linkFlags));
+
+  cmMakefile* mf = this->GetMakefile();
+  std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
+  std::string cmake_arguments = "-E vs_link_dll ";
+  std::string pdb =
+    cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
+             this->GetGeneratorTarget()->GetPDBName(config));
+  cmake_arguments +=
+    cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
+  cmake_arguments += " --rc=$RC$";
+  cmake_arguments += " --mt=$MT$";
+  cmake_arguments +=
+    cmStrCat(" --manifests ", this->GetManifests(config));
+  cmake_arguments += " -- $CMakeLinker$";
+  cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
+  cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");    // %2
+  cmake_arguments +=
+    cmStrCat(" /implib:", target_output, "/", target_name, ".lib");
+  if (!pdb.empty())
+    cmake_arguments += cmStrCat(" /pdb:", pdb);
+  cmake_arguments += cmStrCat(" ", linkFlags, " ");
+  cmake_arguments += linkLibs;
+
   gfb->WriteCommand(os, "Executable", gfb->Quote(executable_name));
   gfb->WritePushScope(os);
+  gfb->WriteVariableFB(os, "RC",
+                       gfb->Quote(cmOutputConverter::EscapeForCMake(
+                         mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
+  gfb->WriteVariableFB(os, "MT",
+                       gfb->Quote(cmOutputConverter::EscapeForCMake(
+                         mf->GetSafeDefinition("CMAKE_MT"))));
+  gfb->WriteVariableFB(os, "CMakeLinker",
+                       gfb->Quote(cmOutputConverter::EscapeForCMake(
+                         mf->GetSafeDefinition("CMAKE_LINKER"))));
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
   if (!listImplicitDeps.empty())
     gfb->WriteVariableFB(os, "Libraries2",
@@ -418,6 +474,8 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(cmStrCat(target_output, "/", target_name, ".exe")));
+  gfb->WriteVariableFB(os, "Linker", gfb->Quote(cmake_command));
+  gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(cmake_arguments));
   gfb->WritePopScope(os);
 
   std::string listImplicitDepsAlias = "";

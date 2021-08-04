@@ -237,6 +237,13 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
   } else if (targetType == cmStateEnums::SHARED_LIBRARY) {
     this->WriteObjectListsFB(config);
     this->WriteDLLFB(config);
+  } else if (targetType == cmStateEnums::MODULE_LIBRARY) {
+    this->GetGlobalGenerator()->WriteSectionHeader(
+      this->GetCommonFileStream(),
+      cmStrCat("NOT YET AVAILABLE : MODULE LIBRARY : ",
+               this->GetTargetName()));
+    this->WriteObjectListsFB(config);
+    this->WriteDLLFB(config);
   } else if (targetType == cmStateEnums::OBJECT_LIBRARY) {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
@@ -246,12 +253,8 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
       this->GetCommonFileStream(),
       cmStrCat("NOT YET AVAILABLE : GLOBAL TARGET : ",
                this->GetTargetName()));
-  } else if (targetType == cmStateEnums::MODULE_LIBRARY) {
-    this->GetGlobalGenerator()->WriteSectionHeader(
-      this->GetCommonFileStream(),
-      cmStrCat("NOT YET AVAILABLE : MODULE LIBRARY : ", this->GetTargetName()));
     this->WriteObjectListsFB(config);
-    this->WriteDLLFB(config);
+    this->WriteExecutableFB(config);
   } else if (targetType == cmStateEnums::INTERFACE_LIBRARY) {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),
@@ -372,6 +375,38 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   gfb->WritePopScope(os);
 }
 
+void cmFastbuildNormalTargetGenerator::GetTargetFlagsFB(
+  const std::string& config, std::string& linkLibs, std::string& flags,
+  std::string& linkFlags)
+{
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  std::ostream& os = this->GetCommonFileStream();
+
+  std::string createRule = this->GetGeneratorTarget()->GetCreateRuleVariable(
+    this->TargetLinkLanguage(config), config);
+  bool useWatcomQuote =
+    this->GetMakefile()->IsOn(createRule + "_USE_WATCOM_QUOTE");
+
+  cmLocalFastbuildGenerator& localGen = *this->GetLocalGenerator();
+
+  std::unique_ptr<cmLinkLineComputer> linkLineComputer =
+    gfb->CreateLinkLineComputer(
+      this->GetLocalGenerator(),
+      this->GetLocalGenerator()->GetStateSnapshot().GetDirectory());
+  linkLineComputer->SetUseWatcomQuote(useWatcomQuote);
+  linkLineComputer->SetUseFastbuildMulti(gfb->IsMultiConfig());
+  std::string frameworkPath;
+  std::string linkPath;
+  localGen.GetTargetFlags(linkLineComputer.get(), config, linkLibs, flags,
+                          linkFlags, frameworkPath, linkPath,
+                          this->GetGeneratorTarget());
+  gfb->WriteSectionHeader(os,
+                          cmStrCat("GetTargetFlags linkLibs : ", linkLibs));
+  gfb->WriteSectionHeader(os, cmStrCat("GetTargetFlags flags : ", flags));
+  gfb->WriteSectionHeader(os,
+                          cmStrCat("GetTargetFlags linkFlags : ", linkFlags));
+}
+
 void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   const std::string& config)
 {
@@ -402,38 +437,14 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
       gfb->Quote(implicitDep);
   }
 
-
-  std::string createRule =
-    this->GetGeneratorTarget()->GetCreateRuleVariable(this->TargetLinkLanguage(config), config);
-  bool useWatcomQuote = this->GetMakefile()->IsOn(createRule + "_USE_WATCOM_QUOTE");
-
-  cmLocalFastbuildGenerator& localGen = *this->GetLocalGenerator();
-
-  std::unique_ptr<cmLinkLineComputer> linkLineComputer =
-    gfb->CreateLinkLineComputer(
-      this->GetLocalGenerator(),
-      this->GetLocalGenerator()->GetStateSnapshot().GetDirectory());
-  linkLineComputer->SetUseWatcomQuote(useWatcomQuote);
-  linkLineComputer->SetUseFastbuildMulti(gfb->IsMultiConfig());
   std::string linkLibs;
   std::string flags;
   std::string linkFlags;
-  std::string frameworkPath;
-  std::string linkPath;
-  localGen.GetTargetFlags(linkLineComputer.get(), config,
-                          linkLibs, flags,
-                          linkFlags, frameworkPath, linkPath,
-                          this->GetGeneratorTarget());
-  gfb->WriteSectionHeader(os,
-                            cmStrCat("GetTargetFlags linkLibs : ", linkLibs));
-  gfb->WriteSectionHeader(os,
-                          cmStrCat("GetTargetFlags flags : ", flags));
-  gfb->WriteSectionHeader(os,
-                          cmStrCat("GetTargetFlags linkFlags : ", linkFlags));
+  this->GetTargetFlagsFB(config, linkLibs, flags, linkFlags);
 
   cmMakefile* mf = this->GetMakefile();
   std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
-  std::string cmake_arguments = "-E vs_link_dll ";
+  std::string cmake_arguments = "-E vs_link_exe ";
   std::string pdb =
     cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
              this->GetGeneratorTarget()->GetPDBName(config));
@@ -617,6 +628,11 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   std::string pdb =
     cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
              this->GetGeneratorTarget()->GetPDBName(config));
+
+  std::string linkLibs;
+  std::string flags;
+  std::string linkFlags;
+  this->GetTargetFlagsFB(config, linkLibs, flags, linkFlags);
   
   cmake_arguments +=
     cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
@@ -631,8 +647,8 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmStrCat(" /implib:", target_output, "/", target_name, ".lib");
   if (!pdb.empty())
     cmake_arguments += cmStrCat(" /pdb:", pdb);
-  cmake_arguments += mf->GetSafeDefinition("LINK_FLAGS");
-  cmake_arguments += mf->GetSafeDefinition("LINK_LIBRARIES");
+  cmake_arguments += cmStrCat(" ", linkFlags, " ");
+  cmake_arguments += linkLibs;
   cmake_arguments += " /dll";
 
   // Create .dll
@@ -652,7 +668,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(cmake_command));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(cmake_arguments));
   gfb->WriteVariableFB(os, "Libraries",
-                       cmStrCat("{ ", listImplicitDeps, " }"));
+                       cmStrCat("{ ", gfb->Quote(library_name), " }"));
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(cmStrCat(target_output, "/", target_name, ".dll")));

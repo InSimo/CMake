@@ -15,8 +15,6 @@
 #include <cm/optional>
 #include <cm/vector>
 
-#include <filesystem>
-
 #include "cmComputeLinkInformation.h"
 #include "cmCustomCommand.h" // IWYU pragma: keep
 #include "cmCustomCommandGenerator.h"
@@ -125,8 +123,6 @@ std::vector<std::string> cmFastbuildNormalTargetGenerator::GetNameDepsTargets(co
   std::vector<std::string> listDeps;
   const cmFastbuildDeps depsPath = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
   for (std::string depPath : depsPath) {
-    if (std::filesystem::exists(depPath))
-      continue;
     listDeps.push_back(cmStrCat(GetNameFile(depPath), config));
   }
   
@@ -472,11 +468,11 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
   }
   
-  std::vector<std::string> fileDeps = GetFileDeps(config);
-  std::string listFileDeps = "";
-  for (std::string fileDep : fileDeps) {
-    listFileDeps +=
-      gfb->Quote(fileDep);
+  std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
+  std::string listTargetDeps = "";
+  for (std::string targetDep : targetDeps) {
+    listTargetDeps +=
+      gfb->Quote(targetDep);
   }
 
   std::string linkLibs;
@@ -518,9 +514,9 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
                        gfb->Quote(cmOutputConverter::EscapeForCMake(
                          mf->GetSafeDefinition("CMAKE_LINKER"))));
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
-  if (!listFileDeps.empty())
+  if (!listTargetDeps.empty())
     gfb->WriteVariableFB(os, "Libraries2",
-                         cmStrCat("{ ", listFileDeps, " }"));
+                         cmStrCat("{ ", listTargetDeps, " }"));
   gfb->WriteCommand(
     os, "Using",
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
@@ -587,10 +583,10 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
   }
 
-  std::vector<std::string> fileDeps = GetFileDeps(config);
-  std::string listFileDeps = "";
-  for (std::string fileDep : fileDeps) {
-    listFileDeps += gfb->Quote(fileDep);
+  std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
+  std::string listTargetDeps = "";
+  for (std::string targetDep : targetDeps) {
+    listTargetDeps += gfb->Quote(targetDep);
   }
 
   gfb->WriteCommand(os, "Library", gfb->Quote(library_name));
@@ -600,8 +596,8 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listFileDeps.empty())
-    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listFileDeps, " }"));
+  if (!listTargetDeps.empty())
+    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listTargetDeps, " }"));
   gfb->WriteVariableFB(
     os, "LibrarianOutput",
     cmStrCat("\'", target_output, "/", target_name, ".lib\'"));
@@ -647,10 +643,10 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
   }
 
-  std::vector<std::string> fileDeps = GetFileDeps(config);
-  std::string listFileDeps = "";
-  for (std::string fileDep : fileDeps) {
-    listFileDeps += gfb->Quote(fileDep);
+  std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
+  std::string listTargetDeps = "";
+  for (std::string targetDep : targetDeps) {
+    listTargetDeps += gfb->Quote(targetDep);
   }
 
   // Create .lib
@@ -661,8 +657,8 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listFileDeps.empty())
-    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listFileDeps, " }"));
+  if (!listTargetDeps.empty())
+    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listTargetDeps, " }"));
   gfb->WriteVariableFB(
     os, "LibrarianOutput",
     gfb->Quote(cmStrCat(target_output, "/", target_name, ".lib")));
@@ -698,7 +694,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   cmake_arguments += " /dll";
 
   // Create .dll
-  listFileDeps += gfb->Quote(library_name);
+  listTargetDeps += gfb->Quote(library_name);
 
   gfb->WriteCommand(os, "DLL", gfb->Quote(dll_name));
   gfb->WritePushScope(os);

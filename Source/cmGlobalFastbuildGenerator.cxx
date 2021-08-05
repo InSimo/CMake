@@ -240,22 +240,25 @@ void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, s
     fbt.is_treated = false;
     fbt.config = config;
     fbt.name_target_deps = name_target_deps;
-    fbt.number_untrated_deps = GetNumberUntratedDepsTarget(name_target_deps);
+    fbt.number_untrated_deps =
+      GetNumberUntratedDepsTarget(target_name, name_target_deps);
     fbt.gt = gt;
     this->MapFastbuildInfoTargets.insert(std::make_pair(target_name, fbt));
   }
 }
 
-int cmGlobalFastbuildGenerator::GetNumberUntratedDepsTarget(std::vector<std::string> name_target_deps)
+int cmGlobalFastbuildGenerator::GetNumberUntratedDepsTarget(std::string target_name, std::vector<std::string> name_target_deps)
 {
   int numberDepsTarget = 0;
   for(std::string name_target : name_target_deps){
-    auto it = this->MapFastbuildInfoTargets.find(name_target);
-    if(it != this->MapFastbuildInfoTargets.end()){
-      if(!this->MapFastbuildInfoTargets[name_target].is_treated) numberDepsTarget += 1;
-    }
-    else{
-      numberDepsTarget += 1;
+    if (name_target != target_name) {
+      auto it = this->MapFastbuildInfoTargets.find(name_target);
+      if (it != this->MapFastbuildInfoTargets.end()) {
+        if (!this->MapFastbuildInfoTargets[name_target].is_treated)
+          numberDepsTarget += 1;
+      } else {
+        numberDepsTarget += 1;
+      }
     }
   }
   return numberDepsTarget;
@@ -277,11 +280,28 @@ void cmGlobalFastbuildGenerator::TargetTreatedFinish(cmGeneratorTarget* gt, cons
   std::string target_name = cmStrCat(gt->GetName(), config);
   this->MapFastbuildInfoTargets[target_name].is_treated = true;
   for(auto fit : this->MapFastbuildInfoTargets){
-    this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.second.name_target_deps);
+    this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.first, fit.second.name_target_deps);
 
     // If finally the target can be treat, we treat him immediately
     if(this->CanTreatTargetFB(fit.second.gt, config)){
       cmFastbuildNormalTargetGenerator(this->MapFastbuildInfoTargets[fit.first].gt).Generate(this->MapFastbuildInfoTargets[fit.first].config);
+    }
+  }
+}
+
+void cmGlobalFastbuildGenerator::PrintAllTargetWithNbDeps()
+{
+  for (auto fit : this->MapFastbuildInfoTargets) {
+    if (!fit.second.is_treated) {
+      WriteSectionHeader(*this->GetCommonFileStream(),
+                         cmStrCat("WARNING : ", fit.first, " : NB DEPS : ",
+                                  fit.second.number_untrated_deps,
+                                  " : IS TREATED : ", fit.second.is_treated));
+
+      for (auto ntd : fit.second.name_target_deps) {
+        WriteSectionHeader(*this->GetCommonFileStream(),
+                           cmStrCat("TARGET DEPS : ", ntd));
+      }
     }
   }
 }
@@ -728,6 +748,8 @@ void cmGlobalFastbuildGenerator::Generate()
   this->cmGlobalGenerator::Generate();
 
   this->WriteTargetAliasesFB(*this->GetCommonFileStream());
+
+  this->PrintAllTargetWithNbDeps();
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());

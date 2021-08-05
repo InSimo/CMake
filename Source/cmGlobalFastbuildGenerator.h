@@ -482,7 +482,7 @@ public:
 
   void AddFastbuildInfoTarget(cmGeneratorTarget* gt,  std::vector<std::string> name_target_deps, const std::string& config);
 
-  int GetNumberUntratedDepsTarget(std::vector<std::string> name_target_deps);
+  int GetNumberUntratedDepsTarget(std::string target_name, std::vector<std::string> name_target_deps);
 
   bool CanTreatTargetFB(cmGeneratorTarget* gt, const std::string& config);
 
@@ -556,6 +556,8 @@ private:
     std::string config;
   };
   std::map<std::string, cmFastbuildInfoTarget> MapFastbuildInfoTargets;
+
+  void PrintAllTargetWithNbDeps();
 
   void InitFastbuildNormalTargetGenerators();
 

@@ -27,7 +27,7 @@ public:
   std::vector<std::string> GetNameTargetLibraries(bool isMultiConfig,
                                                   std::string config);
 
-  static std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
+  std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
 
   void WriteTargetFB(const std::string& config);
 

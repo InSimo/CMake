@@ -179,7 +179,9 @@ cmFastbuildNormalTargetGenerator::GetNameTargetLibraries(bool isMultiConfig,
     this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
   std::vector<std::string> listImplicitDeps;
   for (std::string implicitDep : implicitDeps) {
-    listImplicitDeps.push_back(GetNameTargetLibrary(implicitDep, isMultiConfig, config));
+    std::string temp =
+      GetNameTargetLibrary(implicitDep, isMultiConfig, config);
+    if(!temp.empty())listImplicitDeps.push_back(temp);
   }
 
   return RemoveDuplicateName(listImplicitDeps);
@@ -207,11 +209,15 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
 
   nameFile = namePathFile.substr(found);
 
-  std::size_t found_point = nameFile.find('.');
+  std::size_t found_point = nameFile.rfind('.');
   if (found_point != std::string::npos) {
     nameTarget = nameFile.substr(0, found_point);
     if (nameFile.substr(found_point, 4) == ".lib")
       nameTarget = cmStrCat(nameTarget, "-lib");
+    else if (nameFile.substr(found_point, 9) == ".manifest") {
+      // We ignore .manifest
+      return "";
+    }
   }
 
   if (isMultiConfig) {

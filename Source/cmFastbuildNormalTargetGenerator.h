@@ -22,12 +22,17 @@ public:
 
   std::string GetNameFile(std::string namePathFile);
 
+  std::vector<std::string> GetFileDeps(std::string config);
+
   std::vector<std::string> RemoveDuplicateName(std::vector<std::string> listName);
 
   std::vector<std::string> GetNameTargetLibraries(bool isMultiConfig,
                                                   std::string config);
 
   std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
+
+  static std::string cmFastbuildNormalTargetGenerator::GetOutputExtension(
+    const std::string& lang);
 
   void WriteTargetFB(const std::string& config);
 

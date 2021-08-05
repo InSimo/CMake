@@ -15,6 +15,8 @@
 #include <cm/optional>
 #include <cm/vector>
 
+#include <filesystem>
+
 #include "cmComputeLinkInformation.h"
 #include "cmCustomCommand.h" // IWYU pragma: keep
 #include "cmCustomCommandGenerator.h"
@@ -123,6 +125,8 @@ std::vector<std::string> cmFastbuildNormalTargetGenerator::GetNameDepsTargets(co
   std::vector<std::string> listDeps;
   const cmFastbuildDeps depsPath = this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
   for (std::string depPath : depsPath) {
+    if (std::filesystem::exists(depPath))
+      continue;
     listDeps.push_back(cmStrCat(GetNameFile(depPath), config));
   }
   
@@ -169,6 +173,23 @@ std::string cmFastbuildNormalTargetGenerator::GetNameFile(std::string namePathFi
   }
   
   return nameTarget;
+}
+
+std::vector<std::string>
+cmFastbuildNormalTargetGenerator::GetFileDeps(std::string config)
+{
+  const cmFastbuildDeps implicitDeps =
+    this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
+  std::vector<std::string> listImplicitDeps;
+  for (std::string implicitDep : implicitDeps) {
+    std::size_t found_point = implicitDep.rfind('.');
+    if (found_point != std::string::npos &&
+        implicitDep.substr(found_point, 9) == ".manifest") {
+      continue;
+    }
+    listImplicitDeps.push_back(implicitDep);
+  }
+  return RemoveDuplicateName(listImplicitDeps);
 }
 
 std::vector<std::string>
@@ -225,6 +246,16 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
   }
 
   return nameTarget;
+}
+
+std::string cmFastbuildNormalTargetGenerator::GetOutputExtension(
+  const std::string& lang)
+{
+  if (lang == "C")
+    return "c";
+  if (lang == "CXX")
+    return "cpp";
+  return "";
 }
 
 void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
@@ -367,6 +398,10 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   std::ostream& os = this->GetCommonFileStream();
   std::string target_output =
     this->GetGeneratorTarget()->GetObjectDirectory(config);
+  std::string extension = ".obj";
+  std::string extension_lang = this->GetOutputExtension(language);
+  if (!extension_lang.empty())
+    extension = cmStrCat(".", extension_lang, extension);
 
   gfb->WriteCommand(os, "ObjectList", gfb->Quote(under_objectList_name));
   gfb->WritePushScope(os);
@@ -378,6 +413,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
     gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(compilerOptions),
                          "+");
   gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
+  gfb->WriteVariableFB(os, "CompilerOutputExtension", gfb->Quote(extension));
   gfb->WritePopScope(os);
 }
 
@@ -406,11 +442,11 @@ void cmFastbuildNormalTargetGenerator::GetTargetFlagsFB(
   localGen.GetTargetFlags(linkLineComputer.get(), config, linkLibs, flags,
                           linkFlags, frameworkPath, linkPath,
                           this->GetGeneratorTarget());
-  gfb->WriteSectionHeader(os,
+  /*gfb->WriteSectionHeader(os,
                           cmStrCat("GetTargetFlags linkLibs : ", linkLibs));
   gfb->WriteSectionHeader(os, cmStrCat("GetTargetFlags flags : ", flags));
   gfb->WriteSectionHeader(os,
-                          cmStrCat("GetTargetFlags linkFlags : ", linkFlags));
+                          cmStrCat("GetTargetFlags linkFlags : ", linkFlags));*/
 }
 
 void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
@@ -436,11 +472,11 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
   }
   
-  std::vector<std::string> implicitDeps = GetNameTargetLibraries(isMultiConfig, config);
-  std::string listImplicitDeps = "";
-  for (std::string implicitDep : implicitDeps) {
-    listImplicitDeps +=
-      gfb->Quote(implicitDep);
+  std::vector<std::string> fileDeps = GetFileDeps(config);
+  std::string listFileDeps = "";
+  for (std::string fileDep : fileDeps) {
+    listFileDeps +=
+      gfb->Quote(fileDep);
   }
 
   std::string linkLibs;
@@ -482,9 +518,9 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
                        gfb->Quote(cmOutputConverter::EscapeForCMake(
                          mf->GetSafeDefinition("CMAKE_LINKER"))));
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
-  if (!listImplicitDeps.empty())
+  if (!listFileDeps.empty())
     gfb->WriteVariableFB(os, "Libraries2",
-                         cmStrCat("{ ", listImplicitDeps, " }"));
+                         cmStrCat("{ ", listFileDeps, " }"));
   gfb->WriteCommand(
     os, "Using",
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
@@ -495,12 +531,14 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(cmake_arguments));
   gfb->WritePopScope(os);
 
+  // Alias
+  std::vector<std::string> implicitDeps =
+    GetNameTargetLibraries(isMultiConfig, config);
   std::string listImplicitDepsAlias = "";
   for (std::string implicitDep : implicitDeps) {
-    if(!implicitDep.empty()) listImplicitDepsAlias += gfb->Quote(cmStrCat(implicitDep, "-deps"));
+    if (!implicitDep.empty())
+      listImplicitDepsAlias += gfb->Quote(cmStrCat(implicitDep, "-deps"));
   }
-
-  // Alias
   std::string listDeps = listImplicitDepsAlias;
   listDeps += gfb->Quote(executable_name);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
@@ -549,11 +587,10 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
   }
 
-  std::vector<std::string> implicitDeps =
-    GetNameTargetLibraries(isMultiConfig, config);
-  std::string listImplicitDeps = "";
-  for (std::string implicitDep : implicitDeps) {
-    listImplicitDeps += gfb->Quote(implicitDep);
+  std::vector<std::string> fileDeps = GetFileDeps(config);
+  std::string listFileDeps = "";
+  for (std::string fileDep : fileDeps) {
+    listFileDeps += gfb->Quote(fileDep);
   }
 
   gfb->WriteCommand(os, "Library", gfb->Quote(library_name));
@@ -563,15 +600,20 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listImplicitDeps.empty())
-    gfb->WriteVariableFB(os, "Libraries2",
-                         cmStrCat("{ ", listImplicitDeps, " }"));
+  if (!listFileDeps.empty())
+    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listFileDeps, " }"));
   gfb->WriteVariableFB(
     os, "LibrarianOutput",
     cmStrCat("\'", target_output, "/", target_name, ".lib\'"));
   gfb->WritePopScope(os);
 
   // Alias
+  std::vector<std::string> implicitDeps =
+    GetNameTargetLibraries(isMultiConfig, config);
+  std::string listImplicitDeps = "";
+  for (std::string implicitDep : implicitDeps) {
+    listImplicitDeps += gfb->Quote(implicitDep);
+  }
   std::string listDeps = listImplicitDeps;
   listDeps += gfb->Quote(library_name);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
@@ -605,11 +647,10 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
   }
 
-  std::vector<std::string> implicitDeps =
-    GetNameTargetLibraries(isMultiConfig, config);
-  std::string listImplicitDeps = "";
-  for (std::string implicitDep : implicitDeps) {
-    listImplicitDeps += gfb->Quote(implicitDep);
+  std::vector<std::string> fileDeps = GetFileDeps(config);
+  std::string listFileDeps = "";
+  for (std::string fileDep : fileDeps) {
+    listFileDeps += gfb->Quote(fileDep);
   }
 
   // Create .lib
@@ -620,9 +661,8 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listImplicitDeps.empty())
-    gfb->WriteVariableFB(os, "Libraries2",
-                         cmStrCat("{ ", listImplicitDeps, " }"));
+  if (!listFileDeps.empty())
+    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listFileDeps, " }"));
   gfb->WriteVariableFB(
     os, "LibrarianOutput",
     gfb->Quote(cmStrCat(target_output, "/", target_name, ".lib")));
@@ -658,7 +698,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   cmake_arguments += " /dll";
 
   // Create .dll
-  listImplicitDeps += gfb->Quote(library_name);
+  listFileDeps += gfb->Quote(library_name);
 
   gfb->WriteCommand(os, "DLL", gfb->Quote(dll_name));
   gfb->WritePushScope(os);
@@ -681,7 +721,13 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   gfb->WritePopScope(os);
 
   // Alias
-  std::string listDeps = listImplicitDeps;
+  std::vector<std::string> implicitDeps =
+    GetNameTargetLibraries(isMultiConfig, config);
+  std::string listImplicitDeps = "";
+  for (std::string implicitDep : implicitDeps) {
+    listImplicitDeps += gfb->Quote(implicitDep);
+  }
+  std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
   listDeps += gfb->Quote(dll_name);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
                         listDeps, config);

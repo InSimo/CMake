@@ -334,7 +334,6 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     section_header_name = cmStrCat(target_name, " : ", config);
     objectList_name = cmStrCat(target_name, "-obj-", config);
   }
-
   gfb->WriteSectionHeader(os, section_header_name);
 
   std::string compilerOptions = "";
@@ -350,6 +349,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   std::string compilerOptionsTemp = "";
   std::vector<std::string> objectList;
   for (cmSourceFile const* sf : objectSources) {
+    // We treat .rc files differentely
     if (sf->GetExtension() == "rc") {
       this->WriteSourceFileRCFB(sf, config);
         continue;
@@ -489,6 +489,10 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   std::string pdb =
     cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
              this->GetGeneratorTarget()->GetPDBName(config));
+
+  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
+  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+
   cmake_arguments +=
     cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
   cmake_arguments += " --rc=$RC$";
@@ -499,7 +503,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
   cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");    // %2
   cmake_arguments +=
-    cmStrCat(" /implib:", target_output, "/", target_name, ".lib");
+    cmStrCat(" /implib:", implib);
   if (!pdb.empty())
     cmake_arguments += cmStrCat(" /pdb:", pdb);
   cmake_arguments += cmStrCat(" ", linkFlags, " ");
@@ -674,6 +678,9 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
              this->GetGeneratorTarget()->GetPDBName(config));
 
+  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
+  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+
   std::string linkLibs;
   std::string flags;
   std::string linkFlags;
@@ -689,7 +696,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
   cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");    // %2
   cmake_arguments +=
-    cmStrCat(" /implib:", target_output, "/", target_name, ".lib");
+    cmStrCat(" /implib:", implib);
   if (!pdb.empty())
     cmake_arguments += cmStrCat(" /pdb:", pdb);
   cmake_arguments += cmStrCat(" ", linkFlags, " ");

@@ -350,7 +350,10 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   std::string compilerOptionsTemp = "";
   std::vector<std::string> objectList;
   for (cmSourceFile const* sf : objectSources) {
-
+    if (sf->GetExtension() == "rc") {
+      this->WriteSourceFileRCFB(sf, config);
+        continue;
+    }
     compilerOptionsTemp =
       this->ComputeFlagsForObject(sf, language, config);
     compilerOptionsTemp += cmStrCat(
@@ -766,7 +769,53 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
   gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$Compiler$"));
   gfb->WriteVariableFB(os, "ExecArguments",
     cmStrCat("\' /nologo ", objectList, "\'"));
-  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(cmStrCat(target_output, "/", target_name, ".res"))); // .rc en .res (voir si autre extension)
+  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(cmStrCat(target_output, "/", target_name, ".res")));
+  gfb->WritePopScope(os);
+
+  // Alias
+  std::string listDeps = "";
+  listDeps += gfb->Quote(objlib_name);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
+                        listDeps, config);
+}
+
+void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(const cmSourceFile* sf, const std::string& config)
+{
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  std::ostream& os = this->GetCommonFileStream();
+  bool isMultiConfig = gfb->IsMultiConfig();
+  std::string target_output = this->GetTargetOutputDir(config);
+  cmMakefile* mf = this->GetMakefile();
+
+  std::string target_name = this->GetTargetName();
+  std::string language = this->TargetLinkLanguage(config);
+  std::string objlib_name;
+  std::string alias_name;
+
+  if (!isMultiConfig) {
+    objlib_name = cmStrCat(target_name, "-rc");
+    alias_name = cmStrCat(target_name, "-rc-deps");
+  } else {
+    objlib_name = cmStrCat(target_name, "-rc-", config);
+    alias_name = cmStrCat(target_name, "-rc-", config, "-deps");
+  }
+
+  std::vector<cmSourceFile const*> objectSources;
+  this->GeneratorTarget->GetObjectSources(objectSources, config);
+  std::string objectList = "";
+
+  objectList += cmStrCat("\"", sf->GetFullPath(), "\"");
+
+  gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
+  gfb->WritePushScope(os);
+  gfb->WriteVariableFB(os, "ExecExecutable",
+                       gfb->Quote(cmOutputConverter::EscapeForCMake(
+                         mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
+  gfb->WriteVariableFB(os, "ExecArguments",
+                       cmStrCat("\' /nologo ", objectList, "\'"));
+  gfb->WriteVariableFB(
+    os, "ExecOutput",
+    gfb->Quote(cmStrCat(target_output, "/", target_name, ".res")));
   gfb->WritePopScope(os);
 
   // Alias

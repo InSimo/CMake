@@ -86,6 +86,6 @@ private:
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
   void WriteDLLFB(const std::string& config);
-  void cmFastbuildNormalTargetGenerator::WriteRCFB(
-    const std::string& config);
+  void WriteRCFB(const std::string& config);
+  void WriteSourceFileRCFB(const cmSourceFile* sf, const std::string& config);
 };

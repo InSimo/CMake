@@ -254,6 +254,16 @@ std::string cmFastbuildNormalTargetGenerator::GetOutputExtension(
   return "";
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetPath(const std::string& fullPath)
+{
+  std::string path = "";
+  auto found = fullPath.rfind("/");
+  if (found != std::string::npos) {
+    path = fullPath.substr(0, found+1);
+  }
+  return path;
+}
+
 void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
 {  
   cmStateEnums::TargetType targetType = this->GetGeneratorTarget()->GetType();
@@ -332,6 +342,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     section_header_name = cmStrCat(target_name, " : ", config);
     objectList_name = cmStrCat(target_name, "-obj-", config);
   }
+  
   gfb->WriteSectionHeader(os, section_header_name);
 
   std::string compilerOptions = "";
@@ -343,13 +354,29 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     compilerOptions +=
       this->ComputeIncludes(objectSources[0], language, config);
   }
+
+  std::vector<std::string> output_objects;
+  this->GetGeneratorTarget()->GetTargetObjectNames(config, output_objects);
+
+  // For differentely output path
+  int nbSourceFile = 0;
+  std::string output_object_path;
+  if (!objectSources.empty())
+    output_object_path =
+      this->GetPath(this->GetPath(output_objects[0]));
+  std::string output_object_path_temp;
+
+  // For differentely compile options
   int nbObjectList = 1;
   std::string compilerOptionsTemp = "";
+
   std::vector<std::string> objectList;
   for (cmSourceFile const* sf : objectSources) {
+    output_object_path_temp = this->GetPath(output_objects[nbSourceFile]);
+    nbSourceFile++;
     // We treat .rc files differentely
     if (sf->GetExtension() == "rc") {
-      this->WriteSourceFileRCFB(sf, config);
+      this->WriteSourceFileRCFB(sf, config, output_object_path);
         continue;
     }
     compilerOptionsTemp =
@@ -359,23 +386,24 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     compilerOptionsTemp +=
       this->ComputeIncludes(sf, language, config);
 
-    if (compilerOptions != compilerOptionsTemp) {
+    if (compilerOptions != compilerOptionsTemp ||
+        output_object_path != output_object_path_temp) {
       std::string under_objectList_name =
         cmStrCat(objectList_name, "-", std::to_string(nbObjectList));
       this->WriteObjectListFB(config, language, under_objectList_name,
-                              objectList,
-                              compilerOptions);
+                              objectList, compilerOptions, output_object_path);
 
         compilerOptions = compilerOptionsTemp;
         objectList.clear();
         nbObjectList++;
+        output_object_path = output_object_path_temp;
     }
     objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
   std::string under_objectList_name =
     cmStrCat(objectList_name, "-", std::to_string(nbObjectList));
-  this->WriteObjectListFB(config, language, under_objectList_name,
-                            objectList, compilerOptions);
+  this->WriteObjectListFB(config, language, under_objectList_name, objectList,
+                          compilerOptions, output_object_path);
   std::string under_objectLists = gfb->Quote(under_objectList_name);
   for (int i = 1; i < nbObjectList; i++) {
     under_objectLists +=
@@ -388,13 +416,14 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
 
 void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   const std::string& config, const std::string& language,
-                       const std::string& under_objectList_name,
-                       std::vector<std::string> objectList, const std::string& compilerOptions)
+  const std::string& under_objectList_name,
+  std::vector<std::string> objectList, const std::string& compilerOptions,
+  const std::string& output_path)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = this->GetCommonFileStream();
-  std::string target_output =
-    this->GetGeneratorTarget()->GetObjectDirectory(config);
+  std::string object_output = cmStrCat(
+    this->GetGeneratorTarget()->GetObjectDirectory(config), output_path);
   std::string extension = ".obj";
   std::string extension_lang = this->GetOutputExtension(language);
   if (!extension_lang.empty())
@@ -409,7 +438,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   if (!compilerOptions.empty())
     gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(compilerOptions),
                          "+");
-  gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
+  gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(object_output));
   gfb->WriteVariableFB(os, "CompilerOutputExtension", gfb->Quote(extension));
   gfb->WritePopScope(os);
 }
@@ -784,12 +813,14 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
                         listDeps, config);
 }
 
-void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(const cmSourceFile* sf, const std::string& config)
+void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
+  const cmSourceFile* sf, const std::string& config, const std::string& output_path)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = this->GetCommonFileStream();
   bool isMultiConfig = gfb->IsMultiConfig();
-  std::string target_output = this->GetTargetOutputDir(config);
+  std::string object_output =
+    this->GetGeneratorTarget()->GetObjectDirectory(config);
   cmMakefile* mf = this->GetMakefile();
 
   std::string target_name = this->GetTargetName();
@@ -820,7 +851,8 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(const cmSourceFile* s
                        cmStrCat("\' /nologo ", objectList, "\'"));
   gfb->WriteVariableFB(
     os, "ExecOutput",
-    gfb->Quote(cmStrCat(target_output, "/", target_name, ".res")));
+                       gfb->Quote(cmStrCat(object_output, "/", output_path,
+                                           target_name, ".res")));
   gfb->WritePopScope(os);
 
   // Alias

@@ -34,6 +34,9 @@ public:
   static std::string cmFastbuildNormalTargetGenerator::GetOutputExtension(
     const std::string& lang);
 
+  static std::string cmFastbuildNormalTargetGenerator::GetPath(
+    const std::string& fullPath);
+
   void WriteTargetFB(const std::string& config);
 
 private:
@@ -80,12 +83,14 @@ private:
                          const std::string& language,
                          const std::string& under_objectList_name,
                          std::vector<std::string> objectList,
-                         const std::string& compilerOptions);
+                         const std::string& compilerOptions,
+                         const std::string& output_path);
   void GetTargetFlagsFB(const std::string& config, std::string& linkLibs,
                         std::string& flags, std::string& linkFlags);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
   void WriteDLLFB(const std::string& config);
   void WriteRCFB(const std::string& config);
-  void WriteSourceFileRCFB(const cmSourceFile* sf, const std::string& config);
+  void WriteSourceFileRCFB(const cmSourceFile* sf, const std::string& config,
+                           const std::string& output_path);
 };

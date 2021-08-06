@@ -286,8 +286,6 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
       this->GetCommonFileStream(),
       cmStrCat("NOT YET AVAILABLE : GLOBAL TARGET : ",
                this->GetTargetName()));
-    this->WriteObjectListsFB(config);
-    this->WriteExecutableFB(config);
   } else if (targetType == cmStateEnums::INTERFACE_LIBRARY) {
     this->GetGlobalGenerator()->WriteSectionHeader(
       this->GetCommonFileStream(),

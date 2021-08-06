@@ -280,11 +280,47 @@ void cmGlobalFastbuildGenerator::TargetTreatedFinish(cmGeneratorTarget* gt, cons
   std::string target_name = cmStrCat(gt->GetName(), config);
   this->MapFastbuildInfoTargets[target_name].is_treated = true;
   for(auto fit : this->MapFastbuildInfoTargets){
-    this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.first, fit.second.name_target_deps);
+    //this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.first, fit.second.name_target_deps);
+    for (std::string name_target_dep : fit.second.name_target_deps) {
+      if (target_name == name_target_dep)
+        this->MapFastbuildInfoTargets[fit.first].number_untrated_deps--;
+    }
 
     // If finally the target can be treat, we treat him immediately
-    if(this->CanTreatTargetFB(fit.second.gt, config)){
+    if (this->CanTreatTargetFB(
+          fit.second.gt, this->MapFastbuildInfoTargets[fit.first].config)) {
       cmFastbuildNormalTargetGenerator(this->MapFastbuildInfoTargets[fit.first].gt).Generate(this->MapFastbuildInfoTargets[fit.first].config);
+    }
+  }
+}
+
+void cmGlobalFastbuildGenerator::DecrementNbDepsTargetUnexist()
+{
+  for (auto fit : this->MapFastbuildInfoTargets) {
+    if (!fit.second.is_treated) {
+      for (std::string name_target_dep : fit.second.name_target_deps) {
+        // if the target does not exist in the map,
+        // we have considered that this dependency does not need to be processed by cmake
+        // and that we do not need in the order of the dependencies
+        if (this->MapFastbuildInfoTargets.find(name_target_dep) ==
+            this->MapFastbuildInfoTargets.end()) {
+          this->MapFastbuildInfoTargets[fit.first].number_untrated_deps--;
+        }
+      }
+    }
+  }
+}
+
+void cmGlobalFastbuildGenerator::lastChanceToTreatTargets()
+{
+  this->DecrementNbDepsTargetUnexist();
+  for (auto fit : this->MapFastbuildInfoTargets) {
+    if (!fit.second.is_treated) {
+      if (this->CanTreatTargetFB(fit.second.gt, fit.second.config)) {
+        cmFastbuildNormalTargetGenerator(
+          this->MapFastbuildInfoTargets[fit.first].gt)
+          .Generate(this->MapFastbuildInfoTargets[fit.first].config);
+      }
     }
   }
 }
@@ -742,14 +778,18 @@ void cmGlobalFastbuildGenerator::Generate()
   this->linePrefix = "";
   this->closingScope = "";
 
+
+  // For Fastbuild
   // this->WriteSettings(*this->GetCommonFileStream());
   this->WritePlaceholders(*this->GetCommonFileStream());
 
   this->cmGlobalGenerator::Generate();
 
-  this->WriteTargetAliasesFB(*this->GetCommonFileStream());
+  this->lastChanceToTreatTargets();
 
+  this->WriteTargetAliasesFB(*this->GetCommonFileStream());
   this->PrintAllTargetWithNbDeps();
+
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());

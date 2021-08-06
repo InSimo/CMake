@@ -488,6 +488,12 @@ public:
 
   void TargetTreatedFinish(cmGeneratorTarget* gt, const std::string& config);
 
+  void DecrementNbDepsTargetUnexist();
+
+  void lastChanceToTreatTargets();
+
+  void PrintAllTargetWithNbDeps();
+
   std::string GetDefaultFileConfig()
   {
     return DefaultFileConfig;
@@ -556,8 +562,6 @@ private:
     std::string config;
   };
   std::map<std::string, cmFastbuildInfoTarget> MapFastbuildInfoTargets;
-
-  void PrintAllTargetWithNbDeps();
 
   void InitFastbuildNormalTargetGenerators();
 

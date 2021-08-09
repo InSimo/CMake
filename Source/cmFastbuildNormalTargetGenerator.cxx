@@ -574,21 +574,10 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
                         listDeps, config);
 
-  if (isMultiConfig) {
-    // For success cmake basic test with Multi-Config
-    if (gfb->GetDefaultFileConfig() == config) {
-      gfb->WriteCommand(os, "Executable", gfb->Quote(target_name));
-      gfb->WritePushScope(os);
-      gfb->WriteVariableFB(
-        os, "Libraries",
-        cmStrCat("{ \"", target_name, "-obj-", config, "\" }"));
-      gfb->WriteCommand(
-        os, "Using",
-        cmStrCat(".Compiler", language, config, this->GetTargetName()));
-      gfb->WriteVariableFB(os, "LinkerOutput",
-                           gfb->Quote(cmStrCat("out/", target_name, ".exe")));
-      gfb->WritePopScope(os);
-    }
+  if (isMultiConfig && gfb->GetDefaultFileConfig() == config) {
+    // Have the good name alias for success cmake basic test with Multi-Config
+    gfb->WriteAliasFB(os, gfb->Quote(target_name),
+                      gfb->Quote(executable_name));
   }
 }
 
@@ -814,16 +803,20 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
 }
 
 void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
-  const cmSourceFile* sf, const std::string& config, const std::string& output_path)
+  const cmSourceFile* sf, const std::string& config,
+  const std::string& output_path)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = this->GetCommonFileStream();
   bool isMultiConfig = gfb->IsMultiConfig();
-  std::string object_output =
-    this->GetGeneratorTarget()->GetObjectDirectory(config);
   cmMakefile* mf = this->GetMakefile();
 
   std::string target_name = this->GetTargetName();
+  std::string object_output = cmStrCat(
+    this->GetGeneratorTarget()->GetObjectDirectory(config), output_path);
+  std::string outputRC = cmStrCat(object_output, "/", target_name, ".res");
+
+  
   std::string language = this->TargetLinkLanguage(config);
   std::string objlib_name;
   std::string alias_name;
@@ -844,15 +837,13 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
 
   gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
   gfb->WritePushScope(os);
-  gfb->WriteVariableFB(os, "ExecExecutable",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
+  gfb->WriteVariableFB(os, "ExecRC",
+                       gfb->Quote(mf->GetSafeDefinition("CMAKE_RC_COMPILER")));
+  gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$ExecRC$"));
   gfb->WriteVariableFB(os, "ExecArguments",
-                       cmStrCat("\' /nologo ", objectList, "\'"));
+    cmStrCat("\' /nologo ", objectList, "/fo ", outputRC, "\'"));
   gfb->WriteVariableFB(
-    os, "ExecOutput",
-                       gfb->Quote(cmStrCat(object_output, "/", output_path,
-                                           target_name, ".res")));
+    os, "ExecOutput", gfb->Quote(outputRC));
   gfb->WritePopScope(os);
 
   // Alias

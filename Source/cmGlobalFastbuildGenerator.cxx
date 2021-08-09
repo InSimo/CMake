@@ -233,9 +233,10 @@ void cmGlobalFastbuildGenerator::WriteAliasFB(std::ostream& os,
 
 void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, std::vector<std::string> name_target_deps, const std::string& config)
 {
+  std::string target_name = cmStrCat(gt->GetName(), config);
   // We add the target whether she is not already in the map
-  if(this->MapFastbuildInfoTargets.find(gt->GetName()) == this->MapFastbuildInfoTargets.end()){
-    std::string target_name = cmStrCat(gt->GetName(), config);
+  if (this->MapFastbuildInfoTargets.find(target_name) ==
+      this->MapFastbuildInfoTargets.end()) {
     cmFastbuildInfoTarget fbt;
     fbt.is_treated = false;
     fbt.config = config;
@@ -789,7 +790,6 @@ void cmGlobalFastbuildGenerator::Generate()
 
   this->WriteTargetAliasesFB(*this->GetCommonFileStream());
   this->PrintAllTargetWithNbDeps();
-
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());

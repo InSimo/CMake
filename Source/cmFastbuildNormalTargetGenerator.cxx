@@ -765,6 +765,7 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
 
   std::string target_name = this->GetTargetName();
   std::string language = this->TargetLinkLanguage(config);
+  std::string outputRC = cmStrCat(target_output, "/", target_name, ".rc.res");
   std::string objlib_name;
   std::string alias_name;
 
@@ -791,8 +792,8 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
     cmStrCat(".Compiler", language, config, target_name));
   gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$Compiler$"));
   gfb->WriteVariableFB(os, "ExecArguments",
-    cmStrCat("\' /nologo ", objectList, "\'"));
-  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(cmStrCat(target_output, "/", target_name, ".res")));
+    cmStrCat("\' /fo \"", outputRC,"\" /nologo ", objectList, "\'"));
+  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(outputRC));
   gfb->WritePopScope(os);
 
   // Alias
@@ -814,7 +815,7 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
   std::string target_name = this->GetTargetName();
   std::string object_output = cmStrCat(
     this->GetGeneratorTarget()->GetObjectDirectory(config), output_path);
-  std::string outputRC = cmStrCat(object_output, "/", target_name, ".res");
+  std::string outputRC = cmStrCat(object_output, "/", target_name, ".rc.res");
 
   
   std::string language = this->TargetLinkLanguage(config);
@@ -841,7 +842,7 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
                        gfb->Quote(mf->GetSafeDefinition("CMAKE_RC_COMPILER")));
   gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$ExecRC$"));
   gfb->WriteVariableFB(os, "ExecArguments",
-    cmStrCat("\' /nologo ", objectList, "/fo ", outputRC, "\'"));
+    cmStrCat("\' /fo \"", outputRC, "\" /nologo ", objectList, "\'"));
   gfb->WriteVariableFB(
     os, "ExecOutput", gfb->Quote(outputRC));
   gfb->WritePopScope(os);

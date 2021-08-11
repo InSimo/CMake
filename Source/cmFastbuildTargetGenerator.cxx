@@ -945,54 +945,6 @@ void cmFastbuildTargetGenerator::WriteCompileRule(const std::string& lang,
   rule.Comment = cmStrCat("Rule for compiling ", lang, " files.");
   rule.Description = cmStrCat("Building ", lang, " object $out");
   //this->GetGlobalGenerator()->AddRule(rule);
-
-  // For Fastbuild
-  this->WriteCompileFB(lang, config);
-}
-
-void cmFastbuildTargetGenerator::WriteCompileFB(const std::string& lang,
-                                                const std::string& config)
-{
-  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  cmMakefile* mf = this->GetMakefile();
-  std::ostream& os = this->GetRulesFileStream();
-  std::string project_name = this->GetTargetName();
-
-  std::string const& compilerId = mf->GetSafeDefinition(
-    cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
-  
-  
-
-  std::string executable =
-    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-  std::string flags = " /nologo ";
-  std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
-
-  std::string linker = mf->GetSafeDefinition("CMAKE_LINKER");
-
-  //gfb->WriteSectionHeader(os, this->GetGeneratorTarget()->GetCompilePDBPath(config));
-  
-
-  std::string link_flags = "\"%1\" /OUT:\"%2\" /nologo ";
-  link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
-
-  if (compilerId == "MSVC") {
-    flags += "/c \"%1\" /Fo\"%2\" ";
-    // if multiple CL.EXE write to the same .PDB file, please use /FS
-    if (config == "Debug" || config == "RelWithDebInfo") flags += "/FS ";
-  }
-  
-  gfb->WriteSectionHeader(os, "Compilers");
-  gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),
-                       "");
-  gfb->WritePushScopeStruct(os);
-  gfb->WriteVariableFB(os, "Compiler", gfb->Quote(executable));
-  gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags));
-  gfb->WriteVariableFB(os, "Librarian", gfb->Quote(create_static_library));
-  gfb->WriteVariableFB(os, "LibrarianOptions", gfb->Quote(link_flags));
-  gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker));
-  gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(link_flags));
-  gfb->WritePopScope(os);
 }
 
 void cmFastbuildTargetGenerator::WriteObjectBuildStatements(

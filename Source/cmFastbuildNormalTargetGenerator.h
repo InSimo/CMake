@@ -78,6 +78,7 @@ private:
   std::string TargetLinkLanguage(const std::string& config) const;
   std::string DeviceLinkObject;
 
+  void WriteCompileFB(const std::string& config);
   void WriteObjectListsFB(const std::string& config);
   void WriteObjectListFB(const std::string& config,
                          const std::string& language,

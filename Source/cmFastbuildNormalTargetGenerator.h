@@ -20,7 +20,7 @@ public:
 
   std::vector<std::string> GetNameDepsTargets(const std::string& config);
 
-  std::string GetNameFile(std::string namePathFile);
+  static std::string GetNameFile(std::string namePathFile);
 
   std::vector<std::string> GetFileDeps(std::string config);
 

@@ -343,6 +343,14 @@ void cmGlobalFastbuildGenerator::PrintAllTargetWithNbDeps()
   }
 }
 
+std::ostream& cmGlobalFastbuildGenerator::GetFileStream(const std::string& config, bool isMultiConfig)
+{
+  if (!isMultiConfig)
+    return *this->GetCommonFileStream();
+  else
+    return *this->GetImplFileStream(config);
+}
+
 std::unique_ptr<cmLinkLineComputer>
 cmGlobalFastbuildGenerator::CreateLinkLineComputer(
   cmOutputConverter* outputConverter,
@@ -570,6 +578,89 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuild(
   }
 }
 
+void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
+  std::vector<std::string> commands, const std::string& description,
+  const std::string& comment, const std::string& depfile,
+  const std::string& job_pool, bool uses_terminal, bool restat,
+  const cmFastbuildDeps& outputs, const std::string& config,
+  const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps)
+{
+  std::string command = "";
+  int i = 0;
+  for (auto a : commands) {
+    if (i > 1 && i<commands.size())
+      command += " && ";
+    command += a;
+    i++;
+  }
+  std::string output = ""; 
+  for (auto a : outputs) {
+    output += a;
+  }
+  std::string explicitDep = "";
+  for (auto a : explicitDeps) {
+    explicitDep += " ";
+    explicitDep += a;
+  }
+  std::string orderOnlyDep = "";
+  for (auto a : orderOnlyDeps) {
+    orderOnlyDep += " ";
+    orderOnlyDep += a;
+  }
+
+  std::string name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
+  auto it = name_exec.find("-");
+  while (it != std::string::npos) {
+    name_exec.replace(it, 1, "_");
+    it = name_exec.find("-");
+  }
+
+  if (!this->IsMultiConfig()) {
+    std::ostream& os = *this->GetCommonFileStream();
+
+    this->WriteSectionHeader(os, comment);
+    this->WriteCommand(os, "Exec", this->Quote(name_exec));
+    this->WritePushScope(os);
+    this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
+    this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
+    this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
+    this->WritePopScope(os);
+    /*
+    this->WriteSectionHeader(os, cmStrCat("COMMAND : ", command));
+    this->WriteSectionHeader(os, cmStrCat("DESCRIPTION : ", description));
+    this->WriteSectionHeader(os, cmStrCat("COMMENT : ", comment));
+    this->WriteSectionHeader(os, cmStrCat("DEPFILE : ", depfile));
+    this->WriteSectionHeader(os, cmStrCat("JOB POOL : ", job_pool));
+    this->WriteSectionHeader(os, cmStrCat("OUTPUTS : ", output));
+    this->WriteSectionHeader(os, cmStrCat("EXPLICIT DEPS : ", explicitDep));
+    this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
+    */
+    
+  } else {
+    std::ostream& os = *this->GetImplFileStream(config);
+
+    this->WriteSectionHeader(os, comment);
+    this->WriteCommand(os, "Exec", this->Quote(name_exec));
+    this->WritePushScope(os);
+    this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
+    this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
+    this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
+    this->WritePopScope(os);
+    /*
+    this->WriteSectionHeader(os, cmStrCat("COMMAND : ", command));
+    this->WriteSectionHeader(os, cmStrCat("DESCRIPTION : ", description));
+    this->WriteSectionHeader(os, cmStrCat("COMMENT : ", comment));
+    this->WriteSectionHeader(os, cmStrCat("DEPFILE : ", depfile));
+    this->WriteSectionHeader(os, cmStrCat("JOB POOL : ", job_pool));
+    this->WriteSectionHeader(os, cmStrCat("OUTPUTS : ", output));
+    this->WriteSectionHeader(os, cmStrCat("EXPLICIT DEPS : ", explicitDep));
+    this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
+    */
+  }
+  std::string alias_name = cmStrCat(name_exec, "-deps");
+  this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec), config);
+}
+
 void cmGlobalFastbuildGenerator::AddMacOSXContentRule()
 {
   cmFastbuildRule rule("COPY_OSX_CONTENT");
@@ -788,7 +879,7 @@ void cmGlobalFastbuildGenerator::Generate()
 
   this->lastChanceToTreatTargets();
 
-  this->WriteTargetAliasesFB(*this->GetCommonFileStream());
+  this->WriteTargetAliasesFB();
   this->PrintAllTargetWithNbDeps();
 
   this->WriteAssumedSourceDependencies();
@@ -1605,23 +1696,22 @@ void cmGlobalFastbuildGenerator::AppendTargetDependsClosure(
 }
 
 void cmGlobalFastbuildGenerator::AddTargetAliasFB(const std::string& alias,
-                                                  cmGeneratorTarget* target,
                                                   std::string listDeps,
                                                   const std::string& config)
 {
   if (this->TargetAliasesFB.find(alias) == this->TargetAliasesFB.end()) {
     TargetAliasFB ta;
     ta.Config = config;
-    ta.GeneratorTarget = target;
     ta.ListDeps = listDeps;
     this->TargetAliasesFB.insert(std::make_pair(alias, ta));
     this->TargetAliasesOrderedFB.push_back(alias);
   }
 }
 
-void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
+void cmGlobalFastbuildGenerator::WriteTargetAliasesFB()
 {
   if (!IsMultiConfig()) {
+    std::ostream& os = *this->GetCommonFileStream();
     std::string listDepsAll = "";
     this->WriteSectionHeader(os, "Target aliases");
     for (std::string name_alias : this->TargetAliasesOrderedFB) {
@@ -1639,6 +1729,7 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
     configs["Release"] = "";
 
     for (auto config : configs) {
+      std::ostream& os = *this->GetImplFileStream(config.first);
       this->WriteSectionHeader(os,
                                cmStrCat("Target aliases : ", config.first));
       for (std::string name_alias : this->TargetAliasesOrderedFB) {
@@ -1650,12 +1741,10 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB(std::ostream& os)
         configs[ta.Config] += name_alias;
       }
     }
-    this->WriteSectionHeader(os, "Target aliases All");
     for (auto config : configs) {
-      WriteAliasFB(os, Quote(cmStrCat("all-", config.first)), config.second);
+      WriteAliasFB(*this->GetImplFileStream(config.first),
+                   Quote("all"), config.second);
     }
-    WriteAliasFB(os, Quote("all"),
-               Quote(cmStrCat("all-", this->GetDefaultFileConfig())));
   }
 }
 

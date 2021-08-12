@@ -671,7 +671,7 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
         customStep += '-';
         customStep += ccg.GetOutputConfig();
       }
-      // Hash full path to make unique.
+      // Hash full path to make unique.WriteCustomCommandBuildStatement
       customStep += '-';
       cmCryptoHash hash(cmCryptoHash::AlgoSHA256);
       customStep += hash.HashString(fastbuildOutputs[0]).substr(0, 7);
@@ -701,7 +701,7 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
             break;
         }
       }
-
+      
       gg->WriteCustomCommandBuild(
         this->BuildCommandLine(cmdLines, ccg.GetOutputConfig(), fileConfig,
                                customStep),
@@ -709,6 +709,20 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
         depfile, cc->GetJobPool(), cc->GetUsesTerminal(),
         /*restat*/ !symbolic || !byproducts.empty(), fastbuildOutputs, fileConfig,
         fastbuildDeps, orderOnlyDeps);
+
+      // For Fastbuild
+      gg->WriteSectionHeader(
+        this->GetCommonFileStream(),
+        cmStrCat("COMMAND LINE : ",
+                 this->BuildCommandLine(cmdLines, ccg.GetOutputConfig(),
+                                        fileConfig, customStep)));
+      gg->WriteCustomCommandBuildFB(
+        cmdLines,
+        this->ConstructComment(ccg),
+        "Custom command for " + fastbuildOutputs[0], depfile, cc->GetJobPool(),
+        cc->GetUsesTerminal(),
+        /*restat*/ !symbolic || !byproducts.empty(), fastbuildOutputs,
+        fileConfig, fastbuildDeps, orderOnlyDeps);
     }
   }
 }

@@ -121,6 +121,13 @@ public:
     const cmFastbuildDeps& explicitDeps = cmFastbuildDeps(),
     const cmFastbuildDeps& orderOnlyDeps = cmFastbuildDeps());
 
+  void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
+    std::vector<std::string> commands, const std::string& description,
+    const std::string& comment, const std::string& depfile,
+    const std::string& job_pool, bool uses_terminal, bool restat,
+    const cmFastbuildDeps& outputs, const std::string& config,
+    const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps);
+
   void WriteMacOSXContentBuild(std::string input, std::string output,
                                const std::string& config);
 
@@ -454,8 +461,8 @@ public:
 
   // For Fastbuild
 
-  void AddTargetAliasFB(const std::string& alias, cmGeneratorTarget* target,
-                        std::string listDeps, const std::string& config);
+  void AddTargetAliasFB(const std::string& alias, std::string listDeps,
+                        const std::string& config);
 
   void WriteCommentFB(std::ostream& os, const std::string& comment);
 
@@ -493,6 +500,8 @@ public:
   void lastChanceToTreatTargets();
 
   void PrintAllTargetWithNbDeps();
+
+  std::ostream& GetFileStream(const std::string& config, bool isMultiConfig);
 
   std::string GetDefaultFileConfig()
   {
@@ -551,7 +560,7 @@ private:
   void WriteAssumedSourceDependencies();
 
   // For Fastbuild
-  void WriteTargetAliasesFB(std::ostream& os);
+  void WriteTargetAliasesFB();
 
   struct cmFastbuildInfoTarget
   {
@@ -631,7 +640,6 @@ private:
 
   struct TargetAliasFB
   {
-    cmGeneratorTarget* GeneratorTarget;
     std::string Config;
     std::string ListDeps;
   };
@@ -744,7 +752,7 @@ public:
     return "";
   }
 
-  const char* GetCMakeCFGIntDir() const override { return "${CONFIGURATION}"; }
+  const char* GetCMakeCFGIntDir() const override { return "$CONFIGURATION$"; }
 
   std::string ExpandCFGIntDir(const std::string& str,
                               const std::string& config) const override;

@@ -145,7 +145,6 @@ std::vector<std::string> cmFastbuildNormalTargetGenerator::RemoveDuplicateName(s
 std::string cmFastbuildNormalTargetGenerator::GetNameFile(std::string namePathFile)
 {
   std::string nameFile = "";
-  std::string nameTarget = "";
   std::size_t found = 0;
   std::size_t found1 = namePathFile.rfind('/');
   std::size_t found2 = namePathFile.rfind('\\');
@@ -165,10 +164,10 @@ std::string cmFastbuildNormalTargetGenerator::GetNameFile(std::string namePathFi
 
   std::size_t found_point = nameFile.find('.');
   if (found_point != std::string::npos) {
-    nameTarget = nameFile.substr(0, found_point);
+    nameFile = nameFile.substr(0, found_point);
   }
   
-  return nameTarget;
+  return nameFile;
 }
 
 std::vector<std::string>
@@ -364,7 +363,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
 void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
 
   std::vector<cmSourceFile const*> objectSources;
@@ -463,7 +462,8 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   const std::string& output_path)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
+
   std::string object_output = cmStrCat(
     this->GetGeneratorTarget()->GetObjectDirectory(config), output_path);
   std::string extension = ".obj";
@@ -490,7 +490,7 @@ void cmFastbuildNormalTargetGenerator::GetTargetFlagsFB(
   std::string& linkFlags)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
 
   std::string createRule = this->GetGeneratorTarget()->GetCreateRuleVariable(
     this->TargetLinkLanguage(config), config);
@@ -521,7 +521,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
   std::string language = this->TargetLinkLanguage(config);
 
@@ -613,8 +613,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   }
   std::string listDeps = listImplicitDepsAlias;
   listDeps += gfb->Quote(executable_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
-                        listDeps, config);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
 
   if (isMultiConfig && gfb->GetDefaultFileConfig() == config) {
     // Have the good name alias for success cmake basic test with Multi-Config
@@ -627,7 +626,7 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
 
   std::string language = this->TargetLinkLanguage(config);
@@ -677,14 +676,13 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   }
   std::string listDeps = listImplicitDeps;
   listDeps += gfb->Quote(library_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
-                        listDeps, config);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
 
   std::string language = this->TargetLinkLanguage(config);
@@ -793,15 +791,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   }
   std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
   listDeps += gfb->Quote(dll_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
-                        listDeps, config);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteRCFB(
   const std::string& config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
   std::string target_output = this->GetTargetOutputDir(config);
 
@@ -841,8 +838,7 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
   // Alias
   std::string listDeps = "";
   listDeps += gfb->Quote(objlib_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
-                        listDeps, config);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
@@ -850,7 +846,7 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
   const std::string& output_path)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
-  std::ostream& os = this->GetCommonFileStream();
+  std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
   cmMakefile* mf = this->GetMakefile();
 
@@ -892,8 +888,7 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
   // Alias
   std::string listDeps = "";
   listDeps += gfb->Quote(objlib_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), this->GetGeneratorTarget(),
-                        listDeps, config);
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
 }
 
 

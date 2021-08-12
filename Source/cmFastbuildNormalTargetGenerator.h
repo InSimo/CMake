@@ -85,13 +85,11 @@ private:
                          const std::string& under_objectList_name,
                          std::vector<std::string> objectList,
                          const std::string& compilerOptions,
-                         const std::string& output_path);
+                         const std::string& output_path,
+                         const std::string& SourceFileExtension);
   void GetTargetFlagsFB(const std::string& config, std::string& linkLibs,
                         std::string& flags, std::string& linkFlags);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
   void WriteDLLFB(const std::string& config);
-  void WriteRCFB(const std::string& config);
-  void WriteSourceFileRCFB(const cmSourceFile* sf, const std::string& config,
-                           const std::string& output_path);
 };

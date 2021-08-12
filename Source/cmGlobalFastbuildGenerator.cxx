@@ -583,19 +583,30 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   const std::string& comment, const std::string& depfile,
   const std::string& job_pool, bool uses_terminal, bool restat,
   const cmFastbuildDeps& outputs, const std::string& config,
-  const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps)
+  const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps,
+  const std::string&  random_name_file)
 {
+  std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
   std::string command = "";
   int i = 0;
   for (auto a : commands) {
+    if (i == 0 && commands.size() > 1) {
+      i++;
+      continue;
+    }
     if (i > 1 && i<commands.size())
       command += " && ";
     command += a;
     i++;
   }
+
   std::string output = ""; 
   for (auto a : outputs) {
     output += a;
+    if (!random_name_file.empty()) {
+      output += "/";
+      output += random_name_file;
+    }
   }
   std::string explicitDep = "";
   for (auto a : explicitDeps) {
@@ -608,6 +619,13 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     orderOnlyDep += a;
   }
 
+  if (!random_name_file.empty()) {
+    // We must create a output file
+    command += " && ";
+    command += "type nul > ";
+    command += output;
+  }
+
   std::string name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
   auto it = name_exec.find("-");
   while (it != std::string::npos) {
@@ -615,48 +633,26 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     it = name_exec.find("-");
   }
 
-  if (!this->IsMultiConfig()) {
-    std::ostream& os = *this->GetCommonFileStream();
+  this->WriteSectionHeader(os, comment);
+  this->WriteCommand(os, "Exec", this->Quote(name_exec));
+  this->WritePushScope(os);
+  this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
+  this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
+  this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
+  this->WriteVariableFB(os, "ExecWorkingDir", this->Quote("./"));
+  this->WriteVariableFB(os, "ExecAlways", "true");
+  this->WritePopScope(os);
+  /*
+  this->WriteSectionHeader(os, cmStrCat("COMMAND : ", command));
+  this->WriteSectionHeader(os, cmStrCat("DESCRIPTION : ", description));
+  this->WriteSectionHeader(os, cmStrCat("COMMENT : ", comment));
+  this->WriteSectionHeader(os, cmStrCat("DEPFILE : ", depfile));
+  this->WriteSectionHeader(os, cmStrCat("JOB POOL : ", job_pool));
+  this->WriteSectionHeader(os, cmStrCat("OUTPUTS : ", output));
+  this->WriteSectionHeader(os, cmStrCat("EXPLICIT DEPS : ", explicitDep));
+  this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
+  */
 
-    this->WriteSectionHeader(os, comment);
-    this->WriteCommand(os, "Exec", this->Quote(name_exec));
-    this->WritePushScope(os);
-    this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
-    this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
-    this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
-    this->WritePopScope(os);
-    /*
-    this->WriteSectionHeader(os, cmStrCat("COMMAND : ", command));
-    this->WriteSectionHeader(os, cmStrCat("DESCRIPTION : ", description));
-    this->WriteSectionHeader(os, cmStrCat("COMMENT : ", comment));
-    this->WriteSectionHeader(os, cmStrCat("DEPFILE : ", depfile));
-    this->WriteSectionHeader(os, cmStrCat("JOB POOL : ", job_pool));
-    this->WriteSectionHeader(os, cmStrCat("OUTPUTS : ", output));
-    this->WriteSectionHeader(os, cmStrCat("EXPLICIT DEPS : ", explicitDep));
-    this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
-    */
-    
-  } else {
-    std::ostream& os = *this->GetImplFileStream(config);
-
-    this->WriteSectionHeader(os, comment);
-    this->WriteCommand(os, "Exec", this->Quote(name_exec));
-    this->WritePushScope(os);
-    this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
-    this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
-    this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
-    this->WritePopScope(os);
-    /*
-    this->WriteSectionHeader(os, cmStrCat("COMMAND : ", command));
-    this->WriteSectionHeader(os, cmStrCat("DESCRIPTION : ", description));
-    this->WriteSectionHeader(os, cmStrCat("COMMENT : ", comment));
-    this->WriteSectionHeader(os, cmStrCat("DEPFILE : ", depfile));
-    this->WriteSectionHeader(os, cmStrCat("JOB POOL : ", job_pool));
-    this->WriteSectionHeader(os, cmStrCat("OUTPUTS : ", output));
-    this->WriteSectionHeader(os, cmStrCat("EXPLICIT DEPS : ", explicitDep));
-    this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
-    */
-  }
   std::string alias_name = cmStrCat(name_exec, "-deps");
   this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec), config);
 }

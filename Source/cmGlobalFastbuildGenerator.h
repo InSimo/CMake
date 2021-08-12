@@ -121,12 +121,13 @@ public:
     const cmFastbuildDeps& explicitDeps = cmFastbuildDeps(),
     const cmFastbuildDeps& orderOnlyDeps = cmFastbuildDeps());
 
-  void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
+  void WriteCustomCommandBuildFB(
     std::vector<std::string> commands, const std::string& description,
     const std::string& comment, const std::string& depfile,
     const std::string& job_pool, bool uses_terminal, bool restat,
     const cmFastbuildDeps& outputs, const std::string& config,
-    const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps);
+    const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps,
+    const std::string& random_name_file);
 
   void WriteMacOSXContentBuild(std::string input, std::string output,
                                const std::string& config);

@@ -631,6 +631,7 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
 
     bool symbolic = false;
     for (std::string const& output : outputs) {
+      gg->WriteSectionHeader(this->GetCommonFileStream(), cmStrCat("OUPUT LIST : ", output));
       if (cmSourceFile* sf = this->Makefile->GetSource(output)) {
         if (sf->GetPropertyAsBool("SYMBOLIC")) {
           symbolic = true;
@@ -711,6 +712,11 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
         fastbuildDeps, orderOnlyDeps);
 
       // For Fastbuild
+
+      // Creates a file to replace the fact that the command does not create any
+      std::string random_name_file = "";
+      if(byproducts.empty()) random_name_file = hash.HashString(fastbuildOutputs[0]).substr(0, 7);
+
       gg->WriteSectionHeader(
         this->GetCommonFileStream(),
         cmStrCat("COMMAND LINE : ",
@@ -722,7 +728,7 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
         "Custom command for " + fastbuildOutputs[0], depfile, cc->GetJobPool(),
         cc->GetUsesTerminal(),
         /*restat*/ !symbolic || !byproducts.empty(), fastbuildOutputs,
-        fileConfig, fastbuildDeps, orderOnlyDeps);
+        fileConfig, fastbuildDeps, orderOnlyDeps, random_name_file);
     }
   }
 }

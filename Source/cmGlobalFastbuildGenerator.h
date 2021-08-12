@@ -503,6 +503,8 @@ public:
 
   std::ostream& GetFileStream(const std::string& config, bool isMultiConfig);
 
+  std::map<std::string, std::string> MapCompilersFB;
+
   std::string GetDefaultFileConfig()
   {
     return DefaultFileConfig;

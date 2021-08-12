@@ -250,6 +250,8 @@ std::string cmFastbuildNormalTargetGenerator::GetOutputExtension(
     return "c";
   if (lang == "CXX")
     return "cpp";
+  if (lang == "RC")
+    return "rc";
   return "";
 }
 
@@ -270,7 +272,8 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
 
   if (this->TargetLinkLanguage(config) == "RC") {
     // Fastbuild can't treat the rc compiler, we treat it differentely
-    this->WriteRCFB(config);
+    this->WriteObjectListsFB(config);
+    //this->WriteRCFB(config);
   } else if (targetType == cmStateEnums::EXECUTABLE) {
     this->WriteObjectListsFB(config);
     this->WriteExecutableFB(config);
@@ -327,11 +330,27 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
   std::string project_name = this->GetTargetName();
   std::string lang = this->GetGeneratorTarget()->GetLinkerLanguage(config);
 
+  if (gfb->MapCompilersFB.find(lang) == gfb->MapCompilersFB.end()) {
+    // The compiler isn't yet defined for this lang
+    std::string executable =
+      mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
+
+    gfb->WriteSectionHeader(os, cmStrCat("Compiler ", gfb->Quote(lang)));
+    gfb->WriteCommand(os, "Compiler", gfb->Quote(lang));
+    gfb->WritePushScope(os);
+    gfb->WriteVariableFB(os, "Executable", gfb->Quote(executable));
+    if (lang == "RC")
+      gfb->WriteVariableFB(os, "CompilerFamily", gfb->Quote("custom"));
+    gfb->WritePopScope(os);
+
+    // We backup the treat compiler
+    gfb->MapCompilersFB[lang] = "";
+  }
+
   std::string const& compilerId =
     mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
 
-  std::string executable =
-    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
+  
   std::string flags = " /nologo ";
   std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
 
@@ -347,11 +366,11 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
       flags += "/FS ";
   }
 
-  gfb->WriteSectionHeader(os, "Compilers");
+  gfb->WriteSectionHeader(os, "Info Compilers");
   gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),
                        "");
   gfb->WritePushScopeStruct(os);
-  gfb->WriteVariableFB(os, "Compiler", gfb->Quote(executable));
+  gfb->WriteVariableFB(os, "Compiler", gfb->Quote(lang));
   gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags));
   gfb->WriteVariableFB(os, "Librarian", gfb->Quote(create_static_library));
   gfb->WriteVariableFB(os, "LibrarianOptions", gfb->Quote(link_flags));
@@ -415,8 +434,8 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   for (cmSourceFile const* sf : objectSources) {
     output_object_path_temp = this->GetPath(output_objects[nbSourceFile]);
     nbSourceFile++;
-    // We treat .rc files differentely
-    if (sf->GetExtension() == "rc") {
+    // We treat .rc files differentely if the language isn't RC
+    if (sf->GetExtension() == "rc" && language != "RC") {
       this->WriteSourceFileRCFB(sf, config, output_object_path);
         continue;
     }
@@ -451,8 +470,13 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
       gfb->Quote(cmStrCat(objectList_name, "-", std::to_string(i)));
   }
 
-
-  gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
+  // Alias
+  if (language != "RC")
+    gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
+  else {
+    gfb->AddTargetAliasFB(gfb->Quote(objectList_name), under_objectLists,
+                          config);
+  }
 }
 
 void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
@@ -467,7 +491,14 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   std::string object_output = cmStrCat(
     this->GetGeneratorTarget()->GetObjectDirectory(config), output_path);
   std::string extension = ".obj";
-  std::string extension_lang = this->GetOutputExtension(language);
+  std::string lang = language;
+  std::string options = compilerOptions;
+  if (language == "RC") {
+    extension = ".res";
+    lang = "RC";
+    options = " /fo \"%2\" \"%1\" ";
+  }
+  std::string extension_lang = this->GetOutputExtension(lang);
   if (!extension_lang.empty())
     extension = cmStrCat(".", extension_lang, extension);
 
@@ -475,10 +506,10 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
   gfb->WritePushScope(os);
   gfb->WriteCommand(
     os, "Using",
-    cmStrCat(".Compiler", language, config, this->GetTargetName()));
+    cmStrCat(".Compiler", lang, config, this->GetTargetName()));
   gfb->WriteArray(os, "CompilerInputFiles", objectList);
-  if (!compilerOptions.empty())
-    gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(compilerOptions),
+  if (!options.empty())
+    gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(options),
                          "+");
   gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(object_output));
   gfb->WriteVariableFB(os, "CompilerOutputExtension", gfb->Quote(extension));
@@ -818,21 +849,22 @@ void cmFastbuildNormalTargetGenerator::WriteRCFB(
 
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
-  std::string objectList = "";
+  std::vector<std::string> objectList;
 
   for (cmSourceFile const* sf : objectSources) {
-    objectList += cmStrCat("\"", sf->GetFullPath(), "\"");
+    objectList.push_back(cmStrCat("\"", sf->GetFullPath(), "\""));
   }
 
-  gfb->WriteCommand(os, "Exec", gfb->Quote(objlib_name));
+  gfb->WriteCommand(os, "ObjectList", gfb->Quote(objlib_name));
   gfb->WritePushScope(os);
-  gfb->WriteCommand(
-    os, "Using",
-    cmStrCat(".Compiler", language, config, target_name));
-  gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$Compiler$"));
-  gfb->WriteVariableFB(os, "ExecArguments",
-    cmStrCat("\' /fo \"", outputRC,"\" /nologo ", objectList, "\'"));
-  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(outputRC));
+  gfb->WriteCommand(os, "Using",
+                    cmStrCat(".Compiler", language, config, target_name));
+  gfb->WriteArray(os, "CompilerInputFiles", objectList);
+  gfb->WriteVariableFB(
+    os, "CompilerOptions",
+    "\' /fo \"%2\" \"%1\" \'", "+");
+  gfb->WriteVariableFB(os, "CompilerOutputPath", gfb->Quote(target_output));
+  gfb->WriteVariableFB(os, "CompilerOutputExtension", gfb->Quote(".rc.res"));
   gfb->WritePopScope(os);
 
   // Alias
@@ -881,8 +913,7 @@ void cmFastbuildNormalTargetGenerator::WriteSourceFileRCFB(
   gfb->WriteVariableFB(os, "ExecExecutable", gfb->Quote("$ExecRC$"));
   gfb->WriteVariableFB(os, "ExecArguments",
     cmStrCat("\' /fo \"", outputRC, "\" /nologo ", objectList, "\'"));
-  gfb->WriteVariableFB(
-    os, "ExecOutput", gfb->Quote(outputRC));
+  gfb->WriteVariableFB(os, "ExecOutput", gfb->Quote(outputRC));
   gfb->WritePopScope(os);
 
   // Alias

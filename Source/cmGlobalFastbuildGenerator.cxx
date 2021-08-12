@@ -874,7 +874,7 @@ void cmGlobalFastbuildGenerator::Generate()
   // For Fastbuild
   // this->WriteSettings(*this->GetCommonFileStream());
   this->WritePlaceholders(*this->GetCommonFileStream());
-
+  
   this->cmGlobalGenerator::Generate();
 
   this->lastChanceToTreatTargets();
@@ -1741,6 +1741,7 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB()
         configs[ta.Config] += name_alias;
       }
     }
+    // Write Alias all
     for (auto config : configs) {
       WriteAliasFB(*this->GetImplFileStream(config.first),
                    Quote("all"), config.second);

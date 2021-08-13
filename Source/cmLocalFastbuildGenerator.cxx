@@ -720,6 +720,12 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
           fastbuildOutputs[0].find(".cxx") == std::string::npos)
         random_name_file = hash.HashString(fastbuildOutputs[0]).substr(0, 7);
 
+      bool excludeFromAll = false;
+      for (auto t : targets) {
+        if (t->GetPropertyAsBool("EXCLUDE_FROM_ALL"))
+          excludeFromAll = true;
+      }
+
       gg->WriteSectionHeader(
         this->GetCommonFileStream(),
         cmStrCat("COMMAND LINE : ",
@@ -732,7 +738,7 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
         cc->GetUsesTerminal(),
         /*restat*/ !symbolic || !byproducts.empty(), fastbuildOutputs,
         fileConfig, fastbuildDeps, orderOnlyDeps, random_name_file,
-        ccg.GetWorkingDirectory());
+        ccg.GetWorkingDirectory(), excludeFromAll);
     }
   }
 }

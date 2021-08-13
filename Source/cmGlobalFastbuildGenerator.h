@@ -127,7 +127,8 @@ public:
     const std::string& job_pool, bool uses_terminal, bool restat,
     const cmFastbuildDeps& outputs, const std::string& config,
     const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps,
-    const std::string& random_name_file, const std::string& workingDirectory);
+    const std::string& random_name_file, const std::string& workingDirectory,
+    bool excludeFromAll);
 
   void WriteMacOSXContentBuild(std::string input, std::string output,
                                const std::string& config);
@@ -463,7 +464,7 @@ public:
   // For Fastbuild
 
   void AddTargetAliasFB(const std::string& alias, std::string listDeps,
-                        const std::string& config);
+                        const std::string& config, bool excludeFromAll);
 
   void WriteCommentFB(std::ostream& os, const std::string& comment);
 
@@ -646,6 +647,7 @@ private:
   {
     std::string Config;
     std::string ListDeps;
+    bool ExcludeFromAll;
   };
   std::map<std::string, TargetAliasFB> TargetAliasesFB;
   std::vector<std::string> TargetAliasesOrderedFB;

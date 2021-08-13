@@ -584,7 +584,8 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   const std::string& job_pool, bool uses_terminal, bool restat,
   const cmFastbuildDeps& outputs, const std::string& config,
   const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps,
-  const std::string& random_name_file, const std::string& workingDirectory)
+  const std::string& random_name_file, const std::string& workingDirectory,
+  bool excludeFromAll)
 {
   std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
   std::string command = "";
@@ -664,8 +665,9 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
   */
 
-  std::string alias_name = cmStrCat(name_exec, "-deps");
-  this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec), config);
+  std::string alias_name = cmStrCat(name_exec, "-deps"); 
+  this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec),
+                           config, excludeFromAll);
 }
 
 void cmGlobalFastbuildGenerator::AddMacOSXContentRule()
@@ -1704,12 +1706,13 @@ void cmGlobalFastbuildGenerator::AppendTargetDependsClosure(
 
 void cmGlobalFastbuildGenerator::AddTargetAliasFB(const std::string& alias,
                                                   std::string listDeps,
-                                                  const std::string& config)
+                                                  const std::string& config, bool excludeFromAll)
 {
   if (this->TargetAliasesFB.find(alias) == this->TargetAliasesFB.end()) {
     TargetAliasFB ta;
     ta.Config = config;
     ta.ListDeps = listDeps;
+    ta.ExcludeFromAll = excludeFromAll;
     this->TargetAliasesFB.insert(std::make_pair(alias, ta));
     this->TargetAliasesOrderedFB.push_back(alias);
   }
@@ -1720,22 +1723,36 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB()
   if (!IsMultiConfig()) {
     std::ostream& os = *this->GetCommonFileStream();
     std::string listDepsAll = "";
+    std::string listDepsOther = "";
     this->WriteSectionHeader(os, "Target aliases");
     for (std::string name_alias : this->TargetAliasesOrderedFB) {
       auto ta = this->TargetAliasesFB[name_alias];
 
       WriteAliasFB(os, name_alias, ta.ListDeps);
-
-      listDepsAll += name_alias;
+      if (ta.ExcludeFromAll) {
+        listDepsOther += name_alias;
+      } else {
+        listDepsAll += name_alias;
+      }
     }
-    WriteAliasFB(os, Quote("all"), listDepsAll);
-  } else {
-    std::map<std::string, std::string> configs;
-    configs["Debug"] = "";
-    configs["RelWithDebInfo"] = "";
-    configs["Release"] = "";
 
-    for (auto config : configs) {
+    //Write Alias all
+    WriteAliasFB(os, Quote("all"), listDepsAll);
+    // Write Alias other
+    if (!listDepsOther.empty()) {
+      WriteAliasFB(os, Quote("other"), listDepsOther);
+    }
+  } else {
+    std::map<std::string, std::string> configsAll;
+    std::map<std::string, std::string> configsOther;
+    configsAll["Debug"] = "";
+    configsAll["RelWithDebInfo"] = "";
+    configsAll["Release"] = "";
+    configsOther["Debug"] = "";
+    configsOther["RelWithDebInfo"] = "";
+    configsOther["Release"] = "";
+
+    for (auto config : configsAll) {
       std::ostream& os = *this->GetImplFileStream(config.first);
       this->WriteSectionHeader(os,
                                cmStrCat("Target aliases : ", config.first));
@@ -1745,13 +1762,24 @@ void cmGlobalFastbuildGenerator::WriteTargetAliasesFB()
           continue;
         }
         WriteAliasFB(os, name_alias, ta.ListDeps);
-        configs[ta.Config] += name_alias;
+        if (ta.ExcludeFromAll) {
+          configsOther[ta.Config] += name_alias;
+        } else {
+          configsAll[ta.Config] += name_alias;
+        }
       }
     }
     // Write Alias all
-    for (auto config : configs) {
+    for (auto config : configsAll) {
       WriteAliasFB(*this->GetImplFileStream(config.first),
                    Quote("all"), config.second);
+    }
+    // Write Alias other
+    for (auto config : configsOther) {
+      if (!config.second.empty()) {
+        WriteAliasFB(*this->GetImplFileStream(config.first), Quote("other"),
+                     config.second);
+      }
     }
   }
 }

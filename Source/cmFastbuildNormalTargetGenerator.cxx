@@ -502,8 +502,9 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   if (language != "RC")
     gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
   else {
+    bool excludeFromAll = false; 
     gfb->AddTargetAliasFB(gfb->Quote(objectList_name), under_objectLists,
-                          config);
+                          config, excludeFromAll);
   }
 }
 
@@ -681,7 +682,8 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   }
   std::string listDeps = listImplicitDepsAlias;
   listDeps += gfb->Quote(executable_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
+  bool excludeFromAll = false;
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 
   if (isMultiConfig && gfb->GetDefaultFileConfig() == config) {
     // Have the good name alias for success cmake basic test with Multi-Config
@@ -744,7 +746,8 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   }
   std::string listDeps = listImplicitDeps;
   listDeps += gfb->Quote(library_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
+  bool excludeFromAll = false;
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
@@ -859,7 +862,8 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   }
   std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
   listDeps += gfb->Quote(dll_name);
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config);
+  bool excludeFromAll = false;
+  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 }
 
 

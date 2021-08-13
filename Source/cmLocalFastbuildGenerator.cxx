@@ -715,7 +715,10 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
 
       // Creates a file to replace the fact that the command does not create any
       std::string random_name_file = "";
-      if(byproducts.empty()) random_name_file = hash.HashString(fastbuildOutputs[0]).substr(0, 7);
+      //if(byproducts.empty()) random_name_file = hash.HashString(fastbuildOutputs[0]).substr(0, 7);
+      if (fastbuildOutputs[0].find(".h") == std::string::npos &&
+          fastbuildOutputs[0].find(".cxx") == std::string::npos)
+        random_name_file = hash.HashString(fastbuildOutputs[0]).substr(0, 7);
 
       gg->WriteSectionHeader(
         this->GetCommonFileStream(),

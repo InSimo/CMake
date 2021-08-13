@@ -618,12 +618,16 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     orderOnlyDep += " ";
     orderOnlyDep += a;
   }
-
+  std::string execUseStdOutAsOutput = "false";
   if (!random_name_file.empty()) {
-    // We must create a output file
-    command += " && ";
-    command += "type nul > ";
-    command += output;
+    execUseStdOutAsOutput = "true";
+  }
+
+  std::string arguments = "";
+  auto found = command.find(" ");
+  if (found != std::string::npos) {
+    arguments = command.substr(found);
+    command = command.substr(0, found);
   }
 
   std::string name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
@@ -638,8 +642,11 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   this->WritePushScope(os);
   this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
   this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
+  if (!arguments.empty())
+    this->WriteVariableFB(os, "ExecArguments", this->Quote(arguments));
   this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
   this->WriteVariableFB(os, "ExecWorkingDir", this->Quote("./"));
+  this->WriteVariableFB(os, "ExecUseStdOutAsOutput", execUseStdOutAsOutput);
   this->WriteVariableFB(os, "ExecAlways", "true");
   this->WritePopScope(os);
   /*

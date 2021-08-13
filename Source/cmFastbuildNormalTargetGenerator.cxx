@@ -191,13 +191,20 @@ std::vector<std::string>
 cmFastbuildNormalTargetGenerator::GetNameTargetLibraries(bool isMultiConfig,
                                                          std::string config)
 {
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   const cmFastbuildDeps implicitDeps =
     this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
   std::vector<std::string> listImplicitDeps;
   for (std::string implicitDep : implicitDeps) {
-    std::string temp =
+    std::string nameTarget =
       GetNameTargetLibrary(implicitDep, isMultiConfig, config);
-    if(!temp.empty())listImplicitDeps.push_back(temp);
+    std::string nameInfoTargetGFB = cmStrCat(GetNameFile(implicitDep), config);
+
+    // We add the dependency to the target only if it exists
+    if (!nameTarget.empty() &&
+        gfb->MapFastbuildInfoTargets.find(nameInfoTargetGFB) !=
+          gfb->MapFastbuildInfoTargets.end())
+      listImplicitDeps.push_back(nameTarget);
   }
 
   return RemoveDuplicateName(listImplicitDeps);

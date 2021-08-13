@@ -584,7 +584,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   const std::string& job_pool, bool uses_terminal, bool restat,
   const cmFastbuildDeps& outputs, const std::string& config,
   const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps,
-  const std::string&  random_name_file)
+  const std::string& random_name_file, const std::string& workingDirectory)
 {
   std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
   std::string command = "";
@@ -637,6 +637,10 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     it = name_exec.find("-");
   }
 
+  std::string workingDir = workingDirectory;
+  if (workingDirectory.empty())
+    workingDir = "./";
+
   this->WriteSectionHeader(os, comment);
   this->WriteCommand(os, "Exec", this->Quote(name_exec));
   this->WritePushScope(os);
@@ -645,7 +649,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   if (!arguments.empty())
     this->WriteVariableFB(os, "ExecArguments", this->Quote(arguments));
   this->WriteVariableFB(os, "ExecOutput", this->Quote(output));
-  this->WriteVariableFB(os, "ExecWorkingDir", this->Quote("./"));
+  this->WriteVariableFB(os, "ExecWorkingDir", this->Quote(workingDir));
   this->WriteVariableFB(os, "ExecUseStdOutAsOutput", execUseStdOutAsOutput);
   this->WriteVariableFB(os, "ExecAlways", "true");
   this->WritePopScope(os);

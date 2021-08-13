@@ -731,7 +731,8 @@ void cmLocalFastbuildGenerator::WriteCustomCommandBuildStatement(
         "Custom command for " + fastbuildOutputs[0], depfile, cc->GetJobPool(),
         cc->GetUsesTerminal(),
         /*restat*/ !symbolic || !byproducts.empty(), fastbuildOutputs,
-        fileConfig, fastbuildDeps, orderOnlyDeps, random_name_file);
+        fileConfig, fastbuildDeps, orderOnlyDeps, random_name_file,
+        ccg.GetWorkingDirectory());
     }
   }
 }

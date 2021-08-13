@@ -127,7 +127,7 @@ public:
     const std::string& job_pool, bool uses_terminal, bool restat,
     const cmFastbuildDeps& outputs, const std::string& config,
     const cmFastbuildDeps& explicitDeps, const cmFastbuildDeps& orderOnlyDeps,
-    const std::string& random_name_file);
+    const std::string& random_name_file, const std::string& workingDirectory);
 
   void WriteMacOSXContentBuild(std::string input, std::string output,
                                const std::string& config);
@@ -506,6 +506,17 @@ public:
 
   std::map<std::string, std::string> MapCompilersFB;
 
+  struct cmFastbuildInfoTarget
+  {
+    int number_untrated_deps;
+    cmGeneratorTarget* gt;
+    std::vector<std::string> name_target_deps;
+    bool is_treated;
+    std::string config;
+  };
+
+  std::map<std::string, cmFastbuildInfoTarget> MapFastbuildInfoTargets;
+
   std::string GetDefaultFileConfig()
   {
     return DefaultFileConfig;
@@ -564,16 +575,6 @@ private:
 
   // For Fastbuild
   void WriteTargetAliasesFB();
-
-  struct cmFastbuildInfoTarget
-  {
-    int number_untrated_deps;
-    cmGeneratorTarget* gt;
-    std::vector<std::string> name_target_deps;
-    bool is_treated;
-    std::string config;
-  };
-  std::map<std::string, cmFastbuildInfoTarget> MapFastbuildInfoTargets;
 
   void InitFastbuildNormalTargetGenerators();
 

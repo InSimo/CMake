@@ -453,7 +453,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   // For differentely compile options
   int nbObjectList = 1;
   std::string compilerOptionsTemp = "";
-
+  
   // For files (.rc)
   std::string extension;
   std::string extension_temp;
@@ -700,8 +700,12 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   bool isMultiConfig = gfb->IsMultiConfig();
 
   std::string language = this->TargetLinkLanguage(config);
-  std::string target_output = this->GetTargetOutputDir(config);
+  //std::string target_output = this->GetTargetOutputDir(config);
   std::string target_name = this->GetTargetName();
+
+  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
+  std::string library_output =
+    cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
 
   std::string library_name;
   std::string objectList_name;
@@ -733,8 +737,7 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   if (!listTargetDeps.empty())
     gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listTargetDeps, " }"));
   gfb->WriteVariableFB(
-    os, "LibrarianOutput",
-    cmStrCat("\'", target_output, "/", target_name, ".lib\'"));
+    os, "LibrarianOutput", gfb->Quote(library_output));
   gfb->WritePopScope(os);
 
   // Alias
@@ -759,7 +762,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   std::string language = this->TargetLinkLanguage(config);
   std::string target_output = this->GetTargetOutputDir(config);
   std::string target_name = this->GetTargetName();
-
+  
   std::string library_name;
   std::string objectList_name;
   std::string dll_name;
@@ -783,6 +786,9 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     listTargetDeps += gfb->Quote(targetDep);
   }
 
+  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
+  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+
   // Create .lib
   gfb->WriteCommand(os, "Library", gfb->Quote(library_name));
   gfb->WritePushScope(os);
@@ -793,9 +799,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
                        cmStrCat("{ \"", objectList_name, "\" }"));
   if (!listTargetDeps.empty())
     gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listTargetDeps, " }"));
-  gfb->WriteVariableFB(
-    os, "LibrarianOutput",
-    gfb->Quote(cmStrCat(target_output, "/", target_name, ".lib")));
+  gfb->WriteVariableFB(os, "LibrarianOutput", gfb->Quote(implib));
   gfb->WritePopScope(os);
 
   cmMakefile* mf = this->GetMakefile();
@@ -804,9 +808,6 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   std::string pdb =
     cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
              this->GetGeneratorTarget()->GetPDBName(config));
-
-  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
 
   std::string linkLibs;
   std::string flags;

@@ -365,7 +365,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     // The compiler isn't yet defined for this lang
     std::string executable =
       mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-
+    
     gfb->WriteSectionHeader(os, cmStrCat("Compiler ", gfb->Quote(lang)));
     gfb->WriteCommand(os, "Compiler", gfb->Quote(lang));
     gfb->WritePushScope(os);
@@ -375,6 +375,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     if (lang == "C" || lang == "CXX") {
       if (compilerId == "MSVC") {
         std::string root = this->GetPath(mf->GetSafeDefinition(cmStrCat("CMAKE_",lang,"_COMPILER")));
+        std::string architecture = mf->GetSafeDefinition(cmStrCat("MSVC_",lang,"_ARCHITECTURE_ID"));
         gfb->WriteVariableFB(os, "Root", gfb->Quote(root));
         // VS 2019
         if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
@@ -393,9 +394,13 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
           extrafile.push_back(gfb->Quote("$Root$/msvcp140_atomic_wait.dll"));
           extrafile.push_back(gfb->Quote("$Root$/tbbmalloc.dll"));
           extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/vcruntime140_1.dll")); // Not in x86
           extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
           extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+
+          if (architecture == "x64") {
+            extrafile.push_back(
+              gfb->Quote("$Root$/vcruntime140_1.dll")); // Not in x86
+          }
           
           gfb->WriteArray(os, "ExtraFiles", extrafile);
         }
@@ -419,7 +424,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
   
           gfb->WriteArray(os, "ExtraFiles", extrafile);
         }
-        // VS 2015 x64
+        // VS 2015
         else if (cmSystemTools::VersionCompare(
                      cmSystemTools::OP_GREATER_EQUAL, compilerVersion.c_str(),
                      "19.00")) {
@@ -433,10 +438,20 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
           extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
           extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
           extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/../../redist/x64/Microsoft.VC140.CRT/msvcp140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/../../redist/x64/Microsoft.VC140.CRT/vccorlib140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/../../redist/x64/Microsoft.VC140.CRT/vcruntime140.dll"));
           extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+
+          std::string redist_path = cmStrCat("$Root$/../redist/", architecture,
+                                "/Microsoft.VC140.CRT");
+          if (architecture == "x64") {
+            redist_path = cmStrCat("$Root$/../../redist/", architecture,
+                                   "/Microsoft.VC140.CRT");
+          }
+          extrafile.push_back(
+            gfb->Quote(cmStrCat(redist_path, "/msvcp140.dll")));
+          extrafile.push_back(
+            gfb->Quote(cmStrCat(redist_path, "/vccorlib140.dll")));
+          extrafile.push_back(
+            gfb->Quote(cmStrCat(redist_path, "/vcruntime140.dll")));
 
           gfb->WriteArray(os, "ExtraFiles", extrafile);
         }
@@ -447,7 +462,6 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     // We backup the treated compiler
     gfb->MapCompilersFB[lang] = "";
   }
-
   
   std::string flags = " /nologo ";
   std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
@@ -688,7 +702,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     listTargetDeps +=
       gfb->Quote(targetDep);
   }
-
+  
   std::string linkLibs;
   std::string flags;
   std::string linkFlags;

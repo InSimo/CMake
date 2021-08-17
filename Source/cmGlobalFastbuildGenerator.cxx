@@ -632,6 +632,8 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   }
 
   std::string name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
+  if (random_name_file.empty())
+    name_exec = cmStrCat(output, config);
   auto it = name_exec.find("-");
   while (it != std::string::npos) {
     name_exec.replace(it, 1, "_");
@@ -881,7 +883,7 @@ void cmGlobalFastbuildGenerator::Generate()
 
 
   // For Fastbuild
-  // this->WriteSettings(*this->GetCommonFileStream());
+  this->WriteSettings(*this->GetCommonFileStream());
   this->WritePlaceholders(*this->GetCommonFileStream());
   
   this->cmGlobalGenerator::Generate();
@@ -951,9 +953,19 @@ void cmGlobalFastbuildGenerator::WritePlaceholders(std::ostream& os)
 
 void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
 {
+  // Get the Environment Variables for compilation distribute
+  std::vector<std::string> env;
+  for (auto variable : cmSystemTools::GetEnvironmentVariables()) {
+    // we add the variable only if it does not call me another variable
+    if (variable.find("$") == std::string::npos) {
+      env.push_back(Quote(variable));
+    }
+  }
+  
   WriteSectionHeader(os, "Settings");
-  os << "Settings\n";
+  WriteCommand(os, "Settings");
   WritePushScope(os);
+  WriteArray(os, "Environment", env);
   WritePopScope(os);
 }
 

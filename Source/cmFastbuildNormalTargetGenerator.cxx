@@ -350,10 +350,16 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
       gfb->WriteVariableFB(os, "CompilerFamily", gfb->Quote("custom"));
       gfb->WritePopScope(os);
 
-      // We backup the treat compiler
+      // We backup the treated compiler
       gfb->MapCompilersFB["RC"] = "";
     }
   }
+
+  std::string const& compilerId =
+    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
+
+  std::string const& compilerVersion =
+    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_VERSION"));
 
   if (gfb->MapCompilersFB.find(lang) == gfb->MapCompilersFB.end()) {
     // The compiler isn't yet defined for this lang
@@ -366,14 +372,81 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     gfb->WriteVariableFB(os, "Executable", gfb->Quote(executable));
     if (lang == "RC")
       gfb->WriteVariableFB(os, "CompilerFamily", gfb->Quote("custom"));
+    if (lang == "C" || lang == "CXX") {
+      if (compilerId == "MSVC") {
+        std::string root = this->GetPath(mf->GetSafeDefinition(cmStrCat("CMAKE_",lang,"_COMPILER")));
+        gfb->WriteVariableFB(os, "Root", gfb->Quote(root));
+        // VS 2019
+        if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
+                                          compilerVersion.c_str(), "19.20")) {
+          std::vector<std::string> extrafile;
+          extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
+          extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/msvcp140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/msvcp140_atomic_wait.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/tbbmalloc.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/vcruntime140_1.dll")); // Not in x86
+          extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+          
+          gfb->WriteArray(os, "ExtraFiles", extrafile);
+        }
+        // VS 2017
+        else if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
+                                          compilerVersion.c_str(), "19.10")) {
+          std::vector<std::string> extrafile;
+          extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
+          extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/msvcp140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+  
+          gfb->WriteArray(os, "ExtraFiles", extrafile);
+        }
+        // VS 2015 x64
+        else if (cmSystemTools::VersionCompare(
+                     cmSystemTools::OP_GREATER_EQUAL, compilerVersion.c_str(),
+                     "19.00")) {
+          std::vector<std::string> extrafile;
+          extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
+          extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/../../redist/x64/Microsoft.VC140.CRT/msvcp140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/../../redist/x64/Microsoft.VC140.CRT/vccorlib140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/../../redist/x64/Microsoft.VC140.CRT/vcruntime140.dll"));
+          extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+
+          gfb->WriteArray(os, "ExtraFiles", extrafile);
+        }
+      }
+    }
     gfb->WritePopScope(os);
 
-    // We backup the treat compiler
+    // We backup the treated compiler
     gfb->MapCompilersFB[lang] = "";
   }
-
-  std::string const& compilerId =
-    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
 
   
   std::string flags = " /nologo ";
@@ -659,9 +732,10 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
                        gfb->Quote(cmOutputConverter::EscapeForCMake(
                          mf->GetSafeDefinition("CMAKE_LINKER"))));
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
-  if (!listTargetDeps.empty())
+  if (!listTargetDeps.empty()) {
     gfb->WriteVariableFB(os, "Libraries2",
                          cmStrCat("{ ", listTargetDeps, " }"));
+  }
   gfb->WriteCommand(
     os, "Using",
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
@@ -734,8 +808,10 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listTargetDeps.empty())
-    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listTargetDeps, " }"));
+  if (!listTargetDeps.empty()) {
+    gfb->WriteVariableFB(os, "Libraries2",
+                         cmStrCat("{ ", listTargetDeps, " }"));
+  }
   gfb->WriteVariableFB(
     os, "LibrarianOutput", gfb->Quote(library_output));
   gfb->WritePopScope(os);
@@ -797,8 +873,10 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listTargetDeps.empty())
-    gfb->WriteVariableFB(os, "Libraries2", cmStrCat("{ ", listTargetDeps, " }"));
+  if (!listTargetDeps.empty()) {
+    gfb->WriteVariableFB(os, "Libraries2",
+                         cmStrCat("{ ", listTargetDeps, " }"));
+  }
   gfb->WriteVariableFB(os, "LibrarianOutput", gfb->Quote(implib));
   gfb->WritePopScope(os);
 

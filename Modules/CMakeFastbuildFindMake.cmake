@@ -3,7 +3,7 @@
 
 
 find_program(CMAKE_MAKE_PROGRAM
-  NAMES FBuild
+  NAMES fbuild
   NAMES_PER_DIR
   DOC "Program used to build from fbuild.bff files.")
 mark_as_advanced(CMAKE_MAKE_PROGRAM)

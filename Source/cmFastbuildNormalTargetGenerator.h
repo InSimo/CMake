@@ -18,6 +18,8 @@ public:
 
   void Generate(const std::string& config) override;
 
+  std::string GetCompilerId(const std::string& config);
+
   std::vector<std::string> GetNameDepsTargets(const std::string& config);
 
   static std::string GetNameFile(std::string namePathFile);
@@ -31,10 +33,10 @@ public:
 
   std::string GetNameTargetLibrary(std::string namePathFile, bool isMultiConfig, std::string config);
 
-  static std::string cmFastbuildNormalTargetGenerator::GetOutputExtension(
+  static std::string GetOutputExtension(
     const std::string& lang);
 
-  static std::string cmFastbuildNormalTargetGenerator::GetPath(
+  static std::string GetPath(
     const std::string& fullPath);
 
   void WriteTargetFB(const std::string& config);
@@ -89,6 +91,7 @@ private:
                          const std::string& SourceFileExtension);
   void GetTargetFlagsFB(const std::string& config, std::string& linkLibs,
                         std::string& flags, std::string& linkFlags);
+  std::string GetLinkFlagsFB(const std::string& config, const std::string& language, std::string target_name);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);
   void WriteDLLFB(const std::string& config);

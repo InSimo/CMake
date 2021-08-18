@@ -118,6 +118,14 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
   }
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetCompilerId(const std::string& config)
+{
+  std::string lang = this->GetGeneratorTarget()->GetLinkerLanguage(config);
+  std::string const& compilerId =
+    this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
+  return compilerId;
+}
+
 std::vector<std::string> cmFastbuildNormalTargetGenerator::GetNameDepsTargets(const std::string& config)
 {
   std::vector<std::string> listDeps;
@@ -125,7 +133,7 @@ std::vector<std::string> cmFastbuildNormalTargetGenerator::GetNameDepsTargets(co
   for (std::string depPath : depsPath) {
     listDeps.push_back(cmStrCat(GetNameFile(depPath), config));
   }
-  
+
   return RemoveDuplicateName(listDeps);
 }
 
@@ -166,7 +174,7 @@ std::string cmFastbuildNormalTargetGenerator::GetNameFile(std::string namePathFi
   if (found_point != std::string::npos) {
     nameFile = nameFile.substr(0, found_point);
   }
-  
+
   return nameFile;
 }
 
@@ -192,6 +200,7 @@ cmFastbuildNormalTargetGenerator::GetNameTargetLibraries(bool isMultiConfig,
                                                          std::string config)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  const std::string compilerId = this->GetCompilerId(config);
   const cmFastbuildDeps implicitDeps =
     this->ComputeLinkDeps(this->TargetLinkLanguage(config), config);
   std::vector<std::string> listImplicitDeps;
@@ -199,6 +208,21 @@ cmFastbuildNormalTargetGenerator::GetNameTargetLibraries(bool isMultiConfig,
     std::string nameTarget =
       GetNameTargetLibrary(implicitDep, isMultiConfig, config);
     std::string nameInfoTargetGFB = cmStrCat(GetNameFile(implicitDep), config);
+
+    if (compilerId == "GNU" || compilerId == "Clang"){
+      // If we have a lib prefix, we remove it
+      if(nameTarget.substr(0,3) == "lib"){
+        nameTarget = nameTarget.substr(3);
+      }
+      if(nameInfoTargetGFB.substr(0,3) == "lib"){
+        nameInfoTargetGFB = nameInfoTargetGFB.substr(3);
+      }
+    }
+    for(auto a : gfb->MapFastbuildInfoTargets){
+      this->GetGlobalGenerator()->WriteSectionHeader(this->GetCommonFileStream(), cmStrCat("MAP TARGET : ", a.first));
+    }
+    this->GetGlobalGenerator()->WriteSectionHeader(this->GetCommonFileStream(), cmStrCat("NAME TARGET : ", nameTarget));
+    this->GetGlobalGenerator()->WriteSectionHeader(this->GetCommonFileStream(), cmStrCat("NAME INFO TARGETGFB : ", nameInfoTargetGFB));
 
     // We add the dependency to the target only if it exists
     if (!nameTarget.empty() &&
@@ -231,12 +255,12 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
   }
 
   nameFile = namePathFile.substr(found);
-
   std::size_t found_point = nameFile.rfind('.');
   if (found_point != std::string::npos) {
     nameTarget = nameFile.substr(0, found_point);
-    if (nameFile.substr(found_point, 4) == ".lib")
+    if (nameFile.substr(found_point, 4) == ".lib" || nameFile.substr(found_point, 2) == ".a" || nameFile.substr(found_point, 3) == ".so"){
       nameTarget = cmStrCat(nameTarget, "-lib");
+    }
     else if (nameFile.substr(found_point, 9) == ".manifest") {
       // We ignore .manifest
       return "";
@@ -246,7 +270,6 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
   if (isMultiConfig) {
     nameTarget = cmStrCat(nameTarget, "-", config);
   }
-
   return nameTarget;
 }
 
@@ -355,8 +378,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     }
   }
 
-  std::string const& compilerId =
-    mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_ID"));
+  std::string const& compilerId = this->GetCompilerId(config);
 
   std::string const& compilerVersion =
     mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_VERSION"));
@@ -365,7 +387,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     // The compiler isn't yet defined for this lang
     std::string executable =
       mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER"));
-    
+
     gfb->WriteSectionHeader(os, cmStrCat("Compiler ", gfb->Quote(lang)));
     gfb->WriteCommand(os, "Compiler", gfb->Quote(lang));
     gfb->WritePushScope(os);
@@ -401,7 +423,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
             extrafile.push_back(
               gfb->Quote("$Root$/vcruntime140_1.dll")); // Not in x86
           }
-          
+
           gfb->WriteArray(os, "ExtraFiles", extrafile);
         }
         // VS 2017
@@ -421,7 +443,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
           extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
           extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
           extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
-  
+
           gfb->WriteArray(os, "ExtraFiles", extrafile);
         }
         // VS 2015
@@ -462,21 +484,29 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     // We backup the treated compiler
     gfb->MapCompilersFB[lang] = "";
   }
-  
-  std::string flags = " /nologo ";
+
+  std::string flags = "";
   std::string create_static_library = mf->GetSafeDefinition("CMAKE_AR");
 
   std::string linker = mf->GetSafeDefinition("CMAKE_LINKER");
-
-  std::string link_flags = "\"%1\" /OUT:\"%2\" /nologo ";
-  link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
+  std::string link_flags = "";
+  std::string librarian_flags = "";
 
   if (compilerId == "MSVC") {
-    flags += "/c \"%1\" /Fo\"%2\" ";
+    flags += " /nologo /c \"%1\" /Fo\"%2\" ";
+    link_flags = "\"%1\" /OUT:\"%2\" /nologo ";
     // if multiple CL.EXE write to the same .PDB file, please use /FS
     flags += "/FS ";
+    librarian_flags = link_flags;
   }
+  else if(compilerId == "GNU" || compilerId == "Clang"){
+    flags += " -c \"%1\" -o \"%2\" ";
+    link_flags = "\"%1\" -o \"%2\" ";
+    librarian_flags = "qc \"%2\" \"%1\"";
+  }
+  link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
 
+  gfb->WriteSectionHeader(os, cmStrCat("CompilerId : ", compilerId));
   gfb->WriteSectionHeader(os, "Info Compilers");
   gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),
                        "");
@@ -484,7 +514,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
   gfb->WriteVariableFB(os, "Compiler", gfb->Quote(lang));
   gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(flags));
   gfb->WriteVariableFB(os, "Librarian", gfb->Quote(create_static_library));
-  gfb->WriteVariableFB(os, "LibrarianOptions", gfb->Quote(link_flags));
+  gfb->WriteVariableFB(os, "LibrarianOptions", gfb->Quote(librarian_flags));
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(link_flags));
   gfb->WritePopScope(os);
@@ -513,7 +543,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     section_header_name = cmStrCat(target_name, " : ", config);
     objectList_name = cmStrCat(target_name, "-obj-", config);
   }
-  
+
   gfb->WriteSectionHeader(os, section_header_name);
 
   std::string compilerOptions = "";
@@ -540,7 +570,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   // For differentely compile options
   int nbObjectList = 1;
   std::string compilerOptionsTemp = "";
-  
+
   // For files (.rc)
   std::string extension;
   std::string extension_temp;
@@ -589,7 +619,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   if (language != "RC")
     gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
   else {
-    bool excludeFromAll = false; 
+    bool excludeFromAll = false;
     gfb->AddTargetAliasFB(gfb->Quote(objectList_name), under_objectLists,
                           config, excludeFromAll);
   }
@@ -603,16 +633,19 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
+  std::string const& compilerId = this->GetCompilerId(config);
 
   std::string object_output = cmStrCat(
     this->GetGeneratorTarget()->GetObjectDirectory(config), output_path);
   std::string extension = ".obj";
+  if (compilerId == "GNU" || compilerId == "Clang") extension = ".o";
   std::string lang = language;
   std::string options = compilerOptions;
   if (language == "RC" || SourceFileExtension == "rc") {
     extension = ".res";
     lang = "RC";
     options = " /fo \"%2\" \"%1\" ";
+    if (compilerId == "GNU" || compilerId == "Clang") extension = options = " -o \"%2\" \"%1\" ";
   }
   std::string extension_lang = this->GetOutputExtension(lang);
   if (!extension_lang.empty())
@@ -673,6 +706,55 @@ void cmFastbuildNormalTargetGenerator::GetTargetFlagsFB(
                           cmStrCat("GetTargetFlags linkFlags : ", linkFlags));*/
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetLinkFlagsFB(
+  const std::string& config, const std::string& language, std::string target_name)
+{
+  std::string const& compilerId = this->GetCompilerId(config);
+  std::string linkLibs;
+  std::string flags;
+  std::string linkFlags;
+  this->GetTargetFlagsFB(config, linkLibs, flags, linkFlags);
+
+  cmMakefile* mf = this->GetMakefile();
+  std::string cmake_arguments = "";
+  std::string pdb =
+    cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
+             this->GetGeneratorTarget()->GetPDBName(config));
+
+  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
+  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+
+  if(compilerId == "MSVC"){
+    cmake_arguments += "-E vs_link_exe ";
+    cmake_arguments +=
+      cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
+    cmake_arguments += " --rc=$RC$";
+    cmake_arguments += " --mt=$MT$";
+    cmake_arguments +=
+      cmStrCat(" --manifests ", this->GetManifests(config));
+    cmake_arguments += " -- $CMakeLinker$";
+    cmake_arguments += " /nologo $FB_INPUT_1_PLACEHOLDER$"; // %1
+    cmake_arguments += " /out:$FB_INPUT_2_PLACEHOLDER$";    // %2
+    cmake_arguments +=
+      cmStrCat(" /implib:", implib);
+    if (!pdb.empty())
+      cmake_arguments += cmStrCat(" /pdb:", pdb);
+    cmake_arguments += cmStrCat(" ", linkFlags, " ");
+    cmake_arguments += linkLibs;
+  }
+  else if (compilerId == "GNU" || compilerId == "Clang"){
+    implib =
+      cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
+    cmake_arguments += " $FB_INPUT_1_PLACEHOLDER$";     // %1
+    cmake_arguments += " -o $FB_INPUT_2_PLACEHOLDER$ ";  // %2
+    //cmake_arguments += cmStrCat(" -l ", implib);
+    //cmake_arguments += cmStrCat(" ", linkFlags, " ");
+    cmake_arguments += linkLibs;
+  }
+
+  return cmake_arguments;
+}
+
 void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   const std::string& config)
 {
@@ -680,6 +762,8 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
   std::string language = this->TargetLinkLanguage(config);
+  std::string const& compilerId = this->GetCompilerId(config);
+  cmMakefile* mf = this->GetMakefile();
 
   std::string target_output = this->GetTargetOutputDir(config);
   std::string target_name = this->GetTargetName();
@@ -695,69 +779,42 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     objectList_name = cmStrCat(target_name, "-obj-", config);
     alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
   }
-  
+
   std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
   std::string listTargetDeps = "";
   for (std::string targetDep : targetDeps) {
     listTargetDeps +=
       gfb->Quote(targetDep);
   }
-  
-  std::string linkLibs;
-  std::string flags;
-  std::string linkFlags;
-  this->GetTargetFlagsFB(config, linkLibs, flags, linkFlags);
-
-  cmMakefile* mf = this->GetMakefile();
   std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
-  std::string cmake_arguments = "-E vs_link_exe ";
-  std::string pdb =
-    cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
-             this->GetGeneratorTarget()->GetPDBName(config));
-
-  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
-
-  cmake_arguments +=
-    cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
-  cmake_arguments += " --rc=$RC$";
-  cmake_arguments += " --mt=$MT$";
-  cmake_arguments +=
-    cmStrCat(" --manifests ", this->GetManifests(config));
-  cmake_arguments += " -- $CMakeLinker$";
-  cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
-  cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");    // %2
-  cmake_arguments +=
-    cmStrCat(" /implib:", implib);
-  if (!pdb.empty())
-    cmake_arguments += cmStrCat(" /pdb:", pdb);
-  cmake_arguments += cmStrCat(" ", linkFlags, " ");
-  cmake_arguments += linkLibs;
+  std::string arguments = this->GetLinkFlagsFB(config, language, target_name);
 
   gfb->WriteCommand(os, "Executable", gfb->Quote(executable_name));
   gfb->WritePushScope(os);
-  gfb->WriteVariableFB(os, "RC",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
-  gfb->WriteVariableFB(os, "MT",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_MT"))));
-  gfb->WriteVariableFB(os, "CMakeLinker",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_LINKER"))));
+  gfb->WriteCommand(
+    os, "Using",
+    cmStrCat(".Compiler", language, config, this->GetTargetName()));
+  if (compilerId == "MSVC"){
+    gfb->WriteVariableFB(os, "RC",
+                         gfb->Quote(cmOutputConverter::EscapeForCMake(
+                           mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
+    gfb->WriteVariableFB(os, "MT",
+                         gfb->Quote(cmOutputConverter::EscapeForCMake(
+                           mf->GetSafeDefinition("CMAKE_MT"))));
+    gfb->WriteVariableFB(os, "CMakeLinker",
+                         gfb->Quote(cmOutputConverter::EscapeForCMake(
+                           mf->GetSafeDefinition("CMAKE_LINKER"))));
+    gfb->WriteVariableFB(os, "Linker", gfb->Quote(cmake_command));
+  }
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
   if (!listTargetDeps.empty()) {
     gfb->WriteVariableFB(os, "Libraries2",
                          cmStrCat("{ ", listTargetDeps, " }"));
   }
-  gfb->WriteCommand(
-    os, "Using",
-    cmStrCat(".Compiler", language, config, this->GetTargetName()));
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(cmStrCat(target_output, "/", target_name, ".exe")));
-  gfb->WriteVariableFB(os, "Linker", gfb->Quote(cmake_command));
-  gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(cmake_arguments));
+  gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
   gfb->WritePopScope(os);
 
   // Alias
@@ -788,12 +845,22 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   bool isMultiConfig = gfb->IsMultiConfig();
 
   std::string language = this->TargetLinkLanguage(config);
-  //std::string target_output = this->GetTargetOutputDir(config);
   std::string target_name = this->GetTargetName();
 
+  std::string const& compilerId =
+    this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", language, "_COMPILER_ID"));
+
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string library_output =
-    cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+  std::string library_output;
+  if (compilerId == "GNU" || compilerId == "Clang"){
+    library_output =
+      cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
+  }
+  else{
+    library_output =
+      cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+  }
+
 
   std::string library_name;
   std::string objectList_name;
@@ -808,6 +875,7 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     objectList_name = cmStrCat(target_name, "-obj-", config);
     alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
   }
+
 
   std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
   std::string listTargetDeps = "";
@@ -828,6 +896,7 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   }
   gfb->WriteVariableFB(
     os, "LibrarianOutput", gfb->Quote(library_output));
+
   gfb->WritePopScope(os);
 
   // Alias
@@ -848,11 +917,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   bool isMultiConfig = gfb->IsMultiConfig();
+  cmMakefile* mf = this->GetMakefile();
 
   std::string language = this->TargetLinkLanguage(config);
+  std::string const& compilerId =
+    this->GetMakefile()->GetSafeDefinition(cmStrCat("CMAKE_", language, "_COMPILER_ID"));
   std::string target_output = this->GetTargetOutputDir(config);
   std::string target_name = this->GetTargetName();
-  
+
   std::string library_name;
   std::string objectList_name;
   std::string dll_name;
@@ -877,7 +949,15 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   }
 
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+  std::string implib;
+  if (compilerId == "GNU" || compilerId == "Clang"){
+    implib =
+      cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
+  }
+  else{
+    implib =
+      cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+  }
 
   // Create .lib
   gfb->WriteCommand(os, "Library", gfb->Quote(library_name));
@@ -894,34 +974,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   gfb->WriteVariableFB(os, "LibrarianOutput", gfb->Quote(implib));
   gfb->WritePopScope(os);
 
-  cmMakefile* mf = this->GetMakefile();
   std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
-  std::string cmake_arguments = "-E vs_link_dll ";
-  std::string pdb =
-    cmStrCat(this->GetGeneratorTarget()->GetPDBDirectory(config), "/",
-             this->GetGeneratorTarget()->GetPDBName(config));
-
-  std::string linkLibs;
-  std::string flags;
-  std::string linkFlags;
-  this->GetTargetFlagsFB(config, linkLibs, flags, linkFlags);
-  
-  cmake_arguments +=
-    cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
-  cmake_arguments += " --rc=$RC$";
-  cmake_arguments += " --mt=$MT$";
-  cmake_arguments +=
-    cmStrCat(" --manifests ", mf->GetSafeDefinition("MANIFESTS"));
-  cmake_arguments += " -- $CMakeLinker$";
-  cmake_arguments += cmStrCat(" /nologo ", "$FB_INPUT_1_PLACEHOLDER$"); // %1
-  cmake_arguments += cmStrCat(" /out:", "$FB_INPUT_2_PLACEHOLDER$");    // %2
-  cmake_arguments +=
-    cmStrCat(" /implib:", implib);
-  if (!pdb.empty())
-    cmake_arguments += cmStrCat(" /pdb:", pdb);
-  cmake_arguments += cmStrCat(" ", linkFlags, " ");
-  cmake_arguments += linkLibs;
-  cmake_arguments += " /dll";
+  std::string cmake_arguments = this->GetLinkFlagsFB(config, language, target_name);
+  if (compilerId == "MSVC"){
+    cmake_arguments += " /dll";
+  }
+  else if (compilerId == "GNU" || compilerId == "Clang"){
+    cmake_arguments += " --dll";
+  }
 
   // Create .dll
   listTargetDeps += gfb->Quote(library_name);

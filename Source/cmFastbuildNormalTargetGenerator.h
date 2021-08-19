@@ -39,6 +39,8 @@ public:
   static std::string GetPath(
     const std::string& fullPath);
 
+  static std::string GetGccCompilerOptionsFB();
+
   void WriteTargetFB(const std::string& config);
 
 private:

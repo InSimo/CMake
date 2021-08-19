@@ -293,6 +293,13 @@ std::string cmFastbuildNormalTargetGenerator::GetPath(const std::string& fullPat
   return path;
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetGccCompilerOptionsFB()
+{
+  std::string flags = " -c \"%1\" -o \"%2\" ";
+  flags += "-MD -MT \"%2\" -MF \"%2.d\" ";
+  return flags;
+}
+
 void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
 {
   this->WriteCompileFB(config);
@@ -358,28 +365,117 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
   std::string project_name = this->GetTargetName();
   std::string lang = this->GetGeneratorTarget()->GetLinkerLanguage(config);
 
-  // We always define the RC compiler if he doesn't have it,
-  // because there are cases where only certain source files need it without a target having this language
-  if (gfb->MapCompilersFB.find("RC") == gfb->MapCompilersFB.end()) {
-    std::string executable =
-      mf->GetSafeDefinition("CMAKE_RC_COMPILER");
-    if (!executable.empty()) {
-      gfb->WriteSectionHeader(os, cmStrCat("Compiler ", gfb->Quote("RC")));
-      gfb->WriteCommand(os, "Compiler", gfb->Quote("RC"));
-      gfb->WritePushScope(os);
-      gfb->WriteVariableFB(os, "Executable", gfb->Quote(executable));
-      gfb->WriteVariableFB(os, "CompilerFamily", gfb->Quote("custom"));
-      gfb->WritePopScope(os);
-
-      // We backup the treated compiler
-      gfb->MapCompilersFB["RC"] = "";
-    }
-  }
-
   std::string const& compilerId = this->GetCompilerId(config);
 
   std::string const& compilerVersion =
     mf->GetSafeDefinition(cmStrCat("CMAKE_", lang, "_COMPILER_VERSION"));
+
+  // We always define the C, CXX and RC compiler if he doesn't have it,
+  // because there are cases where only certain source files need it without a target having this language
+  std::vector<std::string> useful_languages = {"C", "CXX", "RC"};
+  for(std::string useful_language : useful_languages) {
+    if (gfb->MapCompilersFB.find(useful_language) == gfb->MapCompilersFB.end()) {
+      std::string executable =
+        mf->GetSafeDefinition("CMAKE_RC_COMPILER");
+      if (!executable.empty()) {
+        gfb->WriteSectionHeader(os, cmStrCat("Compiler ", gfb->Quote(useful_language)));
+        gfb->WriteCommand(os, "Compiler", gfb->Quote(useful_language));
+        gfb->WritePushScope(os);
+        gfb->WriteVariableFB(os, "Executable", gfb->Quote(executable));
+        if (lang == "RC")
+          gfb->WriteVariableFB(os, "CompilerFamily", gfb->Quote("custom"));
+        if (lang == "C" || lang == "CXX") {
+          if (compilerId == "MSVC") {
+            std::string root = this->GetPath(mf->GetSafeDefinition(cmStrCat("CMAKE_",lang,"_COMPILER")));
+            std::string architecture = mf->GetSafeDefinition(cmStrCat("MSVC_",lang,"_ARCHITECTURE_ID"));
+            gfb->WriteVariableFB(os, "Root", gfb->Quote(root));
+            // VS 2019
+            if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
+                                              compilerVersion.c_str(), "19.20")) {
+              std::vector<std::string> extrafile;
+              extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
+              extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/msvcp140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/msvcp140_atomic_wait.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/tbbmalloc.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+
+              if (architecture == "x64") {
+                extrafile.push_back(
+                  gfb->Quote("$Root$/vcruntime140_1.dll")); // Not in x86
+              }
+
+              gfb->WriteArray(os, "ExtraFiles", extrafile);
+            }
+            // VS 2017
+            else if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
+                                              compilerVersion.c_str(), "19.10")) {
+              std::vector<std::string> extrafile;
+              extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
+              extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/msvcp140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+
+              gfb->WriteArray(os, "ExtraFiles", extrafile);
+            }
+            // VS 2015
+            else if (cmSystemTools::VersionCompare(
+                         cmSystemTools::OP_GREATER_EQUAL, compilerVersion.c_str(),
+                         "19.00")) {
+              std::vector<std::string> extrafile;
+              extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
+              extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
+              extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
+
+              std::string redist_path = cmStrCat("$Root$/../redist/", architecture,
+                                    "/Microsoft.VC140.CRT");
+              if (architecture == "x64") {
+                redist_path = cmStrCat("$Root$/../../redist/", architecture,
+                                       "/Microsoft.VC140.CRT");
+              }
+              extrafile.push_back(
+                gfb->Quote(cmStrCat(redist_path, "/msvcp140.dll")));
+              extrafile.push_back(
+                gfb->Quote(cmStrCat(redist_path, "/vccorlib140.dll")));
+              extrafile.push_back(
+                gfb->Quote(cmStrCat(redist_path, "/vcruntime140.dll")));
+
+              gfb->WriteArray(os, "ExtraFiles", extrafile);
+            }
+          }
+        }
+        gfb->WritePopScope(os);
+
+        // We backup the treated compiler
+        gfb->MapCompilersFB[useful_language] = "";
+      }
+    }
+  }
 
   if (gfb->MapCompilersFB.find(lang) == gfb->MapCompilersFB.end()) {
     // The compiler isn't yet defined for this lang
@@ -390,93 +486,6 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     gfb->WriteCommand(os, "Compiler", gfb->Quote(lang));
     gfb->WritePushScope(os);
     gfb->WriteVariableFB(os, "Executable", gfb->Quote(executable));
-    if (lang == "RC")
-      gfb->WriteVariableFB(os, "CompilerFamily", gfb->Quote("custom"));
-    if (lang == "C" || lang == "CXX") {
-      if (compilerId == "MSVC") {
-        std::string root = this->GetPath(mf->GetSafeDefinition(cmStrCat("CMAKE_",lang,"_COMPILER")));
-        std::string architecture = mf->GetSafeDefinition(cmStrCat("MSVC_",lang,"_ARCHITECTURE_ID"));
-        gfb->WriteVariableFB(os, "Root", gfb->Quote(root));
-        // VS 2019
-        if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
-                                          compilerVersion.c_str(), "19.20")) {
-          std::vector<std::string> extrafile;
-          extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
-          extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/msvcp140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/msvcp140_atomic_wait.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/tbbmalloc.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
-
-          if (architecture == "x64") {
-            extrafile.push_back(
-              gfb->Quote("$Root$/vcruntime140_1.dll")); // Not in x86
-          }
-
-          gfb->WriteArray(os, "ExtraFiles", extrafile);
-        }
-        // VS 2017
-        else if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
-                                          compilerVersion.c_str(), "19.10")) {
-          std::vector<std::string> extrafile;
-          extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
-          extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/msvcp140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/vcruntime140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/1033/mspft140ui.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
-
-          gfb->WriteArray(os, "ExtraFiles", extrafile);
-        }
-        // VS 2015
-        else if (cmSystemTools::VersionCompare(
-                     cmSystemTools::OP_GREATER_EQUAL, compilerVersion.c_str(),
-                     "19.00")) {
-          std::vector<std::string> extrafile;
-          extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/atlprov.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/msobj140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdb140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdbcore.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/mspdbsrv.exe"));
-          extrafile.push_back(gfb->Quote("$Root$/mspft140.dll"));
-          extrafile.push_back(gfb->Quote("$Root$/1033/clui.dll"));
-
-          std::string redist_path = cmStrCat("$Root$/../redist/", architecture,
-                                "/Microsoft.VC140.CRT");
-          if (architecture == "x64") {
-            redist_path = cmStrCat("$Root$/../../redist/", architecture,
-                                   "/Microsoft.VC140.CRT");
-          }
-          extrafile.push_back(
-            gfb->Quote(cmStrCat(redist_path, "/msvcp140.dll")));
-          extrafile.push_back(
-            gfb->Quote(cmStrCat(redist_path, "/vccorlib140.dll")));
-          extrafile.push_back(
-            gfb->Quote(cmStrCat(redist_path, "/vcruntime140.dll")));
-
-          gfb->WriteArray(os, "ExtraFiles", extrafile);
-        }
-      }
-    }
     gfb->WritePopScope(os);
 
     // We backup the treated compiler
@@ -498,7 +507,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     librarian_flags = link_flags;
   }
   else if(compilerId == "GNU" || compilerId == "Clang"){
-    flags += " -c \"%1\" -o \"%2\" ";
+    flags += this->GetGccCompilerOptionsFB();
     link_flags = "\"%1\" -o \"%2\" ";
     librarian_flags = "qc \"%2\" \"%1\"";
   }
@@ -568,7 +577,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   int nbObjectList = 1;
   std::string compilerOptionsTemp = "";
 
-  // For files (.rc)
+  // For files with differentely extension
   std::string extension;
   std::string extension_temp;
   if (!objectSources.empty())
@@ -588,8 +597,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
 
     if (compilerOptions != compilerOptionsTemp ||
         output_object_path != output_object_path_temp ||
-        (extension_temp == "rc" && extension != "rc") ||
-        (extension_temp != "rc" && extension == "rc")) {
+        extension_temp != extension) {
       std::string under_objectList_name =
         cmStrCat(objectList_name, "-", std::to_string(nbObjectList));
       this->WriteObjectListFB(config, language, under_objectList_name,
@@ -655,12 +663,26 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
     // Get the rc compiler if we must compile rc files without the language rc
     var_info_compile = lang;
     gfb->WriteVariableFB(os, "Compiler", gfb->Quote(var_info_compile));
-    gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(" /nologo "));
+    if (compilerId == "MSVC") gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(" /nologo "));
   } else {
-    // Get the info compilers corresponding to the language and the target
-    var_info_compile =
-      cmStrCat(".Compiler", lang, config, this->GetTargetName());
-    gfb->WriteCommand(os, "Using", var_info_compile);
+    if (language != "C" && SourceFileExtension == "c") {
+      lang = "C";
+      gfb->WriteVariableFB(os, "Compiler", gfb->Quote(lang));
+      if (compilerId == "MSVC") gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(" /nologo "));
+      if (compilerId == "GNU" || compilerId == "Clang") gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(this->GetGccCompilerOptionsFB()));
+    }
+    else if (language != "CXX" && SourceFileExtension == "cpp") {
+      lang = "CXX";
+      gfb->WriteVariableFB(os, "Compiler", gfb->Quote(lang));
+      if (compilerId == "MSVC") gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(" /nologo "));
+      if (compilerId == "GNU" || compilerId == "Clang") gfb->WriteVariableFB(os, "CompilerOptions", gfb->Quote(this->GetGccCompilerOptionsFB()));
+    }
+    else {
+      // Get the info compilers corresponding to the language and the target
+      var_info_compile =
+        cmStrCat(".Compiler", lang, config, this->GetTargetName());
+      gfb->WriteCommand(os, "Using", var_info_compile);
+    }
   }
   gfb->WriteArray(os, "CompilerInputFiles", objectList);
   if (!options.empty())

@@ -253,8 +253,11 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
   std::size_t found_point = nameFile.rfind('.');
   if (found_point != std::string::npos) {
     nameTarget = nameFile.substr(0, found_point);
-    if (nameFile.substr(found_point, 4) == ".lib" || nameFile.substr(found_point, 2) == ".a" || nameFile.substr(found_point, 3) == ".so"){
+    if (nameFile.substr(found_point, 4) == ".lib" || nameFile.substr(found_point, 2) == ".a"){
       nameTarget = cmStrCat(nameTarget, "-lib");
+    }
+    else if (nameFile.substr(found_point, 3) == ".so"){
+      nameTarget = cmStrCat(nameTarget, "-dll");
     }
     else if (nameFile.substr(found_point, 9) == ".manifest") {
       // We ignore .manifest
@@ -855,13 +858,6 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   if (compilerId == "GNU" || compilerId == "Clang"){
     library_output =
       cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
-    /*std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
-    librarian = cmake_command;
-    librarianOptions = "-E rm -f \"%2\" && ";
-    librarianOptions += mf->GetSafeDefinition("CMAKE_AR");
-    librarianOptions += " qc \"%2\" \"%1\" && ";
-    librarianOptions += mf->GetSafeDefinition("CMAKE_RANLIB");
-    librarianOptions += " \"%2\"";*/
   }
   else{
     library_output =
@@ -949,12 +945,12 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     objectList_name = cmStrCat(target_name, "-obj");
     library_name = cmStrCat(target_name, "-lib");
     dll_name = cmStrCat(target_name, "-dll");
-    alias_name = cmStrCat(target_name, "-lib-deps");
+    alias_name = cmStrCat(target_name, "-dll-deps");
   } else {
     objectList_name = cmStrCat(target_name, "-obj-", config);
     library_name = cmStrCat(target_name, "-lib-", config);
     dll_name = cmStrCat(target_name, "-dll-", config);
-    alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
+    alias_name = cmStrCat(target_name, "-dll-", config, "-deps");
   }
 
   std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
@@ -965,13 +961,16 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
 
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
   std::string implib;
+  std::string extension_lib_dyn;
   if (compilerId == "GNU" || compilerId == "Clang"){
     implib =
       cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
+    extension_lib_dyn = ".so";
   }
   else{
     implib =
       cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
+    extension_lib_dyn = ".dll";
   }
 
   // Create .lib
@@ -989,13 +988,18 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   gfb->WriteVariableFB(os, "LibrarianOutput", gfb->Quote(implib));
   gfb->WritePopScope(os);
 
-  std::string cmake_command = mf->GetSafeDefinition("CMAKE_COMMAND");
-  std::string cmake_arguments = this->GetLinkFlagsFB(config, language, target_name);
+  std::string output_dll = cmStrCat(target_output, "/", target_name, extension_lib_dyn);
+  std::string linker_command = mf->GetSafeDefinition("CMAKE_COMMAND");
+  if (compilerId == "GNU" || compilerId == "Clang") {
+    linker_command = mf->GetSafeDefinition(cmStrCat("CMAKE_", language, "_COMPILER"));
+    output_dll = cmStrCat(target_output, "/lib", target_name, extension_lib_dyn);
+  }
+  std::string arguments = this->GetLinkFlagsFB(config, language, target_name);
   if (compilerId == "MSVC"){
-    cmake_arguments += " /dll";
+    arguments += " /dll";
   }
   else if (compilerId == "GNU" || compilerId == "Clang"){
-    cmake_arguments += " --dll";
+    arguments += " -shared";
   }
 
   // Create .dll
@@ -1003,22 +1007,24 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
 
   gfb->WriteCommand(os, "DLL", gfb->Quote(dll_name));
   gfb->WritePushScope(os);
-  gfb->WriteVariableFB(os, "RC",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
-  gfb->WriteVariableFB(os, "MT",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_MT"))));
-  gfb->WriteVariableFB(os, "CMakeLinker",
-                       gfb->Quote(cmOutputConverter::EscapeForCMake(
-                         mf->GetSafeDefinition("CMAKE_LINKER"))));
-  gfb->WriteVariableFB(os, "Linker", gfb->Quote(cmake_command));
-  gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(cmake_arguments));
+  if( compilerId == "MSVC") {
+    gfb->WriteVariableFB(os, "RC",
+                         gfb->Quote(cmOutputConverter::EscapeForCMake(
+                           mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
+    gfb->WriteVariableFB(os, "MT",
+                         gfb->Quote(cmOutputConverter::EscapeForCMake(
+                           mf->GetSafeDefinition("CMAKE_MT"))));
+    gfb->WriteVariableFB(os, "CMakeLinker",
+                         gfb->Quote(cmOutputConverter::EscapeForCMake(
+                           mf->GetSafeDefinition("CMAKE_LINKER"))));
+  }
+  gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker_command));
+  gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
   gfb->WriteVariableFB(os, "Libraries",
                        cmStrCat("{ ", gfb->Quote(library_name), " }"));
   gfb->WriteVariableFB(
     os, "LinkerOutput",
-    gfb->Quote(cmStrCat(target_output, "/", target_name, ".dll")));
+    gfb->Quote(output_dll));
   gfb->WritePopScope(os);
 
   // Alias

@@ -601,7 +601,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     i++;
   }
 
-  std::string output = ""; 
+  std::string output = "";
   for (auto a : outputs) {
     output += a;
     if (!random_name_file.empty()) {
@@ -647,7 +647,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   this->WriteSectionHeader(os, comment);
   this->WriteCommand(os, "Exec", this->Quote(name_exec));
   this->WritePushScope(os);
-  this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
+  if(!config.empty())this->WriteVariableFB(os, "CONFIGURATION", this->Quote(config));
   this->WriteVariableFB(os, "ExecExecutable", this->Quote(command));
   if (!arguments.empty())
     this->WriteVariableFB(os, "ExecArguments", this->Quote(arguments));
@@ -667,7 +667,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
   */
 
-  std::string alias_name = cmStrCat(name_exec, "-deps"); 
+  std::string alias_name = cmStrCat(name_exec, "-deps");
   this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec),
                            config, excludeFromAll);
 }
@@ -885,7 +885,7 @@ void cmGlobalFastbuildGenerator::Generate()
   // For Fastbuild
   this->WriteSettings(*this->GetCommonFileStream());
   this->WritePlaceholders(*this->GetCommonFileStream());
-  
+
   this->cmGlobalGenerator::Generate();
 
   this->lastChanceToTreatTargets();
@@ -942,7 +942,7 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
       env.push_back(Quote(variable));
     }
   }
-  
+
   WriteSectionHeader(os, "Settings");
   WriteCommand(os, "Settings");
   WritePushScope(os);

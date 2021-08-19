@@ -768,11 +768,11 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   std::string objectList_name;
   std::string alias_name;
   if (!isMultiConfig) {
-    executable_name = target_name;
+    executable_name = cmStrCat(target_name, "-exe");
     objectList_name = cmStrCat(target_name, "-obj");
     alias_name = cmStrCat(target_name, "-exe-deps");
   } else {
-    executable_name = cmStrCat(target_name, "-", config);
+    executable_name = cmStrCat(target_name, "-exe-", config);
     objectList_name = cmStrCat(target_name, "-obj-", config);
     alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
   }
@@ -784,8 +784,10 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
       gfb->Quote(targetDep);
   }
   std::string linker_command = mf->GetSafeDefinition("CMAKE_COMMAND");
+  std::string executable_extension = ".exe";
   if (compilerId == "GNU" || compilerId == "Clang") {
     linker_command = mf->GetSafeDefinition(cmStrCat("CMAKE_", language, "_COMPILER"));
+    executable_extension = "";
   }
   std::string arguments = this->GetLinkFlagsFB(config, language, target_name);
 
@@ -813,7 +815,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   }
   gfb->WriteVariableFB(
     os, "LinkerOutput",
-    gfb->Quote(cmStrCat(target_output, "/", target_name, ".exe")));
+    gfb->Quote(cmStrCat(target_output, "/", target_name, executable_extension)));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
   gfb->WritePopScope(os);
 

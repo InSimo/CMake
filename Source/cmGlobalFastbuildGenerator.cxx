@@ -315,6 +315,7 @@ void cmGlobalFastbuildGenerator::DecrementNbDepsTargetUnexist()
 void cmGlobalFastbuildGenerator::lastChanceToTreatTargets()
 {
   this->DecrementNbDepsTargetUnexist();
+  // We try to deal with Targets that are not yet, after removing unnecessary dependencies
   for (auto fit : this->MapFastbuildInfoTargets) {
     if (!fit.second.is_treated) {
       if (this->CanTreatTargetFB(fit.second.gt, fit.second.config)) {
@@ -329,6 +330,7 @@ void cmGlobalFastbuildGenerator::lastChanceToTreatTargets()
 void cmGlobalFastbuildGenerator::PrintAllTargetWithNbDeps()
 {
   for (auto fit : this->MapFastbuildInfoTargets) {
+    // For each target a warning message is wrote in .bff file if it is not processed when it could potentially be
     if (!fit.second.is_treated) {
       WriteSectionHeader(*this->GetCommonFileStream(),
                          cmStrCat("WARNING : ", fit.first, " : NB DEPS : ",
@@ -588,6 +590,8 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   bool excludeFromAll)
 {
   std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
+
+  // Generate the command without the first instruction that matches the "cmd cd <path>" needed for ninja
   std::string command = "";
   int i = 0;
   for (auto a : commands) {
@@ -619,11 +623,14 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     orderOnlyDep += " ";
     orderOnlyDep += a;
   }
+
+  // if the command does not create a file, Fastbuild is told to put the output of the command into the Fastbuild ExecOutput file to create the file
   std::string execUseStdOutAsOutput = "false";
   if (!random_name_file.empty()) {
     execUseStdOutAsOutput = "true";
   }
 
+  // We get the executable of the command
   std::string arguments = "";
   auto found = command.find(" ");
   if (found != std::string::npos) {
@@ -631,6 +638,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
     command = command.substr(0, found);
   }
 
+  // Determine the name to use
   std::string name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
   if (random_name_file.empty())
     name_exec = cmStrCat(output, config);
@@ -644,6 +652,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   if (workingDirectory.empty())
     workingDir = "./";
 
+  // Write in files .bff create custom command
   this->WriteSectionHeader(os, comment);
   this->WriteCommand(os, "Exec", this->Quote(name_exec));
   this->WritePushScope(os);
@@ -656,7 +665,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   this->WriteVariableFB(os, "ExecUseStdOutAsOutput", execUseStdOutAsOutput);
   this->WriteVariableFB(os, "ExecAlways", "true");
   this->WritePopScope(os);
-  /*
+  /* TMP
   this->WriteSectionHeader(os, cmStrCat("COMMAND : ", command));
   this->WriteSectionHeader(os, cmStrCat("DESCRIPTION : ", description));
   this->WriteSectionHeader(os, cmStrCat("COMMENT : ", comment));
@@ -667,6 +676,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   this->WriteSectionHeader(os, cmStrCat("ORDER ONLY DEPS : ", orderOnlyDep));
   */
 
+  // Alias
   std::string alias_name = cmStrCat(name_exec, "-deps");
   this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec),
                            config, excludeFromAll);
@@ -927,6 +937,7 @@ void cmGlobalFastbuildGenerator::Generate()
 
 void cmGlobalFastbuildGenerator::WritePlaceholders(std::ostream& os)
 {
+  // Write in file .bff the helper variables containing the input and output files of the Fastbuild functions
   WriteSectionHeader(os, "Helper variables");
   WriteVariableFB(os, "FB_INPUT_1_PLACEHOLDER", Quote("\"%1\""));
   WriteVariableFB(os, "FB_INPUT_2_PLACEHOLDER", Quote("\"%2\""));
@@ -943,6 +954,7 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
     }
   }
 
+  // Write in file .bff the settings for compilation distribute
   WriteSectionHeader(os, "Settings");
   WriteCommand(os, "Settings");
   WritePushScope(os);

@@ -293,10 +293,22 @@ std::string cmFastbuildNormalTargetGenerator::GetPath(const std::string& fullPat
   return path;
 }
 
-std::string cmFastbuildNormalTargetGenerator::GetGccCompilerOptionsFB()
+std::string cmFastbuildNormalTargetGenerator::RemoveBackslashBeforeDoubleRib(std::string str)
 {
-  std::string flags = " -c \"%1\" -o \"%2\" ";
-  flags += "-MD -MT \"%2\" -MF \"%2.d\" ";
+  // We remove the "\" in "\"": CMAKE_INTDIR = \"Release\" must be "Release"
+  int found = str.find("\\\"");
+  while (found != std::string::npos){
+    str.replace(found,1,"");
+    found = str.find("\\\"");
+  }
+  return str;
+}
+
+std::string cmFastbuildNormalTargetGenerator::GetGccClangCompilerOptionsFB(std::string compilerId)
+{
+  std::string flags = " -c \"%1\" -o \"%2\" -MD ";
+  if(compilerId == "GNU") flags += " -MT \"%2\" ";
+  flags += " -MF \"%2.d\" ";
   return flags;
 }
 
@@ -314,7 +326,7 @@ std::string cmFastbuildNormalTargetGenerator::GetRcCompilerOptionsFB()
   return flags;
 }
 
-std::string cmFastbuildNormalTargetGenerator::GetGccLinkOptionsFB()
+std::string cmFastbuildNormalTargetGenerator::GetGccClangLinkOptionsFB()
 {
   std::string link_flags = "\"%1\" -o \"%2\" ";
   return link_flags;
@@ -418,11 +430,11 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
               cmStrCat("CMAKE_", useful_language, "_COMPILER")));
             std::string architecture = mf->GetSafeDefinition(
               cmStrCat("MSVC_", useful_language, "_ARCHITECTURE_ID"));
-            
+
             // VS 2019
             if (cmSystemTools::VersionCompare(cmSystemTools::OP_GREATER_EQUAL,
                                               compilerVersion.c_str(), "19.20")) {
-           
+
               extrafile.push_back(gfb->Quote("$Root$/c1.dll"));
               extrafile.push_back(gfb->Quote("$Root$/c1xx.dll"));
               extrafile.push_back(gfb->Quote("$Root$/c2.dll"));
@@ -545,8 +557,8 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
     librarian_flags = link_flags;
   }
   else if(compilerId == "GNU" || compilerId == "Clang"){
-    flags = this->GetGccCompilerOptionsFB();
-    link_flags = this->GetGccLinkOptionsFB();
+    flags = this->GetGccClangCompilerOptionsFB(compilerId);
+    link_flags = this->GetGccClangLinkOptionsFB();
     librarian_flags = "qc \"%2\" \"%1\"";
   }
   link_flags += mf->GetSafeDefinition("LINK_OPTIONS");
@@ -570,6 +582,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
+  std::string const& compilerId = this->GetCompilerId(config);
 
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
@@ -595,8 +608,13 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   if (!objectSources.empty()) {
     compilerOptions =
       this->ComputeFlagsForObject(objectSources[0], language, config);
-    compilerOptions += cmStrCat(
+    std::string defines = cmStrCat(
       " ", this->ComputeDefines(objectSources[0], language, config), " ");
+    if (compilerId == "GNU" || compilerId == "Clang"){
+      // We remove the "\" which can cause problem example: CMAKE_INTDIR = \"Release\" must be "Release"
+      defines = this->RemoveBackslashBeforeDoubleRib(defines);
+    }
+    compilerOptions += defines;
     compilerOptions +=
       this->ComputeIncludes(objectSources[0], language, config);
   }
@@ -629,8 +647,13 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     nbSourceFile++;
     compilerOptionsTemp =
       this->ComputeFlagsForObject(sf, language, config);
-    compilerOptionsTemp += cmStrCat(
+    std::string defines = cmStrCat(
       " ", this->ComputeDefines(sf, language, config), " ");
+    if (compilerId == "GNU" || compilerId == "Clang"){
+      // We remove the "\" which can cause problem example: CMAKE_INTDIR = \"Release\" must be "Release"
+      defines = this->RemoveBackslashBeforeDoubleRib(defines);
+    }
+    compilerOptionsTemp += defines;
     compilerOptionsTemp +=
       this->ComputeIncludes(sf, language, config);
 
@@ -708,7 +731,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
       lang = "C";
       compiler = lang;
       if (compilerId == "MSVC") compiler_options = this->GetMsvcCompilerOptionsFB();
-      if (compilerId == "GNU" || compilerId == "Clang") compiler_options = this->GetGccCompilerOptionsFB();
+      if (compilerId == "GNU" || compilerId == "Clang") compiler_options = this->GetGccClangCompilerOptionsFB(compilerId);
     }
     else if (language != "CXX" && SourceFileExtension == "cpp") {
       // Get the CXX compiler if we must compile CXX files without this language at the target
@@ -717,7 +740,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
       if (compilerId == "MSVC")
         compiler_options = this->GetMsvcCompilerOptionsFB();
       if (compilerId == "GNU" || compilerId == "Clang")
-        compiler_options = this->GetGccCompilerOptionsFB();
+        compiler_options = this->GetGccClangCompilerOptionsFB(compilerId);
     }
     else {
       // Obtain the information compilers corresponding to the language of the target
@@ -773,7 +796,7 @@ void cmFastbuildNormalTargetGenerator::GetTargetFlagsFB(
   localGen.GetTargetFlags(linkLineComputer.get(), config, linkLibs, flags,
                           linkFlags, frameworkPath, linkPath,
                           this->GetGeneratorTarget());
-  /* TMP
+  /* // TMP
   gfb->WriteSectionHeader(os,
                           cmStrCat("GetTargetFlags linkLibs : ", linkLibs));
   gfb->WriteSectionHeader(os, cmStrCat("GetTargetFlags flags : ", flags));
@@ -1053,7 +1076,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   for (std::string targetDep : targetDeps) {
     listTargetDeps += gfb->Quote(targetDep);
   }
-  
+
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
   std::string implib;
   std::string extension_lib_dyn;

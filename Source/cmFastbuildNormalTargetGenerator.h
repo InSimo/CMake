@@ -39,13 +39,15 @@ public:
   static std::string GetPath(
     const std::string& fullPath);
 
-  static std::string GetGccCompilerOptionsFB();
+  static std::string RemoveBackslashBeforeDoubleRib(std::string str);
+
+  static std::string GetGccClangCompilerOptionsFB(std::string compilerId);
 
   static std::string GetMsvcCompilerOptionsFB();
 
   static std::string GetRcCompilerOptionsFB();
 
-  static std::string GetGccLinkOptionsFB();
+  static std::string GetGccClangLinkOptionsFB();
 
   static std::string GetMsvcLinkOptionsFB();
 

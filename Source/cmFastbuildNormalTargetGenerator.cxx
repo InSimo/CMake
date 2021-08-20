@@ -351,11 +351,6 @@ void cmFastbuildNormalTargetGenerator::WriteTargetFB(const std::string& config)
     this->WriteObjectListsFB(config, false);
     this->WriteDLLFB(config);
   } else if (targetType == cmStateEnums::OBJECT_LIBRARY) {
-    this->GetGlobalGenerator()->WriteSectionHeader(
-      this->GetGlobalGenerator()->GetFileStream(
-        config, this->GetGlobalGenerator()->IsMultiConfig()),
-      cmStrCat("NOT TOTALLY AVAILABLE : OBJECT LIBRARY : ",
-               this->GetTargetName()));
     this->WriteObjectListsFB(config, true);
   } else if (targetType == cmStateEnums::GLOBAL_TARGET) {
     this->GetGlobalGenerator()->WriteSectionHeader(
@@ -1005,16 +1000,20 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   gfb->WritePopScope(os);
 
   // Alias
-  std::vector<std::string> implicitDeps =
-    GetNameTargetLibraries(isMultiConfig, config);
-  std::string listImplicitDeps = "";
-  for (std::string implicitDep : implicitDeps) {
-    listImplicitDeps += gfb->Quote(implicitDep);
+  if (this->GetGeneratorTarget()->GetType() == cmStateEnums::STATIC_LIBRARY) {
+    std::vector<std::string> implicitDeps =
+      GetNameTargetLibraries(isMultiConfig, config);
+    std::string listImplicitDeps = "";
+    for (std::string implicitDep : implicitDeps) {
+      listImplicitDeps += gfb->Quote(implicitDep);
+    }
+    std::string listDeps = listImplicitDeps;
+    listDeps += gfb->Quote(library_name);
+    bool excludeFromAll = false;
+
+    gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config,
+                          excludeFromAll);
   }
-  std::string listDeps = listImplicitDeps;
-  listDeps += gfb->Quote(library_name);
-  bool excludeFromAll = false;
-  gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
@@ -1054,7 +1053,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   for (std::string targetDep : targetDeps) {
     listTargetDeps += gfb->Quote(targetDep);
   }
-
+  
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
   std::string implib;
   std::string extension_lib_dyn;
@@ -1070,19 +1069,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   }
 
   // Write in file .bff for create static library
-  gfb->WriteCommand(os, "Library", gfb->Quote(library_name));
-  gfb->WritePushScope(os);
-  gfb->WriteCommand(
-    os, "Using",
-    cmStrCat(".Compiler", language, config, this->GetTargetName()));
-  gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
-                       cmStrCat("{ \"", objectList_name, "\" }"));
-  if (!listTargetDeps.empty()) {
-    gfb->WriteVariableFB(os, "Libraries2",
-                         cmStrCat("{ ", listTargetDeps, " }"));
-  }
-  gfb->WriteVariableFB(os, "LibrarianOutput", gfb->Quote(implib));
-  gfb->WritePopScope(os);
+  this->WriteLibraryFB(config);
 
   std::string output_dll = cmStrCat(target_output, "/", target_name, extension_lib_dyn);
   std::string linker_command = mf->GetSafeDefinition("CMAKE_COMMAND");
@@ -1103,17 +1090,6 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
 
   gfb->WriteCommand(os, "DLL", gfb->Quote(dll_name));
   gfb->WritePushScope(os);
-  if( compilerId == "MSVC") {
-    gfb->WriteVariableFB(os, "RC",
-                         gfb->Quote(cmOutputConverter::EscapeForCMake(
-                           mf->GetSafeDefinition("CMAKE_RC_COMPILER"))));
-    gfb->WriteVariableFB(os, "MT",
-                         gfb->Quote(cmOutputConverter::EscapeForCMake(
-                           mf->GetSafeDefinition("CMAKE_MT"))));
-    gfb->WriteVariableFB(os, "CMakeLinker",
-                         gfb->Quote(cmOutputConverter::EscapeForCMake(
-                           mf->GetSafeDefinition("CMAKE_LINKER"))));
-  }
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker_command));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
   gfb->WriteVariableFB(os, "Libraries",

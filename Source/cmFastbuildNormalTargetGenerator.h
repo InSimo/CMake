@@ -103,6 +103,7 @@ private:
                          const std::string& SourceFileExtension);
   void GetTargetFlagsFB(const std::string& config, std::string& linkLibs,
                         std::string& flags, std::string& linkFlags);
+  std::string GetShortOutputName(const std::string& config);
   std::string GetLinkFlagsFB(const std::string& config, const std::string& language, std::string target_name);
   void WriteExecutableFB(const std::string& config);
   void WriteLibraryFB(const std::string& config);

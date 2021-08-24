@@ -862,6 +862,19 @@ std::string cmFastbuildNormalTargetGenerator::GetLinkFlagsFB(
   return cmake_arguments;
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetShortOutputName(
+  const std::string& config)
+{
+  cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
+  std::string full_name = this->GetGeneratorTarget()->GetFullName(config);
+  std::string output_name = full_name;
+  int found = full_name.rfind(".");
+  if(found != std::string::npos){
+    output_name = full_name.substr(0, found);
+  }
+  return output_name;
+}
+
 void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   const std::string& config)
 {
@@ -888,6 +901,8 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     objectList_name = cmStrCat(target_name, "-obj-", config);
     alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
   }
+  std::string output_full_name =
+    this->GetGeneratorTarget()->GetFullName(config);
 
   // Get the targets dependencies
   std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
@@ -920,7 +935,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   }
   gfb->WriteVariableFB(
     os, "LinkerOutput",
-    gfb->Quote(cmStrCat(target_output, "/", target_name, executable_extension)));
+    gfb->Quote(cmStrCat(target_output, "/", output_full_name)));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
   gfb->WritePopScope(os);
 
@@ -964,17 +979,21 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     mf->GetSafeDefinition(cmStrCat("CMAKE_", language, "_COMPILER_ID"));
 
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string library_output;
   std::string librarian = "";
   std::string librarianOptions = "";
-  if (compilerId == "GNU" || compilerId == "Clang"){
-    library_output =
-      cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
+  std::string output_name;
+  if (this->GetGeneratorTarget()->GetType() == cmStateEnums::STATIC_LIBRARY) {
+    output_name = this->GetGeneratorTarget()->GetFullName(config);
+  } else {
+    if (compilerId == "GNU" || compilerId == "Clang") {
+      output_name = cmStrCat(this->GetShortOutputName(config), ".a");
+    }
+    else {
+      output_name = cmStrCat(this->GetShortOutputName(config), ".lib");
+    }
   }
-  else{
-    library_output =
-      cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
-  }
+  std::string library_output =
+    cmStrCat(output_info->ImpDir, "/", output_name);
 
   std::string library_name;
   std::string objectList_name;
@@ -1056,7 +1075,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   std::string objectList_name;
   std::string dll_name;
   std::string alias_name;
-
+  
   // Determine the different names to use
   if (!isMultiConfig) {
     objectList_name = cmStrCat(target_name, "-obj");
@@ -1070,35 +1089,27 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
     alias_name = cmStrCat(target_name, "-dll-", config, "-deps");
   }
 
-  // Get the targets dependencies
-  std::vector<std::string> targetDeps = GetNameTargetLibraries(isMultiConfig, config);
-  std::string listTargetDeps = "";
-  for (std::string targetDep : targetDeps) {
-    listTargetDeps += gfb->Quote(targetDep);
-  }
-
-  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string implib;
-  std::string extension_lib_dyn;
-  if (compilerId == "GNU" || compilerId == "Clang"){
-    implib =
-      cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
-    extension_lib_dyn = ".so";
-  }
-  else{
-    implib =
-      cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
-    extension_lib_dyn = ".dll";
-  }
-
   // Write in file .bff for create static library
   this->WriteLibraryFB(config);
+  
+  auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
+  std::string implib;
+  std::string extension_lib;
+  std::string output_name = this->GetShortOutputName(config);
+  if (compilerId == "GNU" || compilerId == "Clang") {
+    extension_lib = ".a";
+  } else {
+    extension_lib = ".lib";
+  }
+  implib = cmStrCat(output_info->ImpDir, "/", output_name, extension_lib);
 
-  std::string output_dll = cmStrCat(target_output, "/", target_name, extension_lib_dyn);
+  std::string output_full_name =
+    this->GetGeneratorTarget()->GetFullName(config);
+  std::string output_dll = cmStrCat(target_output, "/", output_full_name);
+
   std::string linker_command = mf->GetSafeDefinition("CMAKE_COMMAND");
   if (compilerId == "GNU" || compilerId == "Clang") {
     linker_command = mf->GetSafeDefinition(cmStrCat("CMAKE_", language, "_COMPILER"));
-    output_dll = cmStrCat(target_output, "/lib", target_name, extension_lib_dyn);
   }
   std::string arguments = this->GetLinkFlagsFB(config, language, target_name);
   if (compilerId == "MSVC"){
@@ -1106,6 +1117,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   }
   else if (compilerId == "GNU" || compilerId == "Clang"){
     arguments += " -shared";
+  }
+
+  // Get the targets dependencies
+  std::vector<std::string> targetDeps =
+    GetNameTargetLibraries(isMultiConfig, config);
+  std::string listTargetDeps = "";
+  for (std::string targetDep : targetDeps) {
+    listTargetDeps += gfb->Quote(targetDep);
   }
 
   // Write in file .bff for create dynamic library

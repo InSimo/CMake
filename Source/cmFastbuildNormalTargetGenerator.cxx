@@ -593,6 +593,21 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
   gfb->WritePopScope(os);
 }
 
+std::string cmFastbuildNormalTargetGenerator::GetUiFileDependencies(const std::string& config) {
+  // We check if there are .ui files to generate
+  std::string ui_deps = "";
+  std::vector<cmSourceFile const*> headerSources;
+  this->GeneratorTarget->GetHeaderSources(headerSources, config);
+  for(auto sa : headerSources){
+    std::string file_name = this->GetNameFile(sa->GetFullPath());
+    if( file_name.substr(0, 3) == "ui_"){
+      // Match the names of custom commands with 'Exec' from .ui
+      ui_deps += this->GetGlobalGenerator()->Quote(cmStrCat(file_name, config));
+    }
+  }
+  return ui_deps;
+}
+
 void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& config, bool isObjectLibrary)
 {
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
@@ -600,9 +615,14 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
   std::string const& compilerId = this->GetCompilerId(config);
 
+  std::vector<cmSourceFile const*> headerSources;
+  this->GeneratorTarget->GetHeaderSources(headerSources, config);
+  for(auto sa : headerSources){
+    gfb->WriteSectionHeader(os, cmStrCat("HEADER SOURCES : ", sa->GetFullPath()));
+  }
+
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
-
   std::string target_output =
     this->GetGeneratorTarget()->GetObjectDirectory(config);
   std::string target_name = this->GetTargetName();
@@ -708,6 +728,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
   else {
     bool excludeFromAll = false;
+    under_objectLists = cmStrCat(this->GetUiFileDependencies(config), under_objectLists);
     gfb->AddTargetAliasFB(gfb->Quote(objectList_name), under_objectLists,
                           config, excludeFromAll);
   }
@@ -968,6 +989,7 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   std::string listDeps = listImplicitDepsAlias;
   listDeps += gfb->Quote(executable_name);
   bool excludeFromAll = false;
+  listDeps = cmStrCat(this->GetUiFileDependencies(config), listDeps);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 
   if (compilerId == "MSVC" && !isMultiConfig) {
@@ -1071,7 +1093,7 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
     std::string listDeps = listImplicitDeps;
     listDeps += gfb->Quote(library_name);
     bool excludeFromAll = false;
-
+    listDeps = cmStrCat(this->GetUiFileDependencies(config), listDeps);
     gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config,
                           excludeFromAll);
   }
@@ -1170,6 +1192,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
   listDeps += gfb->Quote(dll_name);
   bool excludeFromAll = false;
+  listDeps = cmStrCat(this->GetUiFileDependencies(config), listDeps);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 }
 

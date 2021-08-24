@@ -96,6 +96,7 @@ private:
   std::string DeviceLinkObject;
 
   void WriteCompileFB(const std::string& config);
+  std::string GetUiFileDependencies(const std::string& config);
   void WriteObjectListsFB(const std::string& config, bool isObjectLibrary);
   void WriteObjectListFB(const std::string& config,
                          const std::string& language,

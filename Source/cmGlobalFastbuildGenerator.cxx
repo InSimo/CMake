@@ -233,7 +233,9 @@ void cmGlobalFastbuildGenerator::WriteAliasFB(std::ostream& os,
 
 void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, std::vector<std::string> name_target_deps, const std::string& config)
 {
-  std::string target_name = cmStrCat(gt->GetName(), config);
+  std::string target_name = cmStrCat(
+    cmFastbuildNormalTargetGenerator::GetNameFile(gt->GetFullName(config)),
+    config);
   // We add the target whether she is not already in the map
   if (this->MapFastbuildInfoTargets.find(target_name) ==
       this->MapFastbuildInfoTargets.end()) {
@@ -245,6 +247,12 @@ void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, s
       GetNumberUntratedDepsTarget(target_name, name_target_deps);
     fbt.gt = gt;
     this->MapFastbuildInfoTargets.insert(std::make_pair(target_name, fbt));
+    this->WriteSectionHeader(this->GetFileStream(config, this->IsMultiConfig()), cmStrCat("NAME : ", target_name));
+    for (auto a : name_target_deps) {
+      this->WriteSectionHeader(
+        this->GetFileStream(config, this->IsMultiConfig()),
+                               cmStrCat("TARGET DEPS : ", a));
+    }
   }
 }
 
@@ -269,7 +277,7 @@ bool cmGlobalFastbuildGenerator::CanTreatTargetFB(
   cmGeneratorTarget* gt, const std::string& config)
 {
   bool canTreat = true;
-  std::string target_name = cmStrCat(gt->GetName(), config);
+  std::string target_name = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(gt->GetFullName(config)), config);
   if(this->MapFastbuildInfoTargets[target_name].number_untrated_deps > 0 || this->MapFastbuildInfoTargets[target_name].is_treated){
     canTreat = false;
   }
@@ -278,7 +286,7 @@ bool cmGlobalFastbuildGenerator::CanTreatTargetFB(
 
 void cmGlobalFastbuildGenerator::TargetTreatedFinish(cmGeneratorTarget* gt, const std::string& config)
 {
-  std::string target_name = cmStrCat(gt->GetName(), config);
+  std::string target_name = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(gt->GetFullName(config)), config);
   this->MapFastbuildInfoTargets[target_name].is_treated = true;
   for(auto fit : this->MapFastbuildInfoTargets){
     //this->MapFastbuildInfoTargets[fit.first].number_untrated_deps = GetNumberUntratedDepsTarget(fit.first, fit.second.name_target_deps);
@@ -641,12 +649,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   // Determine the name to use
   std::string name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
   if (random_name_file.empty())
-    name_exec = cmStrCat(output, config);
-  auto it = name_exec.find("-");
-  while (it != std::string::npos) {
-    name_exec.replace(it, 1, "_");
-    it = name_exec.find("-");
-  }
+    name_exec = cmStrCat(cmFastbuildNormalTargetGenerator::GetNameFile(output), config);
 
   std::string workingDir = workingDirectory;
   if (workingDirectory.empty())
@@ -895,13 +898,11 @@ void cmGlobalFastbuildGenerator::Generate()
   // For Fastbuild
   this->WriteSettings(*this->GetCommonFileStream());
   this->WritePlaceholders(*this->GetCommonFileStream());
-
   this->cmGlobalGenerator::Generate();
-
   this->lastChanceToTreatTargets();
-
   this->WriteTargetAliasesFB();
   this->PrintAllTargetWithNbDeps();
+
 
   this->WriteAssumedSourceDependencies();
   this->WriteTargetAliases(*this->GetCommonFileStream());
@@ -931,7 +932,7 @@ void cmGlobalFastbuildGenerator::Generate()
       !this->GetCMakeInstance()->GetRegenerateDuringBuild())
 #endif
   {
-    //this->CleanMetaData(); TMP
+    // this->CleanMetaData(); // TMP
   }
 }
 

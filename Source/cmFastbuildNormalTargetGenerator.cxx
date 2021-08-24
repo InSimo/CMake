@@ -109,7 +109,9 @@ void cmFastbuildNormalTargetGenerator::Generate(const std::string& config)
 
   // For Fastbuild
   this->GetGlobalGenerator()->AddFastbuildInfoTarget(this->GetGeneratorTarget(), this->GetNameDepsTargets(config), config);
-  if (this->GetGlobalGenerator()->CanTreatTargetFB(this->GetGeneratorTarget(), config)){
+  if (this->GetGlobalGenerator()->CanTreatTargetFB(
+        this->GetGeneratorTarget(),
+        config)) {
     this->WriteTargetFB(config);
 
 
@@ -169,7 +171,7 @@ std::string cmFastbuildNormalTargetGenerator::GetNameFile(std::string namePathFi
   }
 
   nameFile = namePathFile.substr(found);
-
+  
   std::size_t found_point = nameFile.find('.');
   if (found_point != std::string::npos) {
     nameFile = nameFile.substr(0, found_point);
@@ -300,6 +302,18 @@ std::string cmFastbuildNormalTargetGenerator::RemoveBackslashBeforeDoubleRib(std
   while (found != std::string::npos){
     str.replace(found,1,"");
     found = str.find("\\\"");
+  }
+  return str;
+}
+
+std::string cmFastbuildNormalTargetGenerator::ReplaceDashWith_(
+  std::string str)
+{
+  // Files .bff don't accept name with "-" in
+  auto it = str.find("-");
+  while (it != std::string::npos) {
+    str.replace(it, 1, "_");
+    it = str.find("-");
   }
   return str;
 }
@@ -565,7 +579,9 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
 
   // Write in file .bff the compiler information for this target
   gfb->WriteSectionHeader(os, "Info Compilers");
-  gfb->WriteVariableFB(os, cmStrCat("Compiler", lang, config, project_name),
+  gfb->WriteVariableFB(
+    os,
+    cmStrCat("Compiler", lang, config, this->ReplaceDashWith_(project_name)),
                        "");
   gfb->WritePushScopeStruct(os);
   gfb->WriteVariableFB(os, "Compiler", gfb->Quote(lang));
@@ -745,7 +761,8 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
     else {
       // Obtain the information compilers corresponding to the language of the target
       var_info_compile =
-        cmStrCat(".Compiler", lang, config, this->GetTargetName());
+        cmStrCat(".Compiler", lang, config,
+                 this->ReplaceDashWith_(this->GetTargetName()));
     }
   }
 
@@ -926,7 +943,8 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   gfb->WritePushScope(os);
   gfb->WriteCommand(
     os, "Using",
-    cmStrCat(".Compiler", language, config, this->GetTargetName()));
+                    cmStrCat(".Compiler", language, config,
+                             this->ReplaceDashWith_(this->GetTargetName())));
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker_command));
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
   if (!listTargetDeps.empty()) {
@@ -1022,7 +1040,8 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   gfb->WritePushScope(os);
   gfb->WriteCommand(
     os, "Using",
-    cmStrCat(".Compiler", language, config, this->GetTargetName()));
+                    cmStrCat(".Compiler", language, config,
+                             this->ReplaceDashWith_(this->GetTargetName())));
   gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
                        cmStrCat("{ \"", objectList_name, "\" }"));
   if (!listTargetDeps.empty()) {

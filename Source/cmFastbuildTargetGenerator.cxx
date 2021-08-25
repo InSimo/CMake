@@ -947,10 +947,10 @@ void cmFastbuildTargetGenerator::WriteObjectBuildStatements(
 {
   // Write comments.
   cmGlobalFastbuildGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
-  this->GetImplFileStream(fileConfig)
-    << "// NINJA Object build statements for "
-    << cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
-    << " target " << this->GetTargetName() << "\n\n";
+//this->GetImplFileStream(fileConfig)
+  //<< "// NINJA Object build statements for "
+  //<< cmState::GetTargetTypeName(this->GetGeneratorTarget()->GetType())
+  //<< " target " << this->GetTargetName() << "\n\n";
 
   {
     std::vector<cmSourceFile const*> customCommands;

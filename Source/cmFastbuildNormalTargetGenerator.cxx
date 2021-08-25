@@ -629,13 +629,15 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
 
   std::string section_header_name;
   std::string objectList_name;
+  std::string short_name = this->GetShortOutputName(config);
 
+  // Determine the different names to use
   if (!gfb->IsMultiConfig()) {
     section_header_name = target_name;
-    objectList_name = cmStrCat(target_name, "-obj");
+    objectList_name = cmStrCat(short_name, "-obj");
   } else {
     section_header_name = cmStrCat(target_name, " : ", config);
-    objectList_name = cmStrCat(target_name, "-obj-", config);
+    objectList_name = cmStrCat(short_name, "-obj-", config);
   }
 
   gfb->WriteSectionHeader(os, section_header_name);
@@ -928,16 +930,17 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   std::string executable_name;
   std::string objectList_name;
   std::string alias_name;
+  std::string short_name = this->GetShortOutputName(config);
 
   // Determine the different names to use
   if (!isMultiConfig) {
-    executable_name = cmStrCat(target_name, "-exe");
-    objectList_name = cmStrCat(target_name, "-obj");
-    alias_name = cmStrCat(target_name, "-exe-deps");
+    executable_name = cmStrCat(short_name, "-exe");
+    objectList_name = cmStrCat(short_name, "-obj");
+    alias_name = cmStrCat(short_name, "-exe-deps");
   } else {
-    executable_name = cmStrCat(target_name, "-exe-", config);
-    objectList_name = cmStrCat(target_name, "-obj-", config);
-    alias_name = cmStrCat(target_name, "-exe-", config, "-deps");
+    executable_name = cmStrCat(short_name, "-exe-", config);
+    objectList_name = cmStrCat(short_name, "-obj-", config);
+    alias_name = cmStrCat(short_name, "-exe-", config, "-deps");
   }
   std::string output_full_name =
     this->GetGeneratorTarget()->GetFullName(config);
@@ -976,6 +979,9 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     os, "LinkerOutput",
     gfb->Quote(cmStrCat(target_output, "/", output_full_name)));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
+  if (!listTargetDeps.empty())
+    gfb->WriteVariableFB(os, "PreBuildDependencies",
+                         cmStrCat("{ ", listTargetDeps, " }"));
   gfb->WritePopScope(os);
 
   // Alias
@@ -987,8 +993,8 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
       listImplicitDepsAlias += gfb->Quote(cmStrCat(implicitDep, "-deps"));
   }
   std::string listDeps = listImplicitDepsAlias;
-  listDeps += gfb->Quote(executable_name);
   bool excludeFromAll = false;
+  listDeps += gfb->Quote(executable_name);
   listDeps = cmStrCat(this->GetUiFileDependencies(config), listDeps);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 
@@ -1035,19 +1041,20 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   std::string library_output =
     cmStrCat(output_info->ImpDir, "/", output_name);
 
+  std::string short_name = this->GetShortOutputName(config);
   std::string library_name;
   std::string objectList_name;
   std::string alias_name;
 
   // Determine the different names to use
   if (!isMultiConfig) {
-    library_name = cmStrCat(target_name, "-lib");
-    objectList_name = cmStrCat(target_name, "-obj");
-    alias_name = cmStrCat(target_name, "-lib-deps");
+    library_name = cmStrCat(short_name, "-lib");
+    objectList_name = cmStrCat(short_name, "-obj");
+    alias_name = cmStrCat(short_name, "-lib-deps");
   } else {
-    library_name = cmStrCat(target_name, "-lib-", config);
-    objectList_name = cmStrCat(target_name, "-obj-", config);
-    alias_name = cmStrCat(target_name, "-lib-", config, "-deps");
+    library_name = cmStrCat(short_name, "-lib-", config);
+    objectList_name = cmStrCat(short_name, "-obj-", config);
+    alias_name = cmStrCat(short_name, "-lib-", config, "-deps");
   }
 
   // Get the targets dependencies
@@ -1112,6 +1119,7 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   std::string target_output = this->GetTargetOutputDir(config);
   std::string target_name = this->GetTargetName();
 
+  std::string short_name = this->GetShortOutputName(config);
   std::string library_name;
   std::string objectList_name;
   std::string dll_name;
@@ -1119,15 +1127,15 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   
   // Determine the different names to use
   if (!isMultiConfig) {
-    objectList_name = cmStrCat(target_name, "-obj");
-    library_name = cmStrCat(target_name, "-lib");
-    dll_name = cmStrCat(target_name, "-dll");
-    alias_name = cmStrCat(target_name, "-dll-deps");
+    objectList_name = cmStrCat(short_name, "-obj");
+    library_name = cmStrCat(short_name, "-lib");
+    dll_name = cmStrCat(short_name, "-dll");
+    alias_name = cmStrCat(short_name, "-dll-deps");
   } else {
-    objectList_name = cmStrCat(target_name, "-obj-", config);
-    library_name = cmStrCat(target_name, "-lib-", config);
-    dll_name = cmStrCat(target_name, "-dll-", config);
-    alias_name = cmStrCat(target_name, "-dll-", config, "-deps");
+    objectList_name = cmStrCat(short_name, "-obj-", config);
+    library_name = cmStrCat(short_name, "-lib-", config);
+    dll_name = cmStrCat(short_name, "-dll-", config);
+    alias_name = cmStrCat(short_name, "-dll-", config, "-deps");
   }
 
   // Write in file .bff for create static library
@@ -1161,15 +1169,15 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   }
 
   // Get the targets dependencies
-  std::vector<std::string> targetDeps =
+  std::vector<std::string> implicitDeps =
     GetNameTargetLibraries(isMultiConfig, config);
-  std::string listTargetDeps = "";
-  for (std::string targetDep : targetDeps) {
-    listTargetDeps += gfb->Quote(targetDep);
+  std::string listImplicitDeps = "";
+  for (std::string implicitDep : implicitDeps) {
+    listImplicitDeps += gfb->Quote(implicitDep);
   }
-
+  std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
+  
   // Write in file .bff for create dynamic library
-  listTargetDeps += gfb->Quote(library_name);
 
   gfb->WriteCommand(os, "DLL", gfb->Quote(dll_name));
   gfb->WritePushScope(os);
@@ -1180,19 +1188,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(output_dll));
+  if (!listDeps.empty()) gfb->WriteVariableFB(os, "PreBuildDependencies",
+                       cmStrCat("{ ", listDeps, " }"));
   gfb->WritePopScope(os);
 
   // Alias
-  std::vector<std::string> implicitDeps =
-    GetNameTargetLibraries(isMultiConfig, config);
-  std::string listImplicitDeps = "";
-  for (std::string implicitDep : implicitDeps) {
-    listImplicitDeps += gfb->Quote(implicitDep);
-  }
-  std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
-  listDeps += gfb->Quote(dll_name);
   bool excludeFromAll = false;
   listDeps = cmStrCat(this->GetUiFileDependencies(config), listDeps);
+  listDeps += gfb->Quote(dll_name);
   gfb->AddTargetAliasFB(gfb->Quote(alias_name), listDeps, config, excludeFromAll);
 }
 
@@ -2093,9 +2096,9 @@ void cmFastbuildNormalTargetGenerator::WriteLinkStatement(
   // Write comments.
   cmGlobalFastbuildGenerator::WriteDivider(this->GetImplFileStream(fileConfig));
   const cmStateEnums::TargetType targetType = gt->GetType();
-  this->GetImplFileStream(fileConfig)
-    << "// NINJA Link build statements for " << cmState::GetTargetTypeName(targetType)
-    << " target " << this->GetTargetName() << "\n\n";
+//this->GetImplFileStream(fileConfig)
+  //<< "// NINJA Link build statements for " << cmState::GetTargetTypeName(targetType)
+  //<< " target " << this->GetTargetName() << "\n\n";
 
   cmFastbuildBuild linkBuild(this->LanguageLinkerRule(config));
   cmFastbuildVars& vars = linkBuild.Variables;

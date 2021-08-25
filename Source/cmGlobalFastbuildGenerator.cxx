@@ -129,7 +129,7 @@ void cmGlobalFastbuildGenerator::WriteComment(std::ostream& os,
   if (comment.empty()) {
     return;
   }
-  os << "// NINJA" << comment << "\n";
+//os << "// NINJA" << comment << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteCommentFB(std::ostream& os,
@@ -439,7 +439,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
   cmGlobalFastbuildGenerator::WriteComment(os, build.Comment);
 
   // Write output files.
-  std::string buildStr("// NINJA build");
+  /* std::string buildStr("// NINJA build");
   {
     // Write explicit outputs
     for (std::string const& output : build.Outputs) {
@@ -522,7 +522,7 @@ void cmGlobalFastbuildGenerator::WriteBuild(std::ostream& os,
     this->DisableCleandead = true;
   }
 
-  os << buildStr << arguments << assignments << "\n";
+  os << buildStr << arguments << assignments << "\n"; */
 }
 
 void cmGlobalFastbuildGenerator::AddCustomCommandRule()
@@ -737,13 +737,13 @@ void cmGlobalFastbuildGenerator::WriteRule(std::ostream& os,
   // -- Write rule
   // Write rule intro
   cmGlobalFastbuildGenerator::WriteComment(os, rule.Comment);
-  os << "// NINJA " << "rule " << rule.Name << '\n';
+//os << "// NINJA " << "rule " << rule.Name << '\n';
 
   // Write rule key/value pairs
   auto writeKV = [&os](const char* key, std::string const& value) {
     if (!value.empty()) {
       cmGlobalFastbuildGenerator::Indent(os, 1);
-      os << "// NINJA" << key << " = " << value << '\n';
+    //os << "// NINJA" << key << " = " << value << '\n';
     }
   };
 
@@ -786,7 +786,7 @@ void cmGlobalFastbuildGenerator::WriteVariable(std::ostream& os,
 
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
   cmGlobalFastbuildGenerator::Indent(os, indent);
-  os << "// NINJA " << name << " = " << val << "\n";
+//os << "// NINJA " << name << " = " << val << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteInclude(std::ostream& os,
@@ -794,7 +794,7 @@ void cmGlobalFastbuildGenerator::WriteInclude(std::ostream& os,
                                           const std::string& comment)
 {
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
-  os << "// NINJA include " << filename << "\n";
+//os << "// NINJA include " << filename << "\n";
 }
 
 void cmGlobalFastbuildGenerator::WriteDefault(std::ostream& os,
@@ -802,7 +802,7 @@ void cmGlobalFastbuildGenerator::WriteDefault(std::ostream& os,
                                           const std::string& comment)
 {
   cmGlobalFastbuildGenerator::WriteComment(os, comment);
-  os << "// NINJA default";
+//os << "// NINJA default";
   for (std::string const& target : targets) {
     os << " " << target;
   }
@@ -1849,7 +1849,7 @@ void cmGlobalFastbuildGenerator::AddTargetAlias(const std::string& alias,
 void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "// NINJA Target aliases.\n\n";
+//os << "// NINJA Target aliases.\n\n";
   cmFastbuildBuild build("phony");
   build.Outputs.emplace_back();
   for (auto const& ta : this->TargetAliases) {
@@ -1936,7 +1936,7 @@ void cmGlobalFastbuildGenerator::WriteTargetAliases(std::ostream& os)
 void cmGlobalFastbuildGenerator::WriteFolderTargets(std::ostream& os)
 {
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "// NINJA Folder targets.\n\n";
+//os << "// NINJA Folder targets.\n\n";
 
   std::map<std::string, DirectoryTarget> dirTargets =
     this->ComputeDirectoryTargets();
@@ -2138,8 +2138,8 @@ void cmGlobalFastbuildGenerator::WriteBuiltinTargets(std::ostream& os)
 {
   // Write headers.
   cmGlobalFastbuildGenerator::WriteDivider(os);
-  os << "// NINJA Built-in targets\n\n";
-
+//os << "// NINJA Built-in targets\n\n";
+  /*
   this->WriteTargetRebuildManifest(os);
   this->WriteTargetClean(os);
   this->WriteTargetHelp(os);
@@ -2151,7 +2151,7 @@ void cmGlobalFastbuildGenerator::WriteBuiltinTargets(std::ostream& os)
 
   if (!this->DefaultFileConfig.empty()) {
     this->WriteTargetDefault(*this->GetDefaultFileStream());
-  }
+  }*/
 }
 
 void cmGlobalFastbuildGenerator::WriteTargetDefault(std::ostream& os)
@@ -3123,9 +3123,9 @@ bool cmGlobalFastbuildMultiGenerator::OpenBuildFileStreams()
                            << "\n\n";
 
   // Write a comment about this file.
-  *this->CommonFileStream
-    << "// NINJA This file contains build statements common to all "
-       "configurations.\n\n";
+//*this->CommonFileStream
+  //<< "// NINJA This file contains build statements common to all "
+  //   "configurations.\n\n";
 
   auto const& configs =
     this->Makefiles[0]->GetGeneratorConfigs(cmMakefile::IncludeEmptyConfig);
@@ -3138,9 +3138,9 @@ bool cmGlobalFastbuildMultiGenerator::OpenBuildFileStreams()
       }
 
       // Write a comment about this file.
-      *this->ImplFileStreams[config]
-        << "// NINJA This file contains build statements specific to the \"" << config
-        << "\"\n// configuration.\n\n";
+    //*this->ImplFileStreams[config]
+      //<< "// NINJA This file contains build statements specific to the \"" << config
+      //<< "\"\n// configuration.\n\n";
 
       // Open config file.
       if (!this->OpenFileStream(this->ConfigFileStreams[config],

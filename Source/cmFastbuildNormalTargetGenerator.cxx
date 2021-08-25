@@ -861,11 +861,16 @@ std::string cmFastbuildNormalTargetGenerator::GetLinkFlagsFB(
              this->GetGeneratorTarget()->GetPDBName(config));
 
   auto output_info = this->GetGeneratorTarget()->GetOutputInfo(config);
-  std::string implib;
+  std::string output_name;
+  if (compilerId == "GNU" || compilerId == "Clang") {
+    output_name = cmStrCat(this->GetShortOutputName(config), ".a");
+  } else {
+    output_name = cmStrCat(this->GetShortOutputName(config), ".lib");
+  }
+  std::string implib = cmStrCat(output_info->ImpDir, "/", output_name);
 
   // Create the suite of link options
   if(compilerId == "MSVC"){
-    implib = cmStrCat(output_info->ImpDir, "/", target_name, ".lib");
     cmake_arguments += "-E vs_link_exe ";
     cmake_arguments +=
       cmStrCat(" --intdir=", this->GetGeneratorTarget()->GetSupportDirectory());
@@ -890,8 +895,6 @@ std::string cmFastbuildNormalTargetGenerator::GetLinkFlagsFB(
     cmake_arguments += linkLibs;
   }
   else if (compilerId == "GNU" || compilerId == "Clang"){
-    implib =
-      cmStrCat(output_info->ImpDir, "/lib", target_name, ".a");
     cmake_arguments += " $FB_INPUT_1_PLACEHOLDER$";      // %1
     cmake_arguments += " -o $FB_INPUT_2_PLACEHOLDER$ ";  // %2
     //cmake_arguments += cmStrCat(" -l ", implib);
@@ -908,7 +911,7 @@ std::string cmFastbuildNormalTargetGenerator::GetShortOutputName(
   cmGlobalFastbuildGenerator* gfb = this->GetGlobalGenerator();
   std::string full_name = this->GetGeneratorTarget()->GetFullName(config);
   std::string output_name = full_name;
-  int found = full_name.rfind(".");
+  int found = full_name.find(".");
   if(found != std::string::npos){
     output_name = full_name.substr(0, found);
   }
@@ -971,10 +974,10 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
                              this->ReplaceDashWith_(this->GetTargetName())));
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker_command));
   gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
-  if (!listTargetDeps.empty()) {
+  /*if (!listTargetDeps.empty()) {
     gfb->WriteVariableFB(os, "Libraries2",
                          cmStrCat("{ ", listTargetDeps, " }"));
-  }
+  }*/
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(cmStrCat(target_output, "/", output_full_name)));
@@ -1047,14 +1050,18 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   std::string alias_name;
 
   // Determine the different names to use
+  std::string suffix_lib = "lib";
+  if (this->GetGeneratorTarget()->GetType() != cmStateEnums::STATIC_LIBRARY)
+    suffix_lib = "slib";
+
   if (!isMultiConfig) {
-    library_name = cmStrCat(short_name, "-lib");
+    library_name = cmStrCat(short_name, "-", suffix_lib);
     objectList_name = cmStrCat(short_name, "-obj");
-    alias_name = cmStrCat(short_name, "-lib-deps");
+    alias_name = cmStrCat(short_name, "-", suffix_lib, "-deps");
   } else {
-    library_name = cmStrCat(short_name, "-lib-", config);
+    library_name = cmStrCat(short_name, "-", suffix_lib, "-", config);
     objectList_name = cmStrCat(short_name, "-obj-", config);
-    alias_name = cmStrCat(short_name, "-lib-", config, "-deps");
+    alias_name = cmStrCat(short_name, "-", suffix_lib, "-", config, "-deps");
   }
 
   // Get the targets dependencies
@@ -1128,14 +1135,14 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   // Determine the different names to use
   if (!isMultiConfig) {
     objectList_name = cmStrCat(short_name, "-obj");
-    library_name = cmStrCat(short_name, "-lib");
-    dll_name = cmStrCat(short_name, "-dll");
-    alias_name = cmStrCat(short_name, "-dll-deps");
+    library_name = cmStrCat(short_name, "-slib");
+    dll_name = cmStrCat(short_name, "-lib");
+    alias_name = cmStrCat(short_name, "-lib-deps");
   } else {
     objectList_name = cmStrCat(short_name, "-obj-", config);
-    library_name = cmStrCat(short_name, "-lib-", config);
-    dll_name = cmStrCat(short_name, "-dll-", config);
-    alias_name = cmStrCat(short_name, "-dll-", config, "-deps");
+    library_name = cmStrCat(short_name, "-slib-", config);
+    dll_name = cmStrCat(short_name, "-lib-", config);
+    alias_name = cmStrCat(short_name, "-lib-", config, "-deps");
   }
 
   // Write in file .bff for create static library

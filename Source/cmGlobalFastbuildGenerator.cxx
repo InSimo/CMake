@@ -231,6 +231,16 @@ void cmGlobalFastbuildGenerator::WriteAliasFB(std::ostream& os,
   this->WritePopScope(os);
 }
 
+void cmGlobalFastbuildGenerator::AddTargetsFastbuildToWrite(
+  std::string typeToWrite, std::string name, std::string libraries,
+  std::string dependencies,
+  const std::string& config)
+{
+  std::vector<std::string> targetToWrite = { typeToWrite, name, libraries,
+                                             dependencies, config };
+  TargetsFastbuildToWrite.push_back(targetToWrite);
+}
+
 void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, std::vector<std::string> name_target_deps, const std::string& config)
 {
   std::string target_name = cmStrCat(
@@ -247,12 +257,6 @@ void cmGlobalFastbuildGenerator::AddFastbuildInfoTarget(cmGeneratorTarget* gt, s
       GetNumberUntratedDepsTarget(target_name, name_target_deps);
     fbt.gt = gt;
     this->MapFastbuildInfoTargets.insert(std::make_pair(target_name, fbt));
-    this->WriteSectionHeader(this->GetFileStream(config, this->IsMultiConfig()), cmStrCat("NAME : ", target_name));
-    for (auto a : name_target_deps) {
-      this->WriteSectionHeader(
-        this->GetFileStream(config, this->IsMultiConfig()),
-                               cmStrCat("TARGET DEPS : ", a));
-    }
   }
 }
 
@@ -680,7 +684,7 @@ void cmGlobalFastbuildGenerator::WriteCustomCommandBuildFB(
   */
 
   // Alias
-  std::string alias_name = cmStrCat(name_exec, "-deps");
+  std::string alias_name = cmStrCat(name_exec, "_deps");
   this->AddTargetAliasFB(this->Quote(alias_name), this->Quote(name_exec),
                            config, excludeFromAll);
 }
@@ -900,6 +904,7 @@ void cmGlobalFastbuildGenerator::Generate()
   this->WritePlaceholders(*this->GetCommonFileStream());
   this->cmGlobalGenerator::Generate();
   this->lastChanceToTreatTargets();
+  this->WriteTargetsFastbuildToWrite();
   this->WriteTargetAliasesFB();
   this->PrintAllTargetWithNbDeps();
 
@@ -961,6 +966,134 @@ void cmGlobalFastbuildGenerator::WriteSettings(std::ostream& os)
   WritePushScope(os);
   WriteArray(os, "Environment", env);
   WritePopScope(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetsFastbuildToWrite()
+{
+  for (std::vector<std::string> targetToWrite : TargetsFastbuildToWrite) {
+    // We need the five info
+    if (targetToWrite.size() != 5) {
+      continue;
+    }
+    std::string typeToWrite = targetToWrite[0];
+    if (typeToWrite == "Obj") {
+      this->WriteTargetObjectLists(targetToWrite);
+    } else if (typeToWrite == "Exe") {
+      this->WriteTargetExecutable(targetToWrite);
+    } else if (typeToWrite == "Lib") {
+      this->WriteTargetLibrary(targetToWrite);
+    } else if (typeToWrite == "Dll") {
+      this->WriteTargetDLL(targetToWrite);
+    }
+  }
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetObjectLists(
+  std::vector<std::string> targetToWrite)
+{
+  std::string under_objectList_name = targetToWrite[1];
+  std::string listTargetDeps = targetToWrite[3];
+  std::string config = targetToWrite[4];
+
+  std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
+
+  // the last character is the number of under ObjectList that there is
+  int found = under_objectList_name.rfind("_");
+  std::string strNbObjectList =
+    under_objectList_name.substr(found + 1, under_objectList_name.size() - found);
+  int nbObjectList = stoi(strNbObjectList);
+  std::string under_objectLists = this->Quote(under_objectList_name);
+  std::string objectList_name = under_objectList_name.substr(0, found+1);
+  for (int i = 1; i <= nbObjectList; i++) {
+    std::string nb = std::to_string(i);
+    std::string objectList_name_nb = objectList_name + nb;
+    this->WriteTargetObjectList(os, objectList_name_nb, listTargetDeps);
+    under_objectLists += this->Quote(objectList_name_nb);
+  }
+
+  std::string alias_name =
+    under_objectList_name.substr(0, found);
+  this->WriteAliasFB(os, this->Quote(alias_name), under_objectLists);
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetObjectList(
+  std::ostream& os, std::string under_objectList_name,
+  std::string listTargetDeps)
+{
+  // Write in file .bff for create objects files
+  this->WriteCommand(os, "ObjectList", this->Quote(under_objectList_name));
+  this->WritePushScope(os);
+  this->WriteCommand(os, "Using", cmStrCat(".Obj", under_objectList_name));
+  if (!listTargetDeps.empty())
+    this->WriteVariableFB(os, "PreBuildDependencies",
+                         cmStrCat("{ ", listTargetDeps, " }"));
+  this->WritePopScope(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetExecutable(
+  std::vector<std::string> targetToWrite)
+{
+  std::string executable_name = targetToWrite[1];
+  std::string objectList_name = targetToWrite[2];
+  std::string listTargetDeps = targetToWrite[3];
+  std::string config = targetToWrite[4];
+
+  std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
+
+  // Write in file .bff for create executable
+  this->WriteCommand(os, "Executable", this->Quote(executable_name));
+  this->WritePushScope(os);
+  this->WriteCommand(os, "Using", cmStrCat(".Exe", executable_name));
+  this->WriteVariableFB(os, "Libraries", this->Quote(objectList_name));
+  if (!listTargetDeps.empty())
+    this->WriteVariableFB(os, "PreBuildDependencies",
+                         cmStrCat("{ ", listTargetDeps, " }"));
+  this->WritePopScope(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetLibrary(
+  std::vector<std::string> targetToWrite)
+{
+  std::string library_name = targetToWrite[1];
+  std::string objectList_name = targetToWrite[2];
+  std::string listTargetDeps = targetToWrite[3];
+  std::string config = targetToWrite[4];
+
+  std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
+
+  // Write in file .bff for create static library
+  this->WriteCommand(os, "Library", this->Quote(library_name));
+  this->WritePushScope(os);
+  this->WriteCommand(os, "Using", cmStrCat(".Lib", library_name));
+  this->WriteVariableFB(os, "LibrarianAdditionalInputs",
+                       cmStrCat("{ \"", objectList_name, "\" }"));
+  if (!listTargetDeps.empty()) {
+    this->WriteVariableFB(os, "PreBuildDependencies",
+                         cmStrCat("{ ", listTargetDeps, " }"));
+  }
+  this->WritePopScope(os);
+}
+
+void cmGlobalFastbuildGenerator::WriteTargetDLL(
+  std::vector<std::string> targetToWrite)
+{
+  std::string dll_name = targetToWrite[1];
+  std::string library_name = targetToWrite[2];
+  std::string listTargetDeps = targetToWrite[3];
+  std::string config = targetToWrite[4];
+
+  std::ostream& os = this->GetFileStream(config, this->IsMultiConfig());
+
+  // Write in file .bff for create dynamic library
+  this->WriteCommand(os, "DLL", this->Quote(dll_name));
+  this->WritePushScope(os);
+  this->WriteCommand(os, "Using", cmStrCat(".Dll", dll_name));
+  this->WriteVariableFB(os, "Libraries",
+                        cmStrCat("{ ", this->Quote(library_name), " }"));
+  if (!listTargetDeps.empty())
+    this->WriteVariableFB(os, "PreBuildDependencies",
+                       cmStrCat("{ ", listTargetDeps, " }"));
+  this->WritePopScope(os);
 }
 
 void cmGlobalFastbuildGenerator::CleanMetaData()

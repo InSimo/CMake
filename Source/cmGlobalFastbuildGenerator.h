@@ -489,6 +489,10 @@ public:
   void WriteAliasFB(std::ostream& os, const std::string& name_alias,
                     const std::string& targets);
 
+  void AddTargetsFastbuildToWrite(std::string typeToWrite, std::string name, std::string libraries,
+                                  std::string dependencies,
+                                  const std::string& config);
+
   void AddFastbuildInfoTarget(cmGeneratorTarget* gt,  std::vector<std::string> name_target_deps, const std::string& config);
 
   int GetNumberUntratedDepsTarget(std::string target_name, std::vector<std::string> name_target_deps);
@@ -516,6 +520,8 @@ public:
     std::string config;
   };
 
+  std::vector<std::vector<std::string>> TargetsFastbuildToWrite;
+
   std::map<std::string, cmFastbuildInfoTarget> MapFastbuildInfoTargets;
 
   std::string GetDefaultFileConfig()
@@ -531,6 +537,24 @@ protected:
   void WritePlaceholders(std::ostream& os);
 
   void WriteSettings(std::ostream& os);
+
+  void WriteTargetsFastbuildToWrite();
+
+  void cmGlobalFastbuildGenerator::WriteTargetObjectLists(
+    std::vector<std::string> targetToWrite);
+
+  void cmGlobalFastbuildGenerator::WriteTargetObjectList(
+    std::ostream& os, std::string under_objectList_name,
+    std::string listTargetDeps);
+
+  void cmGlobalFastbuildGenerator::WriteTargetExecutable(
+    std::vector<std::string> targetToWrite);
+
+  void cmGlobalFastbuildGenerator::WriteTargetLibrary(
+    std::vector<std::string> targetToWrite);
+
+  void cmGlobalFastbuildGenerator::WriteTargetDLL(
+    std::vector<std::string> targetToWrite);
 
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }
 

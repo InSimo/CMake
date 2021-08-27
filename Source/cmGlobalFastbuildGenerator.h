@@ -540,20 +540,20 @@ protected:
 
   void WriteTargetsFastbuildToWrite();
 
-  void cmGlobalFastbuildGenerator::WriteTargetObjectLists(
+  void WriteTargetObjectLists(
     std::vector<std::string> targetToWrite);
 
-  void cmGlobalFastbuildGenerator::WriteTargetObjectList(
+  void WriteTargetObjectList(
     std::ostream& os, std::string under_objectList_name,
     std::string listTargetDeps);
 
-  void cmGlobalFastbuildGenerator::WriteTargetExecutable(
+  void WriteTargetExecutable(
     std::vector<std::string> targetToWrite);
 
-  void cmGlobalFastbuildGenerator::WriteTargetLibrary(
+  void WriteTargetLibrary(
     std::vector<std::string> targetToWrite);
 
-  void cmGlobalFastbuildGenerator::WriteTargetDLL(
+  void WriteTargetDLL(
     std::vector<std::string> targetToWrite);
 
   bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const override { return true; }

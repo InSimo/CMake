@@ -257,8 +257,7 @@ std::string cmFastbuildNormalTargetGenerator::GetNameTargetLibrary(
     nameTarget = nameFile.substr(0, found_point);
     if (nameFile.substr(found_point, 4) == ".lib" || nameFile.substr(found_point, 2) == ".a"){
       nameTarget = cmStrCat(nameTarget, "_lib");
-    }
-    else if (nameFile.substr(found_point, 3) == ".so"){
+    } else if (nameFile.find(".so") != std::string::npos) {
       nameTarget = cmStrCat(nameTarget, "_dll");
     }
     else if (nameFile.substr(found_point, 9) == ".manifest") {
@@ -306,13 +305,13 @@ std::string cmFastbuildNormalTargetGenerator::RemoveBackslashBeforeDoubleRib(std
   return str;
 }
 
-std::string cmFastbuildNormalTargetGenerator::ReplaceDashWith_(
+std::string cmFastbuildNormalTargetGenerator::ReplaceDashWithUnderscores(
   std::string str)
 {
   // Files .bff don't accept name with "-" in
   auto it = str.find("-");
   while (it != std::string::npos) {
-    str.replace(it, 1, "_");
+    str.replace(it, 1, "__");
     it = str.find("-");
   }
   return str;
@@ -581,7 +580,7 @@ void cmFastbuildNormalTargetGenerator::WriteCompileFB(const std::string& config)
   gfb->WriteSectionHeader(os, "Info Compilers");
   gfb->WriteVariableFB(
     os,
-    cmStrCat("Compiler", lang, config, this->ReplaceDashWith_(project_name)),
+    cmStrCat("Compiler", lang, config, this->ReplaceDashWithUnderscores(project_name)),
                        "");
   gfb->WritePushScopeStruct(os);
   gfb->WriteVariableFB(os, "Compiler", gfb->Quote(lang));
@@ -614,12 +613,6 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   std::ostream& os = gfb->GetFileStream(config, gfb->IsMultiConfig());
   std::string language = this->GetGeneratorTarget()->GetLinkerLanguage(config);
   std::string const& compilerId = this->GetCompilerId(config);
-  /*
-  std::vector<cmSourceFile const*> headerSources;
-  this->GeneratorTarget->GetHeaderSources(headerSources, config);
-  for(auto sa : headerSources){
-    gfb->WriteSectionHeader(os, cmStrCat("HEADER SOURCES : ", sa->GetFullPath()));
-  }*/
 
   std::vector<cmSourceFile const*> objectSources;
   this->GeneratorTarget->GetObjectSources(objectSources, config);
@@ -720,8 +713,8 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
   this->WriteObjectListFB(config, language, under_objectList_name, objectList,
                           compilerOptions, output_object_path, extension);
   
-
-  gfb->AddTargetsFastbuildToWrite("Obj", under_objectList_name, "",
+  // Gives the information to write the corresponding Fastbuild function later
+  gfb->AddTargetsFastbuildToWrite("Obj", under_objectList_name, "", "",
                                   this->GetUiFileDependencies(config), config);
 
   // Alias
@@ -730,9 +723,6 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListsFB(const std::string& con
     under_objectLists +=
       gfb->Quote(cmStrCat(objectList_name, "_", std::to_string(i)));
   }
-  //if (!isObjectLibrary)
-  //  gfb->WriteAliasFB(os, gfb->Quote(objectList_name), under_objectLists);
-  //else {
   if (isObjectLibrary){
     bool excludeFromAll = false;
     gfb->AddTargetAliasFB(gfb->Quote(cmStrCat(objectList_name, "_deps")),
@@ -790,7 +780,7 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
       // Obtain the information compilers corresponding to the language of the target
       var_info_compile =
         cmStrCat(".Compiler", lang, config,
-                 this->ReplaceDashWith_(this->GetTargetName()));
+                 this->ReplaceDashWithUnderscores(this->GetTargetName()));
     }
   }
 
@@ -800,8 +790,6 @@ void cmFastbuildNormalTargetGenerator::WriteObjectListFB(
     extension = cmStrCat(".", extension_lang, extension);
 
   // Write in file .bff for create info objects files
-  //gfb->WriteCommand(os, "ObjectList", gfb->Quote(under_objectList_name));
-  //gfb->WritePushScope(os);
   gfb->WriteVariableFB(os, cmStrCat("Obj", under_objectList_name),
                        "");
   gfb->WritePushScopeStruct(os);
@@ -844,13 +832,6 @@ void cmFastbuildNormalTargetGenerator::GetTargetFlagsFB(
   localGen.GetTargetFlags(linkLineComputer.get(), config, linkLibs, flags,
                           linkFlags, frameworkPath, linkPath,
                           this->GetGeneratorTarget());
-  /* // TMP
-  gfb->WriteSectionHeader(os,
-                          cmStrCat("GetTargetFlags linkLibs : ", linkLibs));
-  gfb->WriteSectionHeader(os, cmStrCat("GetTargetFlags flags : ", flags));
-  gfb->WriteSectionHeader(os,
-                          cmStrCat("GetTargetFlags linkFlags : ", linkFlags));
-  */
 }
 
 std::string cmFastbuildNormalTargetGenerator::GetLinkFlagsFB(
@@ -923,7 +904,7 @@ std::string cmFastbuildNormalTargetGenerator::GetShortOutputName(
   if(found != std::string::npos){
     output_name = full_name.substr(0, found);
   }
-  return this->ReplaceDashWith_(output_name);
+  return this->ReplaceDashWithUnderscores(output_name);
 }
 
 void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
@@ -974,25 +955,21 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
   std::string arguments = this->GetLinkFlagsFB(config, language, target_name);
 
   // Write in file .bff for create info executable
-  //gfb->WriteCommand(os, "Executable", gfb->Quote(executable_name));
-  //gfb->WritePushScope(os);
   gfb->WriteVariableFB(os, cmStrCat("Exe", executable_name), "");
   gfb->WritePushScopeStruct(os);
   gfb->WriteCommand(os, "Using",
                     cmStrCat(".Compiler", language, config,
-                             this->ReplaceDashWith_(this->GetTargetName())));
+                             this->ReplaceDashWithUnderscores(this->GetTargetName())));
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker_command));
-  //gfb->WriteVariableFB(os, "Libraries", gfb->Quote(objectList_name));
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(cmStrCat(target_output, "/", output_full_name)));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
-  //if (!listTargetDeps.empty())
-  //  gfb->WriteVariableFB(os, "PreBuildDependencies",
-  //                       cmStrCat("{ ", listTargetDeps, " }"));
   gfb->WritePopScope(os);
 
+  // Gives the information to write the corresponding Fastbuild function later
   gfb->AddTargetsFastbuildToWrite("Exe", executable_name, objectList_name,
+                                  listTargetDeps,
                                   cmStrCat(this->GetUiFileDependencies(config), listTargetDeps), config);
 
   // Alias
@@ -1014,8 +991,6 @@ void cmFastbuildNormalTargetGenerator::WriteExecutableFB(
     // Have the good name alias for success cmake basic test with Multi-Config
     gfb->AddTargetAliasFB(gfb->Quote(target_name), gfb->Quote(executable_name),
                           config, true);
-    //gfb->WriteAliasFB(os, gfb->Quote(target_name),
-    //                  gfb->Quote(executable_name));
   }
 }
 
@@ -1078,20 +1053,11 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   }
 
   // Write in file .bff for create info static library
-  //gfb->WriteCommand(os, "Library", gfb->Quote(library_name));
-  //gfb->WritePushScope(os);
   gfb->WriteVariableFB(os, cmStrCat("Lib", library_name), "");
   gfb->WritePushScopeStruct(os);
-  gfb->WriteCommand(
-    os, "Using",
+  gfb->WriteCommand(os, "Using",
                     cmStrCat(".Compiler", language, config,
-                             this->ReplaceDashWith_(this->GetTargetName())));
-  //gfb->WriteVariableFB(os, "LibrarianAdditionalInputs",
-  //                     cmStrCat("{ \"", objectList_name, "\" }"));
-  //if (!listTargetDeps.empty()) {
-  //  gfb->WriteVariableFB(os, "PreBuildDependencies",
-  //                       cmStrCat("{ ", listTargetDeps, " }"));
-  //}
+                             this->ReplaceDashWithUnderscores(this->GetTargetName())));
   gfb->WriteVariableFB(
     os, "LibrarianOutput", gfb->Quote(library_output));
   if(!librarian.empty()){
@@ -1104,8 +1070,9 @@ void cmFastbuildNormalTargetGenerator::WriteLibraryFB(
   }
   gfb->WritePopScope(os);
 
-  gfb->AddTargetsFastbuildToWrite("Lib", library_name, objectList_name,
-                                  cmStrCat(this->GetUiFileDependencies(config), listTargetDeps), config);
+  // Gives the information to write the corresponding Fastbuild function later
+  gfb->AddTargetsFastbuildToWrite(
+    "Lib", library_name, gfb->Quote(objectList_name), listTargetDeps, this->GetUiFileDependencies(config), config);
 
   // Alias
   if (this->GetGeneratorTarget()->GetType() == cmStateEnums::STATIC_LIBRARY) {
@@ -1192,26 +1159,22 @@ void cmFastbuildNormalTargetGenerator::WriteDLLFB(const std::string& config)
   for (std::string implicitDep : implicitDeps) {
     listImplicitDeps += gfb->Quote(implicitDep);
   }
-  std::string listDeps = listImplicitDeps + gfb->Quote(library_name);
+  std::string listDeps = listImplicitDeps;
   
   // Write in file .bff for create info dynamic library
-  //gfb->WriteCommand(os, "DLL", gfb->Quote(dll_name));
-  //gfb->WritePushScope(os);
   gfb->WriteVariableFB(os, cmStrCat("Dll", dll_name), "");
   gfb->WritePushScopeStruct(os);
   gfb->WriteVariableFB(os, "Linker", gfb->Quote(linker_command));
   gfb->WriteVariableFB(os, "LinkerOptions", gfb->Quote(arguments));
-  //gfb->WriteVariableFB(os, "Libraries",
-  //                     cmStrCat("{ ", gfb->Quote(library_name), " }"));
   gfb->WriteVariableFB(
     os, "LinkerOutput",
     gfb->Quote(output_dll));
-  //if (!listDeps.empty()) gfb->WriteVariableFB(os, "PreBuildDependencies",
-  //                     cmStrCat("{ ", listDeps, " }"));
   gfb->WritePopScope(os);
 
-  gfb->AddTargetsFastbuildToWrite("Dll", dll_name, library_name,
-                                  cmStrCat(this->GetUiFileDependencies(config), listDeps), config);
+  // Gives the information to write the corresponding Fastbuild function later
+  gfb->AddTargetsFastbuildToWrite(
+    "Dll", dll_name, library_name, "",
+    cmStrCat(this->GetUiFileDependencies(config), listDeps, gfb->Quote(library_name)), config);
 
   // Alias
   bool excludeFromAll = false;

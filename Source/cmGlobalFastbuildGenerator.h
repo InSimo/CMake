@@ -489,7 +489,7 @@ public:
   void WriteAliasFB(std::ostream& os, const std::string& name_alias,
                     const std::string& targets);
 
-  void AddTargetsFastbuildToWrite(std::string typeToWrite, std::string name, std::string libraries,
+  void AddTargetsFastbuildToWrite(std::string typeToWrite, std::string name, std::string libraries, std::string libraries2,
                                   std::string dependencies,
                                   const std::string& config);
 

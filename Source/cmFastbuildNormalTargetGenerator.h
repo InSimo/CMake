@@ -41,7 +41,7 @@ public:
 
   static std::string RemoveBackslashBeforeDoubleRib(std::string str);
 
-  static std::string cmFastbuildNormalTargetGenerator::ReplaceDashWith_(
+  static std::string cmFastbuildNormalTargetGenerator::ReplaceDashWithUnderscores(
     std::string str);
 
   static std::string GetGccClangCompilerOptionsFB(std::string compilerId);
